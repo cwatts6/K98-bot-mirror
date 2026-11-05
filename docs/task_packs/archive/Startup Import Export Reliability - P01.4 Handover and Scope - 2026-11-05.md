@@ -1,3 +1,5 @@
+> **Archived 5 November 2026.** Completed or superseded delivery record; dated holds and pending statements below are historical. Current outcome: [P01.4 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Closeout%20-%202026-11-05.md); remaining checks: [natural acceptance](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md); next work: [P01.5 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 # P01.4 handover and scope: upload outcomes and optional queue audit
 
 > **Current E91, 5 November 2026:** The [complete local qualification receipt](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md) records the full original P01.4 design implemented and qualified locally, with both optional workers enabled in the unpublished candidate. Cost, physical-drain, diagnostic-priority, updater, regression and Changes-review gates passed. No CSV scope was deferred. Publication/deployment and natural-activity acceptance remain outstanding; earlier E88-E90 disabled/pending statements below are historical. Existing changes and archive moves are preserved.
@@ -73,11 +75,11 @@ Preserve and carry forward the complete documentation/archive manifest in the ne
 
 ## Related records
 
-- [P01.3 closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md)
-- [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md)
-- [programme scope](Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md)
-- [tracker](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md)
-- [P01 design](Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md)
-- [P01.3 design and qualification](archive/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Design%20and%20Qualification%20-%202026-11-04.md)
-- [implementation receipt](archive/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md)
-- [ZIP correction](archive/P01.3%20Complete%20ZIP%20Health%20Correction%20-%202026-11-05.md)
+- [P01.3 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md)
+- [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md)
+- [programme scope](../Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md)
+- [tracker](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md)
+- [P01 design](../Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md)
+- [P01.3 design and qualification](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Design%20and%20Qualification%20-%202026-11-04.md)
+- [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md)
+- [ZIP correction](P01.3%20Complete%20ZIP%20Health%20Correction%20-%202026-11-05.md)

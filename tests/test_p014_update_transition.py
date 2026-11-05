@@ -7,11 +7,12 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_p015_hash
 
 
 def test_all_63_historical_transitions_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 64
+    assert len(entries) == 65
     assert hashlib.sha256(json.dumps(entries[:63], sort_keys=True).encode()).hexdigest() == (
         "3f7521d55f8836769937a921b45afe58b0aacd506d00709872ef8f5759d48ea2"
     )
@@ -29,7 +30,8 @@ def pair(monkeypatch):
     for member in transition["members"]:
         path = member["path"]
         after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert hashlib.sha256(after[path]).hexdigest() == member["after_sha256"], path
+        assert before_p015_hash(root, path) == member["after_sha256"], path
+        known[after[path]] = member["after_sha256"]
         if member["before_sha256"] == member["after_sha256"]:
             before[path] = after[path]
         elif member["before_sha256"] is None:
@@ -87,7 +89,9 @@ def test_registry_family_and_count_remain_fixed(monkeypatch, damage):
     registry = json.loads(
         Path(updater.__file__).with_name("k98_update_transitions.json").read_bytes()
     )
-    item = registry["transitions"][-1]
+    item = next(
+        t for t in registry["transitions"] if t["id"] == "p014_upload_outcomes_optional_io_v1"
+    )
     if damage == "missing_member":
         item["members"].pop()
     elif damage == "extra_transition":

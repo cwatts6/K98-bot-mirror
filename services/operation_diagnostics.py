@@ -32,6 +32,11 @@ SLOTS = {
     "terminal",
 }
 V2_FIELDS = {
+    "calendar_written",
+    "calendar_effect",
+    "calendar_cleanup",
+    "calendar_primary",
+    "calendar_index",
     "schema",
     "event_id",
     "sequence",
@@ -61,6 +66,9 @@ V2_FIELDS = {
     "diagnostic_loss",
 }
 NEW_STAGES = {
+    "calendar_sync",
+    "calendar_generate",
+    "calendar_publish",
     "rehydrate_tracked_views",
     "rehydrate_vote_post_views",
     "rehydrate_survey_post_views",
@@ -721,6 +729,7 @@ class DiagnosticSink:
                 "unattempted",
                 "outcome_unconfirmed",
                 "diagnostic_loss",
+                "calendar_written",
             }:
                 if type(value) not in (int, float) or not 0 <= value <= 1e20:
                     raise ValueError("Invalid diagnostic number")
@@ -740,6 +749,19 @@ class DiagnosticSink:
         if event.get("stage") not in STAGES or event.get("state") not in STATES:
             raise ValueError("Unknown diagnostic stage/state")
         for key, values in {
+            "calendar_effect": {
+                "not_started",
+                "running",
+                "committed",
+                "rolled_back",
+                "unknown",
+                "failed_before_effects",
+                "not_applicable",
+                "unavailable",
+            },
+            "calendar_cleanup": {"not_needed", "pending", "settled", "unconfirmed"},
+            "calendar_primary": {"not_attempted", "new", "preserved", "unknown"},
+            "calendar_index": {"not_attempted", "same_payload", "old_or_unknown"},
             "value_kind": {"unavailable", "boolean", "none", "dict", "tuple", "list"},
             "value_meaning": {"unclassified_return"},
             "feature_outcome": {"succeeded", "partial", "failed", "unknown", "not_checked"},
@@ -990,7 +1012,10 @@ class DiagnosticSink:
                 parts.append(part)
                 hasher.update(part)
                 if index % 16 == 15:
-                    time.sleep(0)
+                    # Windows Sleep(0) can immediately reacquire the GIL across
+                    # an entire busy batch. A finite sink-only pause gives ready
+                    # callbacks a scheduling opportunity; producers never wait.
+                    time.sleep(0.001)
             digest = hasher.hexdigest()
             attempt = dict(attempt, target_sha256=digest)
             self.publication = {**self.publication, version: attempt}
@@ -1155,7 +1180,7 @@ class DiagnosticSink:
                 if index % 16 == 15:
                     # Yield the sink's batch to ready business/event-loop threads.
                     # No producer waits here and close still drains every event.
-                    time.sleep(0)
+                    time.sleep(0.001)
             for event in self.uploads.take(64 if closed else 16):
                 try:
                     self._accept(event)

@@ -3015,6 +3015,141 @@
           "after_sha256": "08bd7fa5bb70cdd0f69bbafbb1971f82308913092795dee86e7cd4c27b0047b6"
         }
       ]
+    },
+    {
+      "id": "p015_calendar_ownership_v1",
+      "members": [
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "6d0f9bcea09590c7635a65a8652683dfec59e2b03b36d937e312c12949e5b2d7",
+          "after_sha256": "f86b9f1c48b4fe0dc2be41b01622a362e1b78f1a0c7b767244889bfcafaa0a4b"
+        },
+        {
+          "path": "commands/admin_cmds.py",
+          "before_sha256": "49ac660beee8d80027990046c71b49650370b5226fdc37a518cf6e79526d3f97",
+          "after_sha256": "9441ab987b5f6909736779c38f045b8da01f0ca325e03a75b9b59bb9580024f4"
+        },
+        {
+          "path": "constants.py",
+          "before_sha256": "704f7f046778f54c634543c14979989fdbcd9f099444bbc0b6daf684fedb4e07",
+          "after_sha256": "704f7f046778f54c634543c14979989fdbcd9f099444bbc0b6daf684fedb4e07"
+        },
+        {
+          "path": "core/operation_evidence.py",
+          "before_sha256": "6071ec9adc84273b3d0ef2cb69e36ec74f6c7dcedc623eed521cf83c29ebd559",
+          "after_sha256": "d95e7f6f9031777b73c69611105e483e02580a22aea1705d2d6fd9f0bc52fe5b"
+        },
+        {
+          "path": "core/operation_timing.py",
+          "before_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52",
+          "after_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52"
+        },
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "ee9371ead0616d762fcffca49e72102fc6ef9c549bc3d14e01d1fb901719e7c7",
+          "after_sha256": "ee9371ead0616d762fcffca49e72102fc6ef9c549bc3d14e01d1fb901719e7c7"
+        },
+        {
+          "path": "core/scheduler_lifecycle.py",
+          "before_sha256": "66c718b5d5ed249d929f14e779299cdc93367b8f5664bff17f4f886f9345cfe3",
+          "after_sha256": "66c718b5d5ed249d929f14e779299cdc93367b8f5664bff17f4f886f9345cfe3"
+        },
+        {
+          "path": "event_calendar/audit_dal.py",
+          "before_sha256": null,
+          "after_sha256": "467d5a3a367bc2a835e77d89c02ce4bdf0b4186ab907f69426fedca16fc1d047"
+        },
+        {
+          "path": "event_calendar/cache_publisher.py",
+          "before_sha256": "0d34c99778c83cfec80e3a78511ae91e69eec8e4c61f6ffaf809234017d278c8",
+          "after_sha256": "f372dac0f17f6f0f6b60402bfa3af993da170e2adb5a1a3614c6292ce0de4261"
+        },
+        {
+          "path": "event_calendar/event_generator.py",
+          "before_sha256": "0644c63efc23cbf76e125490a7003440d4d4e94775300d62909ae81812f43779",
+          "after_sha256": "17ce5958ad727d626a916e6331f308b44419d0e17c0ec2cfc96cf4a0787a70c3"
+        },
+        {
+          "path": "event_calendar/mutation_owner.py",
+          "before_sha256": null,
+          "after_sha256": "172270c722368a46134ebcceb9f4389c36663269492cd6426f04d1cbd4784018"
+        },
+        {
+          "path": "event_calendar/scheduler.py",
+          "before_sha256": "bd1bc175a91b61fd540a20037286847c4fd5fe3d7095fc504678a8ad4f5a60b6",
+          "after_sha256": "00311ee1e021f57b58a37e5408c3adc38e896ed9d9a44ead543aab52f6679cc7"
+        },
+        {
+          "path": "event_calendar/service.py",
+          "before_sha256": "25f380198dbe4d9f28335fa5a5787e26876cf6b03bb93471692d4aa091062ca5",
+          "after_sha256": "7d1365806246e75937480f6cafaff79aec4d5e3dc3211dcc0b4471a51f4e48e1"
+        },
+        {
+          "path": "event_calendar/sheets_sync.py",
+          "before_sha256": "83d8f2049a7ae22605312142a9c1d0d4e0b46351903ff74b947036284a9fc75c",
+          "after_sha256": "e6edb0f188f36fe2fe9bcd682463086c3966493e9688aed2241172a987ba5ad6"
+        },
+        {
+          "path": "event_calendar/sql_lifecycle.py",
+          "before_sha256": null,
+          "after_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d"
+        },
+        {
+          "path": "event_calendar/sync_audit.py",
+          "before_sha256": null,
+          "after_sha256": "aaac4531707b359835e4461967a683f142623169004f345f52e77966b51700d9"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "7dbb13089315fdf0d214053d68e31f1c098546d17668ca31534d2705894c886f",
+          "after_sha256": "7dbb13089315fdf0d214053d68e31f1c098546d17668ca31534d2705894c886f"
+        },
+        {
+          "path": "services/download_log_service.py",
+          "before_sha256": "9d9a38d7f7e73fa83e1a417ce5fc0ddb54b99b1529a0a37bbff1e3c1d95624ce",
+          "after_sha256": "9d9a38d7f7e73fa83e1a417ce5fc0ddb54b99b1529a0a37bbff1e3c1d95624ce"
+        },
+        {
+          "path": "services/operation_diagnostics.py",
+          "before_sha256": "ca465e719cbacb01f07a2728c17d98eb2cd42e996125bf67f0117d625d9a7fcd",
+          "after_sha256": "d1494cc570f1fe71d0f830b7867f987cd3391b3c513a136faf13f1985c4822fb"
+        },
+        {
+          "path": "services/optional_import_audit_worker.py",
+          "before_sha256": "614b7c7b4fd8059be2a4a4e3c237ff9b38014a825aa96217c23b79834e2b7f01",
+          "after_sha256": "614b7c7b4fd8059be2a4a4e3c237ff9b38014a825aa96217c23b79834e2b7f01"
+        },
+        {
+          "path": "services/optional_upload_lifecycle.py",
+          "before_sha256": "d294382490b7fe01d69748035b3acb532d37f1206b5dcb7bc9ecfe0b45d3f6c4",
+          "after_sha256": "d294382490b7fe01d69748035b3acb532d37f1206b5dcb7bc9ecfe0b45d3f6c4"
+        },
+        {
+          "path": "services/optional_upload_observations.py",
+          "before_sha256": "786b06e45bcb14aca66a7e885fffc5ce7fa167d32956cdc8cc1abd8309e9cace",
+          "after_sha256": "2563846cdbc6e7508cdbdfeaf178e6fe2fb19256a62ca1531a044b98124be3e6"
+        },
+        {
+          "path": "services/optional_upload_transport.py",
+          "before_sha256": "5a35b0069e2af08510b32f66460a2b6fec0127ae30629ead900b9242a5161548",
+          "after_sha256": "5a35b0069e2af08510b32f66460a2b6fec0127ae30629ead900b9242a5161548"
+        },
+        {
+          "path": "services/recovery_complete_report.py",
+          "before_sha256": "3dc22b5a825edaf3d67ed03d5d04a5cc070019d33683b00bcc5683308ec6a09f",
+          "after_sha256": "3dc22b5a825edaf3d67ed03d5d04a5cc070019d33683b00bcc5683308ec6a09f"
+        },
+        {
+          "path": "services/recovery_evidence_bundle.py",
+          "before_sha256": "a1dcef9308b858f6871014563ff42be0e77445a23b34d4908af60bded4ae01eb",
+          "after_sha256": "a1dcef9308b858f6871014563ff42be0e77445a23b34d4908af60bded4ae01eb"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "aac67e1fd893f188a0798ba741aea9860a5060404b6ee03cf607614334120a4f",
+          "after_sha256": "aac67e1fd893f188a0798ba741aea9860a5060404b6ee03cf607614334120a4f"
+        }
+      ]
     }
   ]
 }

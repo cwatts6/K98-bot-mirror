@@ -3,6 +3,8 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
+from core.operation_evidence import optional as optional_observation
+
 import asyncio
 import io
 import json
@@ -89,6 +91,29 @@ from constants import (
 )
 
 UTC = getattr(datetime, "UTC", timezone.utc)
+
+
+async def _send_calendar_result(ctx, svc, result, embed):
+    try:
+        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
+    except asyncio.CancelledError:
+        optional_observation(
+            svc.record_delivery, result.get("pipeline_run_id"), "unknown", "CancelledError"
+        )
+        raise
+    except Exception as error:
+        optional_observation(
+            svc.record_delivery, result.get("pipeline_run_id"), "failed", type(error).__name__
+        )
+        raise
+    else:
+        optional_observation(svc.record_delivery, result.get("pipeline_run_id"), "succeeded")
+
+
+def _calendar_count(result, key):
+    value = result.get(key)
+    return "unknown / not reached" if value is None else value
+
 
 logger = logging.getLogger(__name__)
 
@@ -1584,16 +1609,19 @@ def register_admin(bot: ext_commands.Bot) -> None:
         await safe_defer(ctx, ephemeral=True)
 
         sheet_id = EVENT_CALENDAR_SHEET_ID
-        async with get_operation_lock("calendar_refresh"):
-            svc = get_calendar_service()
-            result = await svc.refresh_pipeline(
-                actor_user_id=ctx.user.id,
-                actor_source=f"admin:{ctx.user.id}",
-                sheet_id=sheet_id,
-            )
+        svc = get_calendar_service()
+        result = await svc.refresh_pipeline(
+            actor_user_id=ctx.user.id,
+            actor_source=f"admin:{ctx.user.id}",
+            sheet_id=sheet_id,
+        )
 
         ok = bool(result.get("ok"))
-        color = discord.Color.green() if ok else discord.Color.red()
+        color = (
+            discord.Color.orange()
+            if result.get("severity") in {"warning", "pending"}
+            else discord.Color.green() if ok else discord.Color.red()
+        )
 
         pipeline_run_id = result.get("pipeline_run_id", "n/a")
         severity = result.get("severity", "unknown")
@@ -1602,15 +1630,24 @@ def register_admin(bot: ext_commands.Bot) -> None:
         stage_durations = result.get("stage_durations_ms") or {}
         errors = result.get("errors") or []
 
-        events_generated = int(result.get("events_generated") or 0)
-        events_written = int(result.get("events_written") or 0)
+        events_generated = _calendar_count(result, "events_generated")
+        events_written = _calendar_count(result, "events_written")
         publish_reason = result.get("publish_reason", "n/a")
 
         embed = discord.Embed(
             title="📅 Event Calendar Refresh (Pipeline)",
             color=color,
             description=(
-                "Completed successfully." if ok else "Pipeline reported failure/degraded state."
+                result.get("details")
+                or (
+                    "Completed with warnings."
+                    if severity == "warning"
+                    else (
+                        "Completed successfully."
+                        if ok
+                        else "Calendar work did not complete. See stage and ownership details."
+                    )
+                )
             ),
         )
         embed.add_field(name="OK", value=str(ok), inline=True)
@@ -1645,7 +1682,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
             )
 
         embed.timestamp = datetime.utcnow()
-        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
+        await _send_calendar_result(ctx, svc, result, embed)
 
     @ops_group.command(
         name="calendar_generate",
@@ -1669,14 +1706,17 @@ def register_admin(bot: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
 
-        async with get_operation_lock("calendar_generate"):
-            svc = get_calendar_service()
-            result = await svc.generate(
-                actor_user_id=ctx.user.id,
-                horizon_days=horizon_days,
-            )
+        svc = get_calendar_service()
+        result = await svc.generate(
+            actor_user_id=ctx.user.id,
+            horizon_days=horizon_days,
+        )
 
-        color = discord.Color.green() if result.get("ok") else discord.Color.red()
+        color = (
+            discord.Color.orange()
+            if result.get("severity") in {"warning", "pending"}
+            else discord.Color.green() if result.get("ok") else discord.Color.red()
+        )
         embed = discord.Embed(
             title="🧮 Event Calendar Generate",
             color=color,
@@ -1688,16 +1728,16 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed.add_field(
             name="Counts",
             value=(
-                f"generated={result.get('instances_generated', 0)} | "
-                f"written={result.get('instances_written', 0)} | "
-                f"cancelled={result.get('cancelled_count', 0)} | "
-                f"modified={result.get('modified_count', 0)}"
+                f"generated={_calendar_count(result, 'instances_generated')} | "
+                f"written={_calendar_count(result, 'instances_written')} | "
+                f"cancelled={_calendar_count(result, 'cancelled_count')} | "
+                f"modified={_calendar_count(result, 'modified_count')}"
             ),
             inline=False,
         )
         embed.add_field(name="Horizon Days", value=str(horizon_days), inline=True)
 
-        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
+        await _send_calendar_result(ctx, svc, result, embed)
 
     @ops_group.command(
         name="calendar_publish_cache",
@@ -1727,15 +1767,18 @@ def register_admin(bot: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
 
-        async with get_operation_lock("calendar_publish_cache"):
-            svc = get_calendar_service()
-            result = await svc.publish_cache(
-                actor_user_id=ctx.user.id,
-                horizon_days=horizon_days,
-                force_empty=force_empty,
-            )
+        svc = get_calendar_service()
+        result = await svc.publish_cache(
+            actor_user_id=ctx.user.id,
+            horizon_days=horizon_days,
+            force_empty=force_empty,
+        )
 
-        color = discord.Color.green() if result.get("ok") else discord.Color.red()
+        color = (
+            discord.Color.orange()
+            if result.get("severity") in {"warning", "pending"}
+            else discord.Color.green() if result.get("ok") else discord.Color.red()
+        )
         embed = discord.Embed(
             title="📦 Event Calendar Publish Cache",
             color=color,
@@ -1745,12 +1788,12 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed.add_field(name="Status", value=str(result.get("status")), inline=True)
         embed.add_field(name="Published UTC", value=str(result.get("published_utc")), inline=False)
         embed.add_field(
-            name="Events Written", value=str(result.get("events_written", 0)), inline=True
+            name="Events Written", value=str(_calendar_count(result, "events_written")), inline=True
         )
         embed.add_field(name="Cache Path", value=str(result.get("cache_path", "")), inline=False)
         embed.add_field(name="Force Empty", value=str(force_empty), inline=True)
 
-        await ctx.interaction.edit_original_response(embed=_validated_operator_embed(embed))
+        await _send_calendar_result(ctx, svc, result, embed)
 
     @ops_group.command(
         name="calendar_status",
@@ -1803,6 +1846,28 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed = discord.Embed(
             title="📅 Calendar Status",
             color=0x2ECC71 if not degraded else 0xF39C12,
+        )
+
+        ownership = st.get("ownership") or {}
+        active = ownership.get("active") or {}
+        if active or ownership.get("admission_closed") or ownership.get("deferred_scheduled"):
+            embed.add_field(
+                name="Calendar ownership",
+                value=(
+                    f"state: `{active.get('phase', 'closed' if ownership.get('admission_closed') else 'waiting')}`\n"
+                    f"run: `{active.get('reference', 'n/a')}` | stage: `{active.get('stage', 'n/a')}`\n"
+                    f"scheduled refresh waiting: `{ownership.get('deferred_scheduled', False)}`\n"
+                    + (
+                        "Database cleanup is unconfirmed. New work is blocked; time alone cannot release it."
+                        if active.get("cleanup") == "unconfirmed"
+                        else ""
+                    )
+                ),
+                inline=False,
+            )
+        audit = ownership.get("audit") or {}
+        embed.add_field(
+            name="Optional sync audit", value=str(audit.get("state", "unknown")), inline=False
         )
 
         embed.add_field(

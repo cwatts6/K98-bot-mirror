@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
 import io
@@ -13,8 +13,8 @@ from urllib.parse import quote
 
 import requests
 
-from constants import DATABASE, SERVER
-from file_utils import emit_telemetry_event, get_conn_with_retries
+from event_calendar.sql_lifecycle import SqlOutcome, SqlSession, error_facts
+from file_utils import get_conn_with_retries
 
 logger = logging.getLogger(__name__)
 
@@ -115,11 +115,13 @@ class SyncResult:
     rows_read_recurring: int = 0
     rows_read_oneoff: int = 0
     rows_read_overrides: int = 0
-    rows_upserted_recurring: int = 0
-    rows_upserted_oneoff: int = 0
-    rows_upserted_overrides: int = 0
+    rows_upserted_recurring: int | None = 0
+    rows_upserted_oneoff: int | None = 0
+    rows_upserted_overrides: int | None = 0
     instances_generated: int = 0
     error_message: str | None = None
+    attempted: dict[str, int] = field(default_factory=dict)
+    sql: SqlOutcome = field(default_factory=SqlOutcome)
 
 
 # ADD helper near other validators
@@ -517,136 +519,48 @@ def upsert_sql_rows(
     return changed
 
 
-def _insert_sync_log_start(source_name: str) -> int:
-    sql = """
-        INSERT INTO dbo.EventSyncLog (SyncStartedUTC, SourceName, Status)
-        OUTPUT INSERTED.SyncID
-        VALUES (SYSUTCDATETIME(), ?, ?)
-    """
-    with get_conn_with_retries(meta={"operation": "calendar_synclog_start"}) as conn:
-        cur = conn.cursor()
-        cur.execute(sql, source_name, "running")
-        row = cur.fetchone()
-        conn.commit()
-        return int(row[0])
-
-
-def _finish_sync_log(sync_id: int, result: SyncResult) -> None:
-    sql = """
-        UPDATE dbo.EventSyncLog
-        SET
-            SyncCompletedUTC = SYSUTCDATETIME(),
-            Status = ?,
-            RowsReadRecurring = ?,
-            RowsReadOneOff = ?,
-            RowsReadOverrides = ?,
-            RowsUpsertedRecurring = ?,
-            RowsUpsertedOneOff = ?,
-            RowsUpsertedOverrides = ?,
-            InstancesGenerated = ?,
-            ErrorMessage = ?
-        WHERE SyncID = ?
-    """
-    with get_conn_with_retries(meta={"operation": "calendar_synclog_finish"}) as conn:
-        cur = conn.cursor()
-        cur.execute(
-            sql,
-            result.status,
-            result.rows_read_recurring,
-            result.rows_read_oneoff,
-            result.rows_read_overrides,
-            result.rows_upserted_recurring,
-            result.rows_upserted_oneoff,
-            result.rows_upserted_overrides,
-            result.instances_generated,
-            result.error_message,
-            sync_id,
-        )
-        conn.commit()
-
-
 def sync_sheets_to_sql(sheet_id: str) -> SyncResult:
-    sync_id = _insert_sync_log_start("google_sheets")
+    # Optional EventSyncLog is orchestrated independently by CalendarService.
+    result = SyncResult(ok=False, status="failed_fetch_or_validate")
+    session = SqlSession(
+        lambda: get_conn_with_retries(meta={"operation": "calendar_sync_upserts_txn"})
+    )
+    result.sql = session.outcome
     try:
         recurring_raw = fetch_sheet_csv(sheet_id, "recurring_rules")
         oneoff_raw = fetch_sheet_csv(sheet_id, "oneoff_events")
         overrides_raw = fetch_sheet_csv(sheet_id, "overrides")
-
+        result.rows_read_recurring = len(recurring_raw)
+        result.rows_read_oneoff = len(oneoff_raw)
+        result.rows_read_overrides = len(overrides_raw)
         recurring = parse_recurring_rules(recurring_raw)
         oneoff = parse_oneoff_events(oneoff_raw)
         overrides = parse_overrides(overrides_raw)
-
-        with get_conn_with_retries(meta={"operation": "calendar_sync_upserts_txn"}) as conn:
-            up_r = upsert_sql_rows(
-                table_name="EventRecurringRules",
-                key_column="RuleID",
-                rows=recurring,
-                conn=conn,
-            )
-            up_o = upsert_sql_rows(
-                table_name="EventOneOffEvents",
-                key_column="EventID",
-                rows=oneoff,
-                conn=conn,
-            )
-            up_v = upsert_sql_rows(
-                table_name="EventOverrides",
-                key_column="OverrideID",
-                rows=overrides,
-                conn=conn,
-            )
+        with session as conn:
+            for key, table, column, rows in (
+                ("recurring", "EventRecurringRules", "RuleID", recurring),
+                ("oneoff", "EventOneOffEvents", "EventID", oneoff),
+                ("overrides", "EventOverrides", "OverrideID", overrides),
+            ):
+                result.attempted[key] = upsert_sql_rows(
+                    table_name=table, key_column=column, rows=rows, conn=conn
+                )
             conn.commit()
-
-        result = SyncResult(
-            ok=True,
-            status="success",
-            rows_read_recurring=len(recurring_raw),
-            rows_read_oneoff=len(oneoff_raw),
-            rows_read_overrides=len(overrides_raw),
-            rows_upserted_recurring=up_r,
-            rows_upserted_oneoff=up_o,
-            rows_upserted_overrides=up_v,
-            instances_generated=0,
-            error_message=None,
-        )
-        _finish_sync_log(sync_id, result)
-        emit_telemetry_event(
-            {
-                "event": "calendar_sync",
-                "status": "success",
-                "server": SERVER,
-                "database": DATABASE,
-                "rows": {
-                    "recurring": len(recurring_raw),
-                    "oneoff": len(oneoff_raw),
-                    "overrides": len(overrides_raw),
-                },
-                "upserted": {
-                    "recurring": up_r,
-                    "oneoff": up_o,
-                    "overrides": up_v,
-                },
-            }
-        )
-        return result
-
-    except Exception as e:
-        logger.exception("[CALENDAR] sync_sheets_to_sql failed")
-        result = SyncResult(
-            ok=False,
-            status="failed_fetch_or_validate",
-            error_message=f"{type(e).__name__}: {e}",
-        )
-        try:
-            _finish_sync_log(sync_id, result)
-        except Exception:
-            logger.exception("[CALENDAR] failed to write EventSyncLog failure row")
-        emit_telemetry_event(
-            {
-                "event": "calendar_sync",
-                "status": "failed",
-                "error_type": type(e).__name__,
-                "error": str(e),
-            }
-        )
-        return result
+            # Freeze acknowledged facts before cleanup or any optional reporting.
+            result.ok = True
+            result.status = "success"
+            result.rows_upserted_recurring = result.attempted["recurring"]
+            result.rows_upserted_oneoff = result.attempted["oneoff"]
+            result.rows_upserted_overrides = result.attempted["overrides"]
+    except Exception as error:
+        result.error_message = str(error_facts(error))
+        if not result.sql.error:
+            result.sql.error = error_facts(error)
+        if result.sql.effect == "unknown":
+            result.status = "commit_unknown"
+            result.rows_upserted_recurring = None
+            result.rows_upserted_oneoff = None
+            result.rows_upserted_overrides = None
+        elif result.sql.effect == "rolled_back":
+            result.status = "rolled_back"
+    return result

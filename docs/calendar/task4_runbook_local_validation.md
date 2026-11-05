@@ -78,3 +78,9 @@ Expected:
 - refresh_full executes on interval
 - operation lock serialization works
 - no overlap with manual admin operation lock usage
+
+## P01.5 outcome checks (local candidate)
+
+Inspect primary calendar and auxiliary type-index outcomes separately. A primary-success/index-warning result retains the actual primary count; the old index may remain. `generated_utc` identifies descriptive generation evidence, not a two-file transaction. Empty-preserve leaves both existing files untouched. Unknown write counts are shown as unknown, not zero.
+
+Use the P01.5 whole-solution design and local qualification receipt for ownership, cancellation and shutdown checks. Native qualification is restricted to an independently verified new `K98_P015_Disposable_...` fixture on local K98DEV, with offline Sheets/Discord boundaries; retained databases and production are excluded.

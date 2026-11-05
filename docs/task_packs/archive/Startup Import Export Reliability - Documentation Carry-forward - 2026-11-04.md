@@ -1,6 +1,6 @@
 # Reliability programme: required documentation and archive carry-forward
 
-> **Archived 5 November 2026.** The earlier carry-forward set was included in P01.3 delivery. Its old move checklist is historical; the new closeout/archive changes have a separate active manifest. Current outcome: [P01.3 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md). Next task: [P01.4 review/scope](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md).
+> **Archived 5 November 2026.** The earlier carry-forward set was included in P01.3 delivery. Its old move checklist is historical; the new closeout/archive changes have a separate active manifest. Current outcome: [P01.3 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md). Next task: [P01.4 review/scope](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md).
 
 Operator requirement, 4 November 2026: include all preceding programme documentation updates and archive moves in the next P01.2b PR and carry the same intended documentation into private production promotion. This is a required release check, not optional follow-up work. It does not authorize publishing the PR before implementation/review readiness.
 

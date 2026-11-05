@@ -616,6 +616,38 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P015_CALENDAR_PATHS = frozenset(
+    {
+        "bot_instance.py",
+        "commands/admin_cmds.py",
+        "constants.py",
+        "core/operation_evidence.py",
+        "core/operation_timing.py",
+        "core/owned_work.py",
+        "core/scheduler_lifecycle.py",
+        "event_calendar/audit_dal.py",
+        "event_calendar/cache_publisher.py",
+        "event_calendar/event_generator.py",
+        "event_calendar/mutation_owner.py",
+        "event_calendar/scheduler.py",
+        "event_calendar/service.py",
+        "event_calendar/sheets_sync.py",
+        "event_calendar/sql_lifecycle.py",
+        "event_calendar/sync_audit.py",
+        "file_utils.py",
+        "services/download_log_service.py",
+        "services/operation_diagnostics.py",
+        "services/optional_import_audit_worker.py",
+        "services/optional_upload_lifecycle.py",
+        "services/optional_upload_observations.py",
+        "services/optional_upload_transport.py",
+        "services/recovery_complete_report.py",
+        "services/recovery_evidence_bundle.py",
+        "services/recovery_report.py",
+    }
+)
+
+
 P014_UPLOAD_PATHS = frozenset(
     {
         "DL_bot.py",
@@ -830,13 +862,13 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    # Fixed P01.4 successor plus Windows newlines; still a bounded installed file.
-    if len(raw) > 155648:
+    # Fixed P01.5 successor plus Windows newlines; still a bounded installed file.
+    if len(raw) > 172032:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 64:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 65:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -856,6 +888,8 @@ def reviewed_transitions():
                 )
             )
         )
+        if item["id"] == "p015_calendar_ownership_v1":
+            member_limit = len(P015_CALENDAR_PATHS)
         if item["id"] == "p014_upload_outcomes_optional_io_v1":
             member_limit = len(P014_UPLOAD_PATHS)
         if item["id"] in REQUEST_SETTLEMENT_TRANSITIONS:
@@ -931,6 +965,7 @@ def reviewed_transitions():
                 item["id"] == "p1_monitoring_reliability_v1"
                 and path in MONITORING_RELIABILITY_PATHS
             )
+            fixed_p015 = item["id"] == "p015_calendar_ownership_v1" and path in P015_CALENDAR_PATHS
             fixed_p014 = (
                 item["id"] == "p014_upload_outcomes_optional_io_v1" and path in P014_UPLOAD_PATHS
             )
@@ -1054,6 +1089,7 @@ def reviewed_transitions():
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
                     or fixed_p012a
+                    or fixed_p015
                     or fixed_p014
                     or fixed_p013
                     or fixed_p011
@@ -1195,6 +1231,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
+        if item["id"] == "p015_calendar_ownership_v1" and paths != P015_CALENDAR_PATHS:
+            raise ValueError("Complete fixed P01.5 calendar transition required.")
         if item["id"] == "p014_upload_outcomes_optional_io_v1" and paths != P014_UPLOAD_PATHS:
             raise ValueError("Complete fixed P01.4 upload transition required.")
         if item["id"] == "p013_passive_health_v1" and paths != P013_PASSIVE_HEALTH_PATHS:

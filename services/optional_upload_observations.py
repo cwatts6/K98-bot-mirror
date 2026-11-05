@@ -101,7 +101,8 @@ class UploadObservations:
             self.lock.release()
 
     def summary(self, kind, state, unavailable, error_type, dropped=0, failures=0):
-        if kind not in {"sql", "file"}:
+        # Calendar uses only a fixed summary, never the upload event mailbox.
+        if kind not in {"sql", "file", "calendar"}:
             return
         if type(state) is not str or len(state) > 40:
             self.partial = True

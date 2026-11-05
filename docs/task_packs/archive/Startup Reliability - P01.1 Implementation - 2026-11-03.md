@@ -1,3 +1,5 @@
+> **Archived 5 November 2026.** Delivered P01.1 implementation evidence. Its original release holds are historical; see [P01.1 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.1%20Closeout%20-%202026-11-03.md).
+
 # Startup reliability P01.1 — implementation and qualification
 
 ## Scope and status

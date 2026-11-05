@@ -1,174 +1,132 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock
+import threading
 
 import pytest
 
 from event_calendar import service as svc_mod
+from event_calendar.cache_publisher import PublishResult
+from event_calendar.event_generator import GenerationResult
+from event_calendar.mutation_owner import get_owner
 from event_calendar.service import CalendarService, _classify_error
+from event_calendar.sheets_sync import SyncResult
 
 
 @pytest.mark.asyncio
-async def test_calendar_service_refresh_success(monkeypatch):
-    class _R:
-        ok = True
-        status = "success"
-        rows_read_recurring = 1
-        rows_read_oneoff = 2
-        rows_read_overrides = 3
-        rows_upserted_recurring = 1
-        rows_upserted_oneoff = 0
-        rows_upserted_overrides = 2
-        instances_generated = 0
-        error_message = None
+@pytest.mark.parametrize(
+    "method,physical,result,key",
+    [
+        ("refresh", "sync_sheets_to_sql", SyncResult(True, "success", rows_read_oneoff=2), "sync"),
+        (
+            "generate",
+            "generate_calendar_instances",
+            GenerationResult(True, "success", instances_generated=10),
+            "generate",
+        ),
+        (
+            "publish_cache",
+            "publish_event_calendar_cache",
+            PublishResult(True, "success", events_written=7),
+            "publish",
+        ),
+    ],
+)
+async def test_stage_runs_once_on_worker_and_preserves_result(
+    monkeypatch, method, physical, result, key
+):
+    calls = []
+    main_thread = threading.get_ident()
 
-    monkeypatch.setattr(svc_mod, "sync_sheets_to_sql", lambda _sid: _R())
+    def work(*args, **kwargs):
+        calls.append(threading.get_ident())
+        return result
 
-    s = svc_mod.CalendarService()
-    out = await s.refresh(actor_user_id=1, sheet_id="abc")
-    assert out["ok"] is True
-    assert out["status"] == "success"
-
-    st = await s.get_status()
-    assert st["sync"]["status"] == "success"
-    assert st["sync"]["last_result"]["rows_read_oneoff"] == 2
+    monkeypatch.setattr(svc_mod, physical, work)
+    svc = CalendarService()
+    output = await getattr(svc, method)(**({"sheet_id": "offline"} if key == "sync" else {}))
+    assert output["ok"] and output["status"] == "success"
+    assert len(calls) == 1 and calls[0] != main_thread
+    status = await svc.get_status()
+    assert status[key]["status"] == "success"
+    assert status["calendar_health"]["last_successful_pipeline_utc"] == "not_started"
+    output["status"] = "tampered"
+    assert (await svc.get_status())[key]["status"] == "success"
+    await get_owner().audit.drain()
 
 
 @pytest.mark.asyncio
 async def test_calendar_service_refresh_missing_sheet_id():
-    s = svc_mod.CalendarService()
-    out = await s.refresh(actor_user_id=1, sheet_id=None)
-    assert out["ok"] is False
-    assert out["status"] == "failed_service"
-
-
-@pytest.mark.asyncio
-async def test_refresh_uses_to_thread(monkeypatch):
-    svc = CalendarService()
-
-    called = {"to_thread": 0, "sync_fn": 0}
-
-    class FakeSyncResult:
-        ok = True
-        status = "success"
-        rows_read_recurring = 1
-        rows_read_oneoff = 2
-        rows_read_overrides = 3
-        rows_upserted_recurring = 1
-        rows_upserted_oneoff = 1
-        rows_upserted_overrides = 1
-        instances_generated = 0
-        error_message = None
-
-    def fake_sync(sheet_id: str):
-        called["sync_fn"] += 1
-        assert sheet_id == "sheet123"
-        return FakeSyncResult()
-
-    async def fake_to_thread(fn, *args, **kwargs):
-        called["to_thread"] += 1
-        assert fn is fake_sync
-        return fn(*args, **kwargs)
-
-    monkeypatch.setattr("event_calendar.service.sync_sheets_to_sql", fake_sync)
-    monkeypatch.setattr("event_calendar.service.asyncio.to_thread", fake_to_thread)
-    monkeypatch.setattr("event_calendar.service.emit_telemetry_event", lambda e: None)
-
-    out = await svc.refresh(actor_user_id=42, sheet_id="sheet123")
-    assert out["ok"] is True
-    assert called["to_thread"] == 1
-    assert called["sync_fn"] == 1
+    result = await CalendarService().refresh(sheet_id=None)
+    assert not result["ok"] and result["status"] == "failed_service"
+    assert result["effect"] == "failed_before_effects"
 
 
 @pytest.mark.asyncio
 async def test_refresh_failure_emits_telemetry(monkeypatch):
-    svc = CalendarService()
     events = []
 
-    async def fake_to_thread(fn, *args, **kwargs):
-        raise ValueError("boom")
+    def fail(*args):
+        raise ValueError("private input must not leak")
 
-    monkeypatch.setattr("event_calendar.service.asyncio.to_thread", fake_to_thread)
-    monkeypatch.setattr("event_calendar.service.emit_telemetry_event", lambda e: events.append(e))
-
-    out = await svc.refresh(actor_user_id=99, sheet_id="x")
-    assert out["ok"] is False
-    assert out["status"] == "failed_service"
-    assert any(e.get("event") == "calendar_refresh" and e.get("ok") is False for e in events)
-
-
-@pytest.mark.asyncio
-async def test_generate_uses_to_thread_and_updates_status(monkeypatch):
+    monkeypatch.setattr(svc_mod, "sync_sheets_to_sql", fail)
+    monkeypatch.setattr(svc_mod, "emit_telemetry_event", events.append)
     svc = CalendarService()
-
-    class FakeGenResult:
-        ok = True
-        status = "success"
-        instances_generated = 10
-        instances_written = 10
-        cancelled_count = 1
-        modified_count = 2
-        error_message = None
-
-    from event_calendar import service as svc_local
-
-    async def fake_to_thread(fn, *args, **kwargs):
-        if fn is svc_local.generate_calendar_instances:
-            return FakeGenResult()
-        return fn(*args, **kwargs)
-
-    monkeypatch.setattr("event_calendar.service.asyncio.to_thread", fake_to_thread)
-    monkeypatch.setattr("event_calendar.service.emit_telemetry_event", lambda e: None)
-
-    out = await svc.generate(actor_user_id=1, horizon_days=365)
-    assert out["ok"] is True
-    status = await svc.get_status()
-    assert status["generate"]["status"] == "success"
-    assert status["generate"]["last_result"]["instances_generated"] == 10
-
-
-@pytest.mark.asyncio
-async def test_publish_uses_to_thread_and_updates_status(monkeypatch):
-    svc = CalendarService()
-
-    class FakePubResult:
-        ok = True
-        status = "success"
-        events_written = 7
-        cache_path = "cache/event_calendar.json"
-        type_index_path = "cache/event_type_index.json"
-        error_message = None
-
-    from event_calendar import service as svc_local
-
-    async def fake_to_thread(fn, *args, **kwargs):
-        if fn is svc_local.publish_event_calendar_cache:
-            return FakePubResult()
-        return fn(*args, **kwargs)
-
-    monkeypatch.setattr("event_calendar.service.asyncio.to_thread", fake_to_thread)
-    monkeypatch.setattr("event_calendar.service.emit_telemetry_event", lambda e: None)
-
-    out = await svc.publish_cache(actor_user_id=1, horizon_days=365, force_empty=False)
-    assert out["ok"] is True
-    status = await svc.get_status()
-    assert status["publish"]["status"] == "success"
-    assert status["publish"]["last_result"]["events_written"] == 7
+    result = await svc.refresh(sheet_id="offline")
+    assert not result["ok"] and result["status"] == "failed_service"
+    assert "private input" not in str(result)
+    assert any(e.get("event") == "calendar_refresh" and e["ok"] is False for e in events)
+    await get_owner().audit.drain()
 
 
 @pytest.mark.asyncio
 async def test_refresh_full_stops_on_sync_failure(monkeypatch):
-    svc = CalendarService()
-    svc.refresh = AsyncMock(return_value={"ok": False, "status": "failed_service"})
-    svc.generate = AsyncMock()
-    svc.publish_cache = AsyncMock()
+    monkeypatch.setattr(
+        svc_mod, "sync_sheets_to_sql", lambda *a: SyncResult(False, "validation_failed")
+    )
 
-    out = await svc.refresh_full(actor_user_id=1, sheet_id="abc")
-    assert out["ok"] is False
-    assert out["stage"] == "sync"
-    svc.generate.assert_not_called()
-    svc.publish_cache.assert_not_called()
+    def forbidden(**kwargs):
+        raise AssertionError("later stage entered")
+
+    monkeypatch.setattr(svc_mod, "generate_calendar_instances", forbidden)
+    result = await CalendarService().refresh_full(sheet_id="offline")
+    assert not result["ok"] and result["stage"] == "sync"
+    assert result["remaining_stages"] == ["generate", "publish"]
+    await get_owner().audit.drain()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_success_and_failure_history(monkeypatch):
+    monkeypatch.setattr(svc_mod, "sync_sheets_to_sql", lambda *a: SyncResult(True, "success"))
+    monkeypatch.setattr(
+        svc_mod,
+        "generate_calendar_instances",
+        lambda **k: GenerationResult(True, "success", instances_generated=12),
+    )
+    monkeypatch.setattr(
+        svc_mod,
+        "publish_event_calendar_cache",
+        lambda **k: PublishResult(True, "success", events_written=11),
+    )
+    svc = CalendarService()
+    good = await svc.refresh_pipeline(sheet_id="offline")
+    assert good["ok"] and good["events_generated"] == 12 and good["events_written"] == 11
+    status = await svc.get_status()
+    assert status["pipeline"]["pipeline_run_id"] == good["pipeline_run_id"]
+    previous_success = status["calendar_health"]["last_successful_pipeline_utc"]
+    assert previous_success != "not_started"
+    monkeypatch.setattr(
+        svc_mod,
+        "generate_calendar_instances",
+        lambda **k: GenerationResult(False, "rolled_back", error_message="RuntimeError"),
+    )
+    failed = await svc.refresh_pipeline(sheet_id="offline")
+    assert not failed["ok"] and failed["stage"] == "generate"
+    status = await svc.get_status()
+    assert status["pipeline"]["status"] == "failed_generate"
+    assert status["latest_error"]["stage"] == "generate"
+    assert status["calendar_health"]["last_successful_pipeline_utc"] == previous_success
+    await get_owner().audit.drain()
 
 
 @pytest.mark.asyncio
@@ -269,7 +227,7 @@ async def test_calendar_health_reads_cache_count_and_horizon(tmp_path, monkeypat
     cache_file.write_text(
         """
 {
-  "meta": {"horizon_days": 365},
+  "horizon_days": 365,
   "events": [
     {"start_utc": "2099-01-01T00:00:00+00:00"},
     {"start_utc": "2099-01-02T00:00:00+00:00"}
@@ -291,54 +249,7 @@ async def test_calendar_health_reads_cache_count_and_horizon(tmp_path, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_refresh_pipeline_success_sets_pipeline_run_id_and_clears_latest_error(monkeypatch):
-    svc = svc_mod.CalendarService()
-    svc._latest_error = {
-        "stage": "sync",
-        "error_type": "Example",
-        "message": "old",
-        "at_utc": "2000-01-01T00:00:00+00:00",
-    }
-
-    async def _fake_refresh(*, actor_user_id=None, sheet_id=None):
-        return {"ok": True, "status": "success", "details": "ok"}
-
-    async def _fake_generate(*, actor_user_id=None, horizon_days=365):
-        return {
-            "ok": True,
-            "status": "success",
-            "instances_generated": 12,
-            "details": "ok",
-        }
-
-    async def _fake_publish(*, actor_user_id=None, horizon_days=365, force_empty=False):
-        return {
-            "ok": True,
-            "status": "success",
-            "events_written": 11,
-            "details": "ok",
-        }
-
-    monkeypatch.setattr(svc, "refresh", _fake_refresh)
-    monkeypatch.setattr(svc, "generate", _fake_generate)
-    monkeypatch.setattr(svc, "publish_cache", _fake_publish)
-
-    out = await svc.refresh_pipeline(actor_user_id=1, sheet_id="sheet123")
-
-    assert out["ok"] is True
-    assert out["stage"] == "done"
-    assert out["pipeline_run_id"]
-    assert out["events_generated"] == 12
-    assert out["events_written"] == 11
-
-    st = await svc.get_status()
-    assert st["pipeline"]["status"] == "success"
-    assert st["pipeline"]["pipeline_run_id"] == out["pipeline_run_id"]
-    assert st["latest_error"] == {}
-
-
-@pytest.mark.asyncio
-async def test_result_based_retry_retries_retryable_status(monkeypatch):
+async def test_generic_failed_service_never_authorizes_mutation_retry(monkeypatch):
     svc = svc_mod.CalendarService()
     calls = {"n": 0}
 
@@ -364,9 +275,9 @@ async def test_result_based_retry_retries_retryable_status(monkeypatch):
         allow_timeout_retry=False,
     )
 
-    assert result["ok"] is True
-    assert attempts == 2
-    assert calls["n"] == 2
+    assert result["ok"] is False
+    assert attempts == 1
+    assert calls["n"] == 1
     assert isinstance(dur, int)
 
 
@@ -413,34 +324,6 @@ async def test_timeout_does_not_retry_when_timeout_retry_disabled():
         )
 
     assert calls["n"] == 1
-
-
-@pytest.mark.asyncio
-async def test_refresh_pipeline_failure_sets_latest_error(monkeypatch):
-    svc = svc_mod.CalendarService()
-
-    async def _fake_refresh(*, actor_user_id=None, sheet_id=None):
-        return {"ok": True, "status": "success", "details": "ok"}
-
-    async def _fake_generate(*, actor_user_id=None, horizon_days=365):
-        return {"ok": False, "status": "failed_service", "details": "gen broke"}
-
-    async def _fake_publish(*, actor_user_id=None, horizon_days=365, force_empty=False):
-        return {"ok": True, "status": "success", "events_written": 1, "details": "ok"}
-
-    monkeypatch.setattr(svc, "refresh", _fake_refresh)
-    monkeypatch.setattr(svc, "generate", _fake_generate)
-    monkeypatch.setattr(svc, "publish_cache", _fake_publish)
-
-    out = await svc.refresh_pipeline(actor_user_id=1, sheet_id="sheet123")
-
-    assert out["ok"] is False
-    assert out["stage"] == "generate"
-
-    st = await svc.get_status()
-    assert st["pipeline"]["status"] == "failed_generate"
-    assert st["latest_error"]["stage"] == "generate"
-    assert "gen broke" in st["latest_error"]["message"]
 
 
 @pytest.mark.asyncio

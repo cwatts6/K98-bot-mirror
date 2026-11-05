@@ -1,10 +1,12 @@
+> **Current E95:** P01.4 delivered/deployed with natural checks tracked in [the active register](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md). Next: [P01.5](../Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md). Earlier navigation/status below is historical.
+
 # Startup, import and export reliability: archive register
 
-> **Current E85/E86 - 5 November 2026: P01.3 CLOSED.** Passive health, persistent Refresh and the complete-ZIP correction are merged, deployed and live-validated at private `6ec393f71626d15fcb8c50c840854fb681d5f09e`. See [P01.3 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md) and [P01.4 handover/scope](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md). P01.4 (F17/F30) is next, review/scope only. P01.1/P01.2a remain accepted; P01.2b is closed by decision without feature delivery. P01.4-P01.6/P02-P05 and exact incident recovery remain open. Dated checkpoints below retain historical evidence, not current approval or scheduling authority. The [new documentation carry-forward manifest](../Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md) covers this local closeout update.
+> **Current E85/E86 - 5 November 2026: P01.3 CLOSED.** Passive health, persistent Refresh and the complete-ZIP correction are merged, deployed and live-validated at private `6ec393f71626d15fcb8c50c840854fb681d5f09e`. See [P01.3 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md) and [P01.4 handover/scope](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md). P01.4 (F17/F30) is next, review/scope only. P01.1/P01.2a remain accepted; P01.2b is closed by decision without feature delivery. P01.4-P01.6/P02-P05 and exact incident recovery remain open. Dated checkpoints below retain historical evidence, not current approval or scheduling authority. The [new documentation carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md) covers this local closeout update.
 
 Reviewed and relocated on 4 November 2026 at the user's request. These include delivered-pack records and the explicitly declined P01.2b proposal; their dated holds and pre-release instructions are history. No evidence was deleted. Links were rebased to preserve access from the archive.
 
-Current authority: [programme scope](../Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md), [tracker](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md) and [P01.4 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md).
+Current authority: [programme scope](../Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md), [tracker](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md) and [P01.4 handover](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md).
 
 ## Archived delivered records
 
@@ -52,4 +54,21 @@ The active [programme carry-forward checklist](Startup%20Import%20Export%20Relia
 - [Startup Import Export Reliability - Documentation Carry-forward - 2026-11-04.md](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-04.md)
 - [Startup Import Export Reliability - P01.3 Closeout - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md)
 
-Five completed/superseded files were moved; the final closeout was added directly to the archive. No evidence was discarded. Scope, tracker, P01 design, delivery handover, census, tracing, coverage and final sweep stay active because they own P01.4-P01.6/P02-P05 work. Old carry-forward obligations were delivered with P01.3; the new local closeout/archive delta is covered by [the 5 November manifest](../Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md). Before copies, source/destination hashes, incoming/outgoing link checks and validation are retained privately under `.codex_artifacts/p013-closeout-p014-20261105/`.
+Five completed/superseded files were moved; the final closeout was added directly to the archive. No evidence was discarded. Scope, tracker, P01 design, delivery handover, census, tracing, coverage and final sweep stay active because they own P01.4-P01.6/P02-P05 work. Old carry-forward obligations were delivered with P01.3; the new local closeout/archive delta is covered by [the 5 November manifest](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md). Before copies, source/destination hashes, incoming/outgoing link checks and validation are retained privately under `.codex_artifacts/p013-closeout-p014-20261105/`.
+
+## 5 November P01.4 closeout archive
+
+Seven P01.4 scope/design/qualification/release records, the delivered documentation manifest and the completed P01.1 implementation receipt were moved without discarding evidence. A new P01.4 closeout records the agreed outcome. Active programme documents and natural acceptance remain outside the archive.
+
+- [Startup Import Export Reliability - P01.4 Adoption Decision - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Adoption%20Decision%20-%202026-11-05.md)
+- [Startup Import Export Reliability - P01.4 Complete Local Qualification - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md)
+- [Startup Import Export Reliability - P01.4 Handover and Scope - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md)
+- [Startup Import Export Reliability - P01.4 Local Implementation and Qualification - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Local%20Implementation%20and%20Qualification%20-%202026-11-05.md)
+- [Startup Import Export Reliability - P01.4 PR Review and Release - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20PR%20Review%20and%20Release%20-%202026-11-05.md)
+- [Startup Import Export Reliability - P01.4 Source Review and Design - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Source%20Review%20and%20Design%20-%202026-11-05.md)
+- [Startup Import Export Reliability - P01.4 Whole Solution Design - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Whole%20Solution%20Design%20-%202026-11-05.md)
+- [Startup Import Export Reliability - P01.4 Delivered Documentation Carry-forward - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md)
+- [Startup Reliability - P01.1 Implementation - 2026-11-03.md](Startup%20Reliability%20-%20P01.1%20Implementation%20-%202026-11-03.md)
+- [Startup Import Export Reliability - P01.4 Closeout - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Closeout%20-%202026-11-05.md)
+
+Current carry-forward: [documentation manifest](../Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md).

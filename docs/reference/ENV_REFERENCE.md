@@ -493,3 +493,7 @@ Durable pacing also checkpoints a full policy interval after each actual provide
 ### S11 direct SQL permission model — 2026-10-03
 
 Chris selected `direct_application_v1`, retaining the dedicated `S11_ExportApplication` and protected `.env` `S11_SQL_USERNAME`/`S11_SQL_PASSWORD`. No signing certificates or credential files are required in this explicit model. The reviewed legacy role carries database/schema privileges, and the SID-bound login/master user receives the required bulk/file permissions directly. Ordinary application credentials are trusted for these broader rights; former certificate isolation is not claimed. See [the direct SQL amendment](kvk_source_migration/s11_g4_direct_sql_permission_amendment_20261003.md). Production account grants, real connection validation, Bot promotion/deployment, enrollment and activation remain separately staged.
+
+## Calendar reliability semantics — P01.5 local candidate
+
+Existing calendar stage timeout settings are observation deadlines (sync/generation/publication), not cancellation or release authority. Existing retry variables remain parse-compatible but no longer authorize generic mutation retries. Safe GET retries and pre-entry business connection acquisition policy remain unchanged. Optional EventSyncLog uses one configured SQL-login connection attempt, a private 2-second statement timeout and 250 ms lock timeout; it never falls back to another principal. No new environment setting is required.

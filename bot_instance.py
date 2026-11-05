@@ -58,7 +58,7 @@ from core.event_rehydration_lifecycle import (
     run_ready_tracked_view_rehydration,
     wait_for_events,
 )
-from core.interaction_safety import get_operation_lock
+from core.operation_evidence import optional as optional_observation
 from core.queue_lifecycle import run_ready_queue_lifecycle
 from core.scheduler_lifecycle import (
     run_ready_calendar_scheduler_tasks,
@@ -172,14 +172,14 @@ async def _run_pinned_calendar_refresh_once(*, source: str) -> None:
         return
 
     try:
-        async with get_operation_lock("calendar_refresh"):
-            result = await svc.refresh_pipeline(
-                actor_user_id=None,
-                actor_source=source,
-                sheet_id=os.getenv("EVENT_CALENDAR_SHEET_ID"),
-                horizon_days=365,
-                force_empty=False,
-            )
+        result = await svc.refresh_pipeline(
+            actor_user_id=None,
+            actor_source=source,
+            sheet_id=os.getenv("EVENT_CALENDAR_SHEET_ID"),
+            horizon_days=365,
+            force_empty=False,
+            scheduled=True,
+        )
 
         if not result.get("ok"):
             logger.error(
@@ -196,7 +196,25 @@ async def _run_pinned_calendar_refresh_once(*, source: str) -> None:
             )
             return
 
-        upd = await update_calendar_embed(bot, ch_id)
+        if not svc.admission_open():
+            return
+        try:
+            upd = await update_calendar_embed(bot, ch_id)
+        except asyncio.CancelledError:
+            optional_observation(
+                svc.record_delivery, result.get("pipeline_run_id"), "unknown", "CancelledError"
+            )
+            raise
+        except Exception as error:
+            optional_observation(
+                svc.record_delivery, result.get("pipeline_run_id"), "failed", type(error).__name__
+            )
+            raise
+        optional_observation(
+            svc.record_delivery,
+            result.get("pipeline_run_id"),
+            "succeeded" if upd.get("ok") else "failed",
+        )
         logger.info("[CALENDAR][PINNED] refresh result: %s", upd)
         emit_telemetry_event(
             {
@@ -1060,7 +1078,13 @@ async def _graceful_teardown():
     _shutdown_once.set()
     from services import upload_lifecycle
 
+    calendar = get_calendar_service()
+    calendar.close_admission()
     upload_lifecycle.close_admission()
+    calendar_drain = await calendar.drain()
+    if not calendar_drain["ok"]:
+        logger.error("[SHUTDOWN] Calendar cleanup remains unconfirmed: %s", calendar_drain)
+        raise RuntimeError("Calendar physical cleanup is unconfirmed")
     await upload_lifecycle.drain()
     await _stop_health_dashboard()
     from event_cache import refresh_service

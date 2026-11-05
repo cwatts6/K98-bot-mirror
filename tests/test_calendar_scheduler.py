@@ -20,21 +20,27 @@ async def test_scheduler_runs_refresh_full_once(monkeypatch):
             return False
 
     class _Svc:
+        def record_delivery(self, *args):
+            return None
+
+        def admission_open(self):
+            return True
+
         async def refresh_pipeline(self, **kwargs):
+            assert kwargs["scheduled"] is True
             called["refresh_pipeline"] += 1
             return {"ok": True}
 
     async def _sleep(_):
         raise asyncio.CancelledError
 
-    monkeypatch.setattr(sched, "get_operation_lock", lambda _n: _Lock())
     monkeypatch.setattr(sched, "get_calendar_service", lambda: _Svc())
     monkeypatch.setattr(sched.asyncio, "sleep", _sleep)
 
     with pytest.raises(asyncio.CancelledError):
         await sched.run_calendar_pipeline_loop(poll_interval_seconds=1)
 
-    assert called["lock"] == 1
+    assert called["lock"] == 0
     assert called["refresh_pipeline"] == 1
 
 
@@ -56,7 +62,14 @@ async def test_scheduler_runs_pipeline_once(monkeypatch):
             return False
 
     class _Svc:
+        def record_delivery(self, *args):
+            return None
+
+        def admission_open(self):
+            return True
+
         async def refresh_pipeline(self, **kwargs):
+            assert kwargs["scheduled"] is True
             called["pipeline"] += 1
             assert kwargs["actor_source"] == "scheduler"
             return {"ok": True}
@@ -64,14 +77,13 @@ async def test_scheduler_runs_pipeline_once(monkeypatch):
     async def _sleep(_):
         raise asyncio.CancelledError
 
-    monkeypatch.setattr(sched, "get_operation_lock", lambda _n: _Lock())
     monkeypatch.setattr(sched, "get_calendar_service", lambda: _Svc())
     monkeypatch.setattr(sched.asyncio, "sleep", _sleep)
 
     with pytest.raises(asyncio.CancelledError):
         await sched.run_calendar_pipeline_loop(poll_interval_seconds=1)
 
-    assert called["lock"] == 1
+    assert called["lock"] == 0
     assert called["pipeline"] == 1
 
 
@@ -88,7 +100,14 @@ async def test_scheduler_logs_and_continues_on_pipeline_exception(monkeypatch):
             return False
 
     class _Svc:
+        def record_delivery(self, *args):
+            return None
+
+        def admission_open(self):
+            return True
+
         async def refresh_pipeline(self, **kwargs):
+            assert kwargs["scheduled"] is True
             called["pipeline"] += 1
             raise RuntimeError("boom")
 
@@ -96,7 +115,6 @@ async def test_scheduler_logs_and_continues_on_pipeline_exception(monkeypatch):
         called["sleep"] += 1
         raise asyncio.CancelledError
 
-    monkeypatch.setattr(sched, "get_operation_lock", lambda _n: _Lock())
     monkeypatch.setattr(sched, "get_calendar_service", lambda: _Svc())
     monkeypatch.setattr(sched.asyncio, "sleep", _sleep)
     monkeypatch.setattr(
@@ -108,7 +126,7 @@ async def test_scheduler_logs_and_continues_on_pipeline_exception(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await sched.run_calendar_pipeline_loop(poll_interval_seconds=1)
 
-    assert called["lock"] == 1
+    assert called["lock"] == 0
     assert called["pipeline"] == 1
     assert called["sleep"] == 1
     assert logged["exception"] == 1
@@ -130,7 +148,14 @@ async def test_scheduler_does_not_use_outer_wait_for(monkeypatch):
             return False
 
     class _Svc:
+        def record_delivery(self, *args):
+            return None
+
+        def admission_open(self):
+            return True
+
         async def refresh_pipeline(self, **kwargs):
+            assert kwargs["scheduled"] is True
             called["pipeline"] += 1
             return {"ok": True}
 
@@ -140,7 +165,6 @@ async def test_scheduler_does_not_use_outer_wait_for(monkeypatch):
     def _wait_for(*args, **kwargs):
         raise AssertionError("scheduler should not call asyncio.wait_for")
 
-    monkeypatch.setattr(sched, "get_operation_lock", lambda _n: _Lock())
     monkeypatch.setattr(sched, "get_calendar_service", lambda: _Svc())
     monkeypatch.setattr(sched.asyncio, "sleep", _sleep)
     monkeypatch.setattr(sched.asyncio, "wait_for", _wait_for)
@@ -161,7 +185,14 @@ async def test_daily_sequence_pipeline_then_embed(monkeypatch):
     order = []
 
     class _Svc:
+        def record_delivery(self, *args):
+            return None
+
+        def admission_open(self):
+            return True
+
         async def refresh_pipeline(self, **kwargs):
+            assert kwargs["scheduled"] is True
             order.append("pipeline")
             return {"ok": True}
 

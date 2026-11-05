@@ -100,8 +100,12 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
     profile_owner = SimpleNamespace(close=Mock())
     name_close = Mock()
     event_bundle = SimpleNamespace(close_admission=Mock(), shutdown=AsyncMock())
+    calendar = SimpleNamespace(close_admission=Mock(), drain=AsyncMock(return_value={"ok": True}))
+    uploads = SimpleNamespace(close_admission=Mock(), drain=AsyncMock())
 
     def controlled_import(name, *args, **kwargs):
+        if name == "services" and "upload_lifecycle" in (args[2] if len(args) > 2 else ()):
+            return SimpleNamespace(upload_lifecycle=uploads)
         if name == "stats_alerts.diagnostics":
             if failure == "import":
                 raise ImportError("diagnostic module unavailable")
@@ -122,6 +126,7 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
         "_shutdown_once": asyncio.Event(),
         "_stop_health_dashboard": AsyncMock(),
         "_event_bundle": lambda: event_bundle,
+        "get_calendar_service": lambda: calendar,
         "logger": Mock(),
         "daily_summary": Mock(),
         "refresh_event_cache_task": Mock(),
@@ -140,6 +145,10 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
         compile(ast.Module(body=[teardown], type_ignores=[]), "bot_instance.py", "exec"), namespace
     )
     await namespace["_graceful_teardown"]()
+    calendar.close_admission.assert_called_once()
+    calendar.drain.assert_awaited_once()
+    uploads.close_admission.assert_called_once()
+    uploads.drain.assert_awaited_once()
     namespace["_stop_health_dashboard"].assert_awaited_once()
     cache_owner.close_admission.assert_called_once()
     profile_owner.close.assert_called_once()

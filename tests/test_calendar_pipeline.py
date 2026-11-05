@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
+from event_calendar import service as service_module
 from event_calendar.service import CalendarService
 
 
@@ -9,18 +12,28 @@ from event_calendar.service import CalendarService
 async def test_pipeline_happy_path(monkeypatch):
     svc = CalendarService()
 
-    async def _refresh(**_k):
+    def _refresh(*_a, **_k):
         return {"ok": True, "status": "success"}
 
-    async def _generate(**_k):
+    def _generate(*_a, **_k):
         return {"ok": True, "status": "success", "instances_generated": 12}
 
-    async def _publish(**_k):
+    def _publish(*_a, **_k):
         return {"ok": True, "status": "success", "events_written": 12}
 
-    monkeypatch.setattr(svc, "refresh", _refresh)
-    monkeypatch.setattr(svc, "generate", _generate)
-    monkeypatch.setattr(svc, "publish_cache", _publish)
+    monkeypatch.setattr(
+        service_module, "sync_sheets_to_sql", lambda *a, **k: SimpleNamespace(**_refresh(*a, **k))
+    )
+    monkeypatch.setattr(
+        service_module,
+        "generate_calendar_instances",
+        lambda *a, **k: SimpleNamespace(**_generate(*a, **k)),
+    )
+    monkeypatch.setattr(
+        service_module,
+        "publish_event_calendar_cache",
+        lambda *a, **k: SimpleNamespace(**_publish(*a, **k)),
+    )
     monkeypatch.setattr("event_calendar.service.emit_telemetry_event", lambda _e: None)
 
     out = await svc.refresh_pipeline(sheet_id="abc", actor_source="scheduler")
@@ -36,14 +49,20 @@ async def test_pipeline_happy_path(monkeypatch):
 async def test_pipeline_stops_on_sync_failure(monkeypatch):
     svc = CalendarService()
 
-    async def _refresh(**_k):
+    def _refresh(*_a, **_k):
         return {"ok": False, "status": "failed_service", "details": "sync boom"}
 
-    async def _generate(**_k):
+    def _generate(*_a, **_k):
         raise AssertionError("generate should not be called")
 
-    monkeypatch.setattr(svc, "refresh", _refresh)
-    monkeypatch.setattr(svc, "generate", _generate)
+    monkeypatch.setattr(
+        service_module, "sync_sheets_to_sql", lambda *a, **k: SimpleNamespace(**_refresh(*a, **k))
+    )
+    monkeypatch.setattr(
+        service_module,
+        "generate_calendar_instances",
+        lambda *a, **k: SimpleNamespace(**_generate(*a, **k)),
+    )
     monkeypatch.setattr("event_calendar.service.emit_telemetry_event", lambda _e: None)
 
     out = await svc.refresh_pipeline(sheet_id="abc")
@@ -57,18 +76,28 @@ async def test_pipeline_stops_on_sync_failure(monkeypatch):
 async def test_pipeline_publish_preserve_counts_success(monkeypatch):
     svc = CalendarService()
 
-    async def _refresh(**_k):
+    def _refresh(*_a, **_k):
         return {"ok": True, "status": "success"}
 
-    async def _generate(**_k):
+    def _generate(*_a, **_k):
         return {"ok": True, "status": "success", "instances_generated": 0}
 
-    async def _publish(**_k):
+    def _publish(*_a, **_k):
         return {"ok": True, "status": "skipped_empty_preserve_existing", "events_written": 0}
 
-    monkeypatch.setattr(svc, "refresh", _refresh)
-    monkeypatch.setattr(svc, "generate", _generate)
-    monkeypatch.setattr(svc, "publish_cache", _publish)
+    monkeypatch.setattr(
+        service_module, "sync_sheets_to_sql", lambda *a, **k: SimpleNamespace(**_refresh(*a, **k))
+    )
+    monkeypatch.setattr(
+        service_module,
+        "generate_calendar_instances",
+        lambda *a, **k: SimpleNamespace(**_generate(*a, **k)),
+    )
+    monkeypatch.setattr(
+        service_module,
+        "publish_event_calendar_cache",
+        lambda *a, **k: SimpleNamespace(**_publish(*a, **k)),
+    )
     monkeypatch.setattr("event_calendar.service.emit_telemetry_event", lambda _e: None)
 
     out = await svc.refresh_pipeline(sheet_id="abc")

@@ -1,3 +1,5 @@
+> **Archived 5 November 2026.** Completed or superseded delivery record; dated holds and pending statements below are historical. Current outcome: [P01.4 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Closeout%20-%202026-11-05.md); remaining checks: [natural acceptance](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md); next work: [P01.5 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 # P01.4 complete local implementation and qualification
 
 **E91, 5 November 2026: complete original design implemented and qualified locally; ready for a publication decision. Publication and deployment remain held.**
@@ -68,4 +70,4 @@ Publication, PR/merge, private promotion, deployment/restart and natural-activit
 
 Optional SQL/CSV evidence is deliberately best effort: overload/crash/disk failure may omit it, and reports expose partial/unknown coverage. There is no durable retry spool, guaranteed audit delivery or forced termination guarantee for an arbitrary OS/driver hang. Such a hang retains ownership and refuses successful drain. Required Ready/fsync/hash/manifest/export/business custody is unchanged. P01.5/P01.6, P02-P05, F09 contention and exact incident recovery are outside this implementation.
 
-All existing changes and archive moves must travel with the [documentation carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md). Private harnesses, logs, fixture data and before-copies must not be published. No commit, push, PR, merge, deployment, production mutation or provider request occurred.
+All existing changes and archive moves must travel with the [documentation carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md). Private harnesses, logs, fixture data and before-copies must not be published. No commit, push, PR, merge, deployment, production mutation or provider request occurred.

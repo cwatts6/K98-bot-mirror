@@ -11,7 +11,7 @@ from scripts import prepare_k98_update as updater
 
 def test_historical_62_transitions_remain_immutable():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 64
+    assert len(entries) == 65
     assert hashlib.sha256(json.dumps(entries[:62], sort_keys=True).encode()).hexdigest() == (
         "4b36fd4a0996b43ebe5e81303b5813ee54f5e0499d9097a487d8273c783648c9"
     )

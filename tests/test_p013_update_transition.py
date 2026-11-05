@@ -12,7 +12,7 @@ from tests.updater_source_assertions import before_p014_hash
 
 def test_historical_61_transitions_unchanged():
     transitions = updater.reviewed_transitions()
-    assert len(transitions) == 64
+    assert len(transitions) == 65
     assert hashlib.sha256(json.dumps(transitions[:61], sort_keys=True).encode()).hexdigest() == (
         "c161f4d47ee6b9204d51372df908d3a7f9b59d6182e0a8b51e3e97983b769f2e"
     )
@@ -85,6 +85,6 @@ def test_fixed_family_cannot_be_shortened(monkeypatch):
 
 
 def test_registry_remains_size_bounded(monkeypatch):
-    monkeypatch.setattr(Path, "read_bytes", lambda _: b" " * 155649)
+    monkeypatch.setattr(Path, "read_bytes", lambda _: b" " * 172033)
     with pytest.raises(ValueError, match="exceeds bound"):
         updater.reviewed_transitions()

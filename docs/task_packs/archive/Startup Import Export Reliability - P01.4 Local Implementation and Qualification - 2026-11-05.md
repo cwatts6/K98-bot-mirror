@@ -1,3 +1,5 @@
+> **Archived 5 November 2026.** Completed or superseded delivery record; dated holds and pending statements below are historical. Current outcome: [P01.4 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Closeout%20-%202026-11-05.md); remaining checks: [natural acceptance](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md); next work: [P01.5 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 # P01.4 local implementation and qualification
 
 > **Current E91, 5 November 2026:** The [complete local qualification receipt](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md) records the full original P01.4 design implemented and qualified locally, with both optional workers enabled in the unpublished candidate. Cost, physical-drain, diagnostic-priority, updater, regression and Changes-review gates passed. No CSV scope was deferred. Publication/deployment and natural-activity acceptance remain outstanding; earlier E88-E90 disabled/pending statements below are historical. Existing changes and archive moves are preserved.
@@ -12,7 +14,7 @@
 
 Implementation is uncommitted in the existing mirror checkout `.codex_artifacts/p1-mge-mirror-review`, based on `2f2883a98dfc30dff0373dd38800bb4795f1b652`. The older root checkout's intentional documentation changes remain intact. The private checkout at `65ad4fa6d765a88b45cfbb6bba8b6b32af802f6e` and SQL repository at `7e91989f619deb46836194c7e705b0a9eb2ebe11` were not changed. No commit, push, PR, merge, production request, deployment, restart or recovery action was performed.
 
-The prior [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md) was reconciled into the mirror: 25 destination documents and five exact archive moves, with pre-copy files retained privately. Carry this report and the latest status overlays forward too. Do not replace the root checkout's documents from the mirror without reconciling subsequent user work.
+The prior [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md) was reconciled into the mirror: 25 destination documents and five exact archive moves, with pre-copy files retained privately. Carry this report and the latest status overlays forward too. Do not replace the root checkout's documents from the mirror without reconciling subsequent user work.
 
 ## Slice disposition
 

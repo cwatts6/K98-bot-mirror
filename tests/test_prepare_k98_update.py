@@ -218,7 +218,6 @@ def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
         "scripts/Update-K98.ps1",
         "run_bot.py",
         "bot_config.py",
-        "constants.py",
         "core/__init__.py",
         "services/__init__.py",
         "scripts/__init__.py",
@@ -230,6 +229,20 @@ def test_startup_contract_changes_are_rejected_before_blob_reads(path):
 
     with pytest.raises(ValueError, match=r"Startup/update contract change.*non-routine"):
         source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
+
+
+def test_constants_change_requires_exact_reviewed_family():
+    reads = []
+
+    def unreviewed_read(revision, path):
+        reads.append((revision, path))
+        return b"unreviewed constants or peer"
+
+    # Constants is an unchanged, authenticated P01.5 dependency. Merely naming
+    # it in a changed-path inventory cannot authorize modified content.
+    with pytest.raises(ValueError):
+        source_plan(inventory(), BEFORE, AFTER, ["constants.py"], unreviewed_read)
+    assert reads
 
 
 def test_predecessor_preparer_rejects_target_generator_and_consumer_changes(monkeypatch):

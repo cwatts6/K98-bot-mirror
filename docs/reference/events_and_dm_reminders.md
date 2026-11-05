@@ -187,3 +187,9 @@ are isolated together; production default adapters and all natural seasonal rout
 See `runbook_diagnostics.md` for exact paths, keep-all retention, reopen/recovery and smoke.
 A same-day edit is not fresh guard proof. Neither diagnostic smoke nor Phase 2G restart evidence
 completes the separately pending natural-calendar dispatch observation.
+
+## P01.5 calendar mutation contract (local candidate)
+
+Calendar sync, generation, publication and full refresh share one physical owner. Direct competing requests receive a busy result; startup/daily/interval callers can retain one scheduled intent. Deadlines observe the original work and never authorize replay. Cancellation/shutdown drains the entered stage and prevents later stages. Unknown database cleanup remains visibly owned and blocks new mutations.
+
+EventSyncLog is optional, independently admitted, with one context and no retry/backlog. A missing audit row is not proof of business failure. Input commit, generated-instance commit, primary JSON replacement, auxiliary index replacement and Discord response are separate outcomes. A failed type index leaves primary success and its count intact, with a warning; both JSON schemas remain compatible.

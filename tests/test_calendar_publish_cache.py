@@ -34,6 +34,12 @@ def test_publish_preserve_on_empty(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "load_runtime_instances", lambda *_a, **_k: [])
 
     class _Conn:
+        def close(self):
+            return None
+
+        def rollback(self):
+            return None
+
         def __enter__(self):
             return self
 
@@ -65,6 +71,12 @@ def test_publish_writes_two_files(monkeypatch, tmp_path):
     ]
 
     class _Conn:
+        def close(self):
+            return None
+
+        def rollback(self):
+            return None
+
         def __enter__(self):
             return self
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import hashlib
 import json
 import logging
 from typing import Any
 
+from event_calendar.sql_lifecycle import SqlOutcome, SqlSession, error_facts
 from file_utils import get_conn_with_retries
 
 logger = logging.getLogger(__name__)
@@ -28,10 +29,12 @@ class GenerationResult:
     ok: bool
     status: str
     instances_generated: int = 0
-    instances_written: int = 0
+    instances_written: int | None = 0
     cancelled_count: int = 0
     modified_count: int = 0
     error_message: str | None = None
+    attempted: dict[str, int] = field(default_factory=dict)
+    sql: SqlOutcome = field(default_factory=SqlOutcome)
 
 
 def _utcnow() -> datetime:
@@ -376,41 +379,41 @@ def write_event_instances(*, conn, instances: list[dict[str, Any]]) -> int:
 
 
 def generate_calendar_instances(*, horizon_days: int = 365) -> GenerationResult:
-    now = _utcnow()
-    horizon_start = now
-    horizon_end = now + timedelta(days=horizon_days)
-
+    result = GenerationResult(ok=False, status="failed_generate")
+    session = SqlSession(
+        lambda: get_conn_with_retries(meta={"operation": "calendar_generate_instances"})
+    )
+    result.sql = session.outcome
     try:
-        with get_conn_with_retries(meta={"operation": "calendar_generate_instances"}) as conn:
+        now = _utcnow()
+        horizon_end = now + timedelta(days=horizon_days)
+        with session as conn:
             recurring = load_recurring_rules(conn)
             oneoff = load_oneoff_events(conn)
             overrides = load_overrides(conn)
-
             recurring_instances = generate_recurring_instances(
-                rules=recurring,
-                horizon_start_utc=horizon_start,
-                horizon_end_utc=horizon_end,
+                rules=recurring, horizon_start_utc=now, horizon_end_utc=horizon_end
             )
             merged = merge_events(recurring_instances=recurring_instances, oneoff_events=oneoff)
             final_instances, cancelled, modified = apply_overrides(
                 instances=merged, overrides=overrides
             )
-
+            result.instances_generated = len(final_instances)
+            result.cancelled_count = cancelled
+            result.modified_count = modified
             written = write_event_instances(conn=conn, instances=final_instances)
+            result.attempted = {"instances_written": written}
             conn.commit()
-
-        return GenerationResult(
-            ok=True,
-            status="success",
-            instances_generated=len(final_instances),
-            instances_written=written,
-            cancelled_count=cancelled,
-            modified_count=modified,
-        )
-    except Exception as e:
-        logger.exception("[CALENDAR] generate_calendar_instances failed")
-        return GenerationResult(
-            ok=False,
-            status="failed_generate",
-            error_message=f"{type(e).__name__}: {e}",
-        )
+            result.ok = True
+            result.status = "success"
+            result.instances_written = written
+    except Exception as error:
+        result.error_message = str(error_facts(error))
+        if not result.sql.error:
+            result.sql.error = error_facts(error)
+        if result.sql.effect == "unknown":
+            result.status = "commit_unknown"
+            result.instances_written = None
+        elif result.sql.effect == "rolled_back":
+            result.status = "rolled_back"
+    return result

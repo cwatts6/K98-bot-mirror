@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-import json
 import logging
-import os
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Any
 
 from constants import EVENT_CALENDAR_CACHE_FILE_PATH, EVENT_TYPE_INDEX_FILE_PATH
 from event_calendar.cache_contract import build_event_calendar_cache_payload
-from file_utils import get_conn_with_retries
+from event_calendar.sql_lifecycle import SqlOutcome, SqlSession, error_facts
+from file_utils import atomic_json_write, get_conn_with_retries
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +21,14 @@ _TYPE_INDEX_PATH = Path(EVENT_TYPE_INDEX_FILE_PATH)
 class PublishResult:
     ok: bool
     status: str
-    events_written: int = 0
+    events_written: int | None = 0
     cache_path: str = field(default_factory=lambda: str(_CACHE_PATH))
     type_index_path: str = field(default_factory=lambda: str(_TYPE_INDEX_PATH))
     error_message: str | None = None
+    primary: str = "not_attempted"
+    index: str = "not_attempted"
+    generation: str | None = None
+    sql: SqlOutcome = field(default_factory=SqlOutcome)
 
 
 def _utcnow() -> datetime:
@@ -34,13 +36,9 @@ def _utcnow() -> datetime:
 
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as tmp:
-        json.dump(payload, tmp, indent=2)
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp_name = tmp.name
-    os.replace(tmp_name, path)
+    atomic_json_write(
+        str(path), payload, ensure_ascii=True, sort_keys=False, default=None, replace_retries=1
+    )
 
 
 def load_runtime_instances(conn, *, horizon_days: int = 365) -> list[dict[str, Any]]:
@@ -117,37 +115,45 @@ def build_event_type_index_payload(
 def publish_event_calendar_cache(
     *, horizon_days: int = 365, force_empty: bool = False
 ) -> PublishResult:
+    result = PublishResult(ok=False, status="failed_publish")
+    session = SqlSession(
+        lambda: get_conn_with_retries(meta={"operation": "calendar_publish_cache"}),
+        read_only=True,
+    )
+    result.sql = session.outcome
     try:
-        with get_conn_with_retries(meta={"operation": "calendar_publish_cache"}) as conn:
+        with session as conn:
             instances = load_runtime_instances(conn, horizon_days=horizon_days)
-
+        if result.sql.cleanup == "unconfirmed":
+            result.status = "cleanup_unconfirmed"
+            return result
         payload = build_cache_payload(instances, horizon_days=horizon_days)
         events = payload.get("events", [])
-
         if not events and _CACHE_PATH.exists() and not force_empty:
-            return PublishResult(
-                ok=True,
-                status="skipped_empty_preserve_existing",
-                events_written=0,
-            )
-
-        generated_utc = str(payload.get("generated_utc", ""))
-        type_index_payload = build_event_type_index_payload(
-            payload=payload, horizon_days=horizon_days, generated_utc=generated_utc
-        )
-
+            result.ok = True
+            result.status = "skipped_empty_preserve_existing"
+            result.primary = "preserved"
+            return result
+        result.primary = "unknown"
+        result.events_written = None
         _atomic_write_json(_CACHE_PATH, payload)
-        _atomic_write_json(_TYPE_INDEX_PATH, type_index_payload)
-
-        return PublishResult(
-            ok=True,
-            status="success",
-            events_written=len(events),
+        result.ok = True
+        result.status = "success"
+        result.events_written = len(events)
+        result.primary = "new"
+        result.generation = str(payload.get("generated_utc", ""))
+    except Exception as error:
+        result.error_message = str(error_facts(error))
+        return result
+    # Index construction and replacement cannot erase the primary acknowledgement.
+    try:
+        index = build_event_type_index_payload(
+            payload=payload, horizon_days=horizon_days, generated_utc=result.generation
         )
-    except Exception as e:
-        logger.exception("[CALENDAR] publish_event_calendar_cache failed")
-        return PublishResult(
-            ok=False,
-            status="failed_publish",
-            error_message=f"{type(e).__name__}: {e}",
-        )
+        _atomic_write_json(_TYPE_INDEX_PATH, index)
+        result.index = "same_payload"
+    except Exception as error:
+        result.status = "success_index_warning"
+        result.index = "old_or_unknown"
+        result.error_message = str(error_facts(error))
+    return result

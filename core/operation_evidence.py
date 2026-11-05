@@ -21,6 +21,9 @@ _owners_lock = threading.Lock()
 STAGES = frozenset(
     {
         "operation",
+        "calendar_sync",
+        "calendar_generate",
+        "calendar_publish",
         "configuration_attempt",
         "worker_execution",
         "worker_observer",
@@ -368,6 +371,11 @@ def _emit(stage, state, *, elapsed_ms=None, facts=None, error=None, holder=None)
                 for key, value in facts.items()
                 if key
                 in {
+                    "calendar_written",
+                    "calendar_effect",
+                    "calendar_cleanup",
+                    "calendar_primary",
+                    "calendar_index",
                     "reported_success",
                     "attempt_id",
                     "operation_id",

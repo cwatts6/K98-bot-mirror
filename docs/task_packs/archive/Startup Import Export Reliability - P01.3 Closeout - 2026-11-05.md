@@ -64,8 +64,8 @@ P01.4 owns F17/F30; P01.5/P01.6 remain. P02 owns contention/holder attribution (
 
 ## Related records
 
-- [P01.4 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md)
-- [documentation carry-forward](../Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md)
+- [P01.4 handover](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md)
+- [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md)
 - [programme scope](../Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md)
 - [tracker](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md)
 - [P01 design](../Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md)

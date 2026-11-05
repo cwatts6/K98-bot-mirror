@@ -1,8 +1,10 @@
+> **Archived 5 November 2026.** Completed or superseded delivery record; dated holds and pending statements below are historical. Current outcome: [P01.4 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Closeout%20-%202026-11-05.md); remaining checks: [natural acceptance](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md); next work: [P01.5 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 # P01.4 PR review and release preparation
 
 **E92, 5 November 2026: publication, review fixes and merge are authorized; deployment remains for the operator.** This supersedes the publication hold in the dated E91 qualification receipt without changing its evidence or the complete original scope.
 
-The complete candidate is being delivered through [mirror PR 488](https://github.com/cwatts6/K98-bot-mirror/pull/488) and a patch-based private production PR. SQL source is unchanged, so no SQL PR or migration is required. The [complete local qualification](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md), [whole-solution design](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Whole%20Solution%20Design%20-%202026-11-05.md) and [carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md) remain the scope and evidence sources.
+The complete candidate is being delivered through [mirror PR 488](https://github.com/cwatts6/K98-bot-mirror/pull/488) and a patch-based private production PR. SQL source is unchanged, so no SQL PR or migration is required. The [complete local qualification](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md), [whole-solution design](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Whole%20Solution%20Design%20-%202026-11-05.md) and [carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md) remain the scope and evidence sources.
 
 ## Review corrections
 

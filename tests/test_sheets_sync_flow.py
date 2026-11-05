@@ -7,6 +7,12 @@ class FakeConn:
     def cursor(self):
         return object()
 
+    def close(self):
+        return None
+
+    def rollback(self):
+        return None
+
     def commit(self):
         return None
 
@@ -18,14 +24,6 @@ class FakeConn:
 
 
 def test_sync_sheets_to_sql_fetch_fail_graceful(monkeypatch):
-    monkeypatch.setattr(sheets_sync, "_insert_sync_log_start", lambda _src: 123)
-
-    captured = {"finished": None}
-
-    def _finish(sync_id, result):
-        captured["finished"] = (sync_id, result)
-
-    monkeypatch.setattr(sheets_sync, "_finish_sync_log", _finish)
     monkeypatch.setattr(
         sheets_sync,
         "fetch_sheet_csv",
@@ -36,12 +34,10 @@ def test_sync_sheets_to_sql_fetch_fail_graceful(monkeypatch):
     assert res.ok is False
     assert res.status == "failed_fetch_or_validate"
     assert "RuntimeError" in (res.error_message or "")
-    assert captured["finished"] is not None
+    assert res.sql.effect == "not_started"
 
 
 def test_sync_sheets_to_sql_happy_path(monkeypatch):
-    monkeypatch.setattr(sheets_sync, "_insert_sync_log_start", lambda _src: 999)
-    monkeypatch.setattr(sheets_sync, "_finish_sync_log", lambda *_a, **_k: None)
     monkeypatch.setattr(sheets_sync, "get_conn_with_retries", lambda **_kwargs: FakeConn())
 
     def _fetch(_sheet, tab):

@@ -856,3 +856,13 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: high
 - Risk: medium
 - Dependencies: P03a startup custody correction and separately receipted recovery; review the launcher/source-pin transition and actual Windows task execution before deployment. This diagnostic improvement does not authorize changing the existing evidence ACL.
+
+
+### Deferred Optimisation
+- Area: scripts/validate_k98_update_compatibility.py (release-authoring CLI)
+- Type: performance
+- Description: P01.4 review observed repeated per-blob Git process startup for a 40-member source family; the Windows CI compatibility step took about 707 seconds. Installed preparation already uses bounded batched reads, so this is tooling cost, not a demonstrated runtime/drain regression.
+- Suggested Fix: Separately qualify bounded batch blob reads or a byte-bounded cache while preserving exact object, mode, size, inventory and historical-pin checks. Retain before/after costs and rejection tests.
+- Impact: medium
+- Risk: medium
+- Dependencies: Separate tooling scope and Changes review; preserve installed 128 MiB batch bound and all historical transitions. Not an implicit addition to P01.5.
