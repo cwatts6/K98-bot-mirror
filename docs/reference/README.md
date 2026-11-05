@@ -1,3 +1,5 @@
+> **P01.4 publication checkpoint (E92, 5 November):** PR publication, review fixes and merge are authorized; deployment remains with the operator. See the [review and release checkpoint](../task_packs/Startup%20Import%20Export%20Reliability%20-%20P01.4%20PR%20Review%20and%20Release%20-%202026-11-05.md). Earlier publication holds are historical.
+
 # K98 Bot Reference Docs
 
 > **Current E91, 5 November 2026:** The [complete local qualification receipt](../task_packs/Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md) records the full original P01.4 design implemented and qualified locally, with both optional workers enabled in the unpublished candidate. Cost, physical-drain, diagnostic-priority, updater, regression and Changes-review gates passed. No CSV scope was deferred. Publication/deployment and natural-activity acceptance remain outstanding; earlier E88-E90 disabled/pending statements below are historical. Existing changes and archive moves are preserved.
