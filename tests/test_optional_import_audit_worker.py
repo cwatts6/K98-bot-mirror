@@ -174,6 +174,37 @@ class Dal:
         self.calls.append(("fail", values))
 
 
+@pytest.mark.parametrize("failure", [None, OSError("private SQL failure")])
+def test_idle_sql_worker_publishes_settled_summary_without_another_upload(monkeypatch, failure):
+    from services import operation_diagnostics
+
+    summaries = []
+    published = threading.Event()
+    expected_state = "failed" if failure else "settled"
+
+    def capture(kind, state, **details):
+        summaries.append((kind, state, details))
+        if state == expected_state:
+            published.set()
+
+    monkeypatch.setattr(operation_diagnostics, "upload_worker_summary", capture)
+    monkeypatch.setattr(operation_diagnostics, "offer_upload_observation", lambda *a, **kw: None)
+    dal = Dal(start_error=failure)
+    worker = ImportAuditWriter(lambda: None, dal=dal).start()
+    try:
+        worker.start_batch(import_kind="honor")
+        assert published.wait(3), "Idle worker did not publish its final physical outcome"
+        kind, state, details = summaries[-1]
+        assert kind == "sql" and state == expected_state
+        assert details["failures"] == (1 if failure else 0)
+        assert details["error_type"] == ("OSError" if failure else None)
+        assert worker.settled == 1 and len(dal.calls) == 1
+        assert worker._thread.is_alive() and not worker._closed
+        assert "private SQL failure" not in repr(summaries)
+    finally:
+        worker.close()
+
+
 @pytest.mark.parametrize(
     "failure,mismatch", [(RuntimeError("lost ack after insert"), False), (None, True)]
 )

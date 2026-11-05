@@ -112,21 +112,25 @@ class ImportAuditWriter(OptionalWriter):
 
     def _project(self, identity, state, lost=0):
         try:
-            from services.operation_diagnostics import (
-                offer_upload_observation,
-                upload_worker_summary,
-            )
+            from services.operation_diagnostics import offer_upload_observation
 
             offer_upload_observation(identity, state, lost)
-            upload_worker_summary(
-                "sql",
-                self.latest,
-                error_type=self.first_failure,
-                dropped=self.dropped,
-                failures=self.failures,
-            )
+            self.observe_settlement()
         except Exception:
             self.observation_unavailable = True
+
+    def observe_settlement(self):
+        # The transport calls this after updating its physical outcome counters.
+        # Publish even when this is the last SQL operation before an idle period.
+        from services.operation_diagnostics import upload_worker_summary
+
+        upload_worker_summary(
+            "sql",
+            self.latest,
+            error_type=self.first_failure,
+            dropped=self.dropped,
+            failures=self.failures,
+        )
 
     def action(self, handle, action, values):
         if not isinstance(handle, PendingAudit) or action not in {
