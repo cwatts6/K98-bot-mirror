@@ -1,0 +1,19 @@
+# H10 receipt reconciliation — 2026-09-27
+
+Operator-supplied MINI_AMD output reports StartedUtc 07:50:47.5944767Z, FinishedUtc 07:50:49.7826395Z, elapsed 2190 ms and Completed. Both timestamps lie within the approved 07:47:53–08:07:53 UTC window; stopwatch duration and approximately 2.188-second UTC endpoint interval are below 20 seconds. Preserve the distinct clock values. Exactly the three approved tasks are present. No error was supplied; completion is not an independently observed exit status or native identity proof.
+
+The raw receipt is `.codex_artifacts/s11-g4-capture-preparation-20260926/received-H10-20260927T075110Z.txt`. Filename time is receipt recording, not execution. This additive reconciliation supersedes awaiting-output status without rewriting historical approvals or seals.
+
+| Task | Reported settings | Planning implication and limit |
+|---|---|---|
+| K98 SQL Nightly Schema Export | Ready, Enabled=true; daily interval 1, boundary `2026-06-02T01:30:00+01:00`; catch-up=true; PT2H execution limit; battery restrictions; wake=false; RunOnlyIfIdle=false | Account for possible delayed/catch-up execution when later planning writer exclusion. Ready is not Running. IdleDuration PT10M / WaitTimeout PT1H are retained fields, not evidence that this task is idle-only. No next-run UTC prediction or SQL/export effects inferred. |
+| K98 SQL Schema Export | Disabled, Enabled=false; trigger Enabled=true; daily interval 1, boundary `2025-11-14T01:30:00`; catch-up=true; PT1H limit; wake=true | Enabled trigger/catch-up/wake fields do not override disabled task status. Preserve offset-free boundary as supplied. No enablement or invocation. |
+| RUN_Bot | Disabled, Enabled=false; logon trigger Enabled=true with PT1M delay; catch-up=false; PT72H limit | One-minute logon delay is retained definition metadata for a disabled task, not an active launch or future startup authorization. StartDLBotAfterSQL remains the operator-confirmed normal startup task. Logon user filter and action arguments remain unobserved. |
+
+All three report AllowDemandStart=true, RestartCount=0, RestartInterval=null, MultipleInstances=2 and RunOnlyIfNetworkAvailable=false. Preserve these with H04's IgnoreNew rendering; they do not establish process-wide singleton or writer exclusion. No populated repetition interval/duration was supplied. Null fields do not certify defaults. State/settings observations align with H04's Ready/Disabled distinctions but do not prove continuous state between receipts.
+
+Together H07 and H10 provide the selected missing schedule/settings fields for the seven previously named tasks. This closes that bounded metadata gap only. It is not an exhaustive task/service/manual-tool/SQL Agent inventory or proof of no future effects. Arguments/script bindings for these three tasks, withheld Restart daily arguments, and some trigger-specific fields remain unresolved. Obtain retained/source evidence first; no new live observation is authorized by this receipt.
+
+No task was executed or changed by this metadata capture, and no SQL connection or schema export was performed by the assistant. All seven typed G4 proofs and actual restore remain incomplete. Native identity, protected-path/key custody, provider, SQL and storage gaps remain open. Preserve isolated hotfix production, same-account/admin-owned model and fresh output/equivalent reports. Memory-cause investigation remains deferred; withdrawn collector stays withdrawn; empty KVK and view-rehydration remain separate issues. No rollout/G5, provisioning, restore or Git publication approval follows.
+
+Validation: local JSON parsing, target/class/window/budget comparisons, exact command hash and original evidence/seal integrity checks. No application/configuration change or PR; runtime tests, architecture/deferred/test-selection validators and new security scan are skipped for this additive evidence-only record.
