@@ -85,7 +85,6 @@ async def test_admin_user_fetch_completes_before_fallback_processing_lock(
         "stage_and_process_fallback_attachment",
         stage_and_process,
     )
-    monkeypatch.setattr(bot_helpers, "append_csv_line", append_csv_line)
     monkeypatch.setattr(bot_helpers, "handle_file_processing", handle_file_processing)
 
     await bot_helpers.queue_worker(channel_id)

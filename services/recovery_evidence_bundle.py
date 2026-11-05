@@ -368,6 +368,12 @@ def collect_components(*, lease=None):
     except Exception:
         snapshot = {"operations": [], "status": "unavailable"}
     rows = snapshot.get("operations", [])
+    from services.optional_upload_observations import is_upload_row
+
+    upload_coverage = snapshot.get("upload_observations", {})
+    upload_partial = type(upload_coverage) is dict and (
+        upload_coverage.get("coverage") == "partial" or upload_coverage.get("pending", 0) != 0
+    )
     valid, rejected = [], 0
     validator = operation_diagnostics.DiagnosticSink()
     for row in rows[:512]:
@@ -376,17 +382,20 @@ def collect_components(*, lease=None):
             data = encode(projected) + b"\n"
             if len(data) > 32768:
                 raise ValueError("Operation bound")
-            valid.append(data)
+            valid.append((is_upload_row(projected), data))
         except Exception:
             rejected += 1
-    operations = b"".join(valid)
+    valid.sort(key=lambda item: item[0])
+    operations = b"".join(data for _, data in valid)
     if len(operations) <= 16 * 1024 * 1024:
         components["operations.jsonl"] = operations
         descriptors["operations.jsonl"] = dict(
             status=(
                 "unavailable"
                 if snapshot.get("status") == "unavailable"
-                else "partial" if rejected else "available"
+                else "partial"
+                if rejected or upload_partial
+                else "available"
             ),
             included=len(valid),
             available=len(rows) if snapshot.get("status") != "unavailable" else "unknown",
@@ -402,6 +411,7 @@ def collect_components(*, lease=None):
                 lambda: snapshot.get("publication", "unknown"), limit=4096
             )[0],
             retention_days=snapshot.get("retention_days", "unknown"),
+            upload_observations=guarded(lambda: upload_coverage, limit=4096)[0],
             captured_from_utc=started,
             captured_through_utc=utc(),
         )

@@ -25,6 +25,8 @@ STAGES = frozenset(
         "worker_execution",
         "worker_observer",
         "worker_queue_wait",
+        "upload_audit",
+        "download_log",
         "proc_config_import",
         "build_player_stats_cache",
         "warm_profile_cache",

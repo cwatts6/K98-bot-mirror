@@ -92,7 +92,10 @@ def test_registry_requires_fixed_complete_family(monkeypatch):
 def test_historical_bridge_requires_successor_for_its_own_source_family(monkeypatch):
     from tests.updater_source_assertions import before_p012a_hash
 
-    monkeypatch.setattr(updater, "reviewed_transitions", lambda: [])
+    installed = [
+        item for item in updater.reviewed_transitions() if item["id"] != "p012a_evidence_bundle_v1"
+    ]
+    monkeypatch.setattr(updater, "reviewed_transitions", lambda: installed)
     root = Path(__file__).resolve().parents[1]
     with pytest.raises(AssertionError, match="Required p012a_evidence_bundle_v1"):
         before_p012a_hash(root, "core/owned_work.py")

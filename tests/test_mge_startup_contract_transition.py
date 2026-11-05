@@ -108,7 +108,7 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
         name: json.loads(raw)
         for name, raw in successor_seed(
             initial,
-            {"DL_bot.py": updater.sha256(b"old\n")},
+            {"application_feature.py": updater.sha256(b"old\n")},
             deployment_id=str(uuid4()),
             review_id=str(uuid4()),
             pipe_id=str(uuid4()),
@@ -146,8 +146,8 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
         ),
     )
     blobs = {
-        (before, "DL_bot.py"): b"old\n",
-        (target, "DL_bot.py"): b"new\n",
+        (before, "application_feature.py"): b"old\n",
+        (target, "application_feature.py"): b"new\n",
         (target, updater.RELEASE_DESCRIPTION): json.dumps(d).encode(),
     }
     files = {
@@ -183,7 +183,7 @@ def test_complete_packet_rebinds_only_application_contract_and_keeps_other_guard
     def run():
         return updater.prepare_update(
             observation,
-            ["DL_bot.py", updater.RELEASE_DESCRIPTION],
+            ["application_feature.py", updater.RELEASE_DESCRIPTION],
             lambda *key: blobs.get(key),
             tmp_path / "packet",
             tools,

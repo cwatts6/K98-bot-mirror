@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("legacy_optional_audit")
+
 from services import weekly_activity_import_audit_service as audit
 from stats.dal.import_audit_dal import ImportAuditBatchRef
 

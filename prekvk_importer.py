@@ -230,6 +230,8 @@ def import_prekvk_bytes(
     phase = "start"
     scan_id: int | None = None
     rows_imported = 0
+    commit_entered = False
+    commit_acknowledged = False
     rows_in_source: int | None = None
 
     try:
@@ -259,6 +261,13 @@ def import_prekvk_bytes(
             return (ok, note, rows)
         metadata: dict[str, Any] = {
             "status": status,
+            "business_outcome": "committed"
+            if commit_acknowledged
+            else "outcome_unconfirmed"
+            if commit_entered
+            else "duplicate"
+            if status == "duplicate"
+            else "rejected",
             "phase": phase_name or phase,
             "kvk_no": int(kvk_no),
             "rows_in_source": rows_in_source_value,
@@ -272,6 +281,29 @@ def import_prekvk_bytes(
         if error_text:
             metadata["error_text"] = error_text
         return (ok, note, rows, metadata)
+
+    def _committed_or_unconfirmed(error):
+        if commit_acknowledged:
+            return _result(
+                True,
+                "Import committed; follow-up diagnostics unavailable.",
+                rows_imported,
+                status="accepted",
+                phase_name=phase,
+                rows_in_source_value=rows_in_source,
+                error_type=type(error).__name__,
+            )
+        if commit_entered:
+            return _result(
+                False,
+                "Import outcome unconfirmed; do not replay automatically.",
+                0,
+                status="failed",
+                phase_name=phase,
+                rows_in_source_value=rows_in_source,
+                error_type=type(error).__name__,
+            )
+        return None
 
     def _record_history(
         status: str,
@@ -679,9 +711,10 @@ def import_prekvk_bytes(
                 )
 
                 # Keep semantics: one commit for whole scan
-                conn.commit()
-
                 rows_imported = int(inserted)
+                commit_entered = True
+                conn.commit()
+                commit_acknowledged = True
                 logger.info(
                     "[PREKVK] import success kvk_no=%s file=%s scan_id=%s rows=%s hash=%s",
                     kvk_no,
@@ -722,6 +755,9 @@ def import_prekvk_bytes(
         )
 
     except pyodbc.IntegrityError as e:
+        classified = _committed_or_unconfirmed(e)
+        if classified is not None:
+            return classified
         if "UQ_PreKvk_Scan" in str(e) or "unique" in str(e).lower():
             logger.info(
                 "[PREKVK] import skipped duplicate (unique) kvk_no=%s file=%s hash=%s",
@@ -791,6 +827,9 @@ def import_prekvk_bytes(
         )
 
     except Exception as e:
+        classified = _committed_or_unconfirmed(e)
+        if classified is not None:
+            return classified
         logger.exception(
             "[PREKVK] import failed phase=%s kvk_no=%s file=%s", phase, kvk_no, filename
         )

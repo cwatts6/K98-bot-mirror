@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from services import import_audit_service
+from services.optional_import_audit_worker import run_audit
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,8 @@ async def start_weekly_activity_audit_batch(
     audit_runner: AuditThreadRunner = asyncio.to_thread,
 ):
     try:
-        return await audit_runner(
+        return await run_audit(
+            audit_runner,
             _start_weekly_activity_audit_batch_sync,
             context,
             xlsx_bytes,
@@ -132,7 +134,8 @@ async def record_weekly_activity_audit_phase(
     if batch_ref is None:
         return
     try:
-        await audit_runner(
+        await run_audit(
+            audit_runner,
             import_audit_service.record_phase_best_effort,
             batch_ref,
             phase_name=phase_name,
@@ -170,7 +173,8 @@ async def complete_weekly_activity_audit_batch(
     if batch_ref is None:
         return
     try:
-        await audit_runner(
+        await run_audit(
+            audit_runner,
             import_audit_service.complete_batch_best_effort,
             batch_ref,
             status=status,
@@ -205,7 +209,8 @@ async def fail_weekly_activity_audit_batch(
     if batch_ref is None:
         return
     try:
-        await audit_runner(
+        await run_audit(
+            audit_runner,
             import_audit_service.fail_batch_best_effort,
             batch_ref,
             status=status,

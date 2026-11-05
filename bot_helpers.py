@@ -13,11 +13,11 @@ import discord
 
 from bot_config import ADMIN_USER_ID, ADMIN_USER_MENTION, CHANNEL_IDS, NOTIFY_CHANNEL_ID
 from bot_loader import bot  # ✅ safe to do now
-from constants import COMMAND_CACHE_FILE, CSV_LOG, DOWNLOAD_FOLDER, RESTART_FLAG_PATH
+from constants import COMMAND_CACHE_FILE, DOWNLOAD_FOLDER, RESTART_FLAG_PATH
 from embed_utils import send_embed
-from file_utils import append_csv_line
 from logging_setup import flush_logs
 from processing_pipeline import handle_file_processing
+from services.fallback_queue_item import selected_attachments
 from services.fallback_upload_staging_service import (
     stage_and_process_fallback_attachment,
 )
@@ -253,8 +253,7 @@ async def clean_expired_jobs(days=7):
                 and "uploaded" in job
                 and (
                     # parse safely and normalise to UTC-aware before comparing
-                    ensure_aware_utc(datetime.fromisoformat(job["uploaded"])).timestamp()
-                    < cutoff
+                    ensure_aware_utc(datetime.fromisoformat(job["uploaded"])).timestamp() < cutoff
                 )
             )
         ]
@@ -292,9 +291,13 @@ async def queue_worker(channel_id):
     queue = channel_queues[channel_id]
     while True:
         try:
-            message = await queue.get()
+            item = await queue.get()
+            attachments = ()
+            attempted = 0
             try:
-                for attachment in message.attachments:
+                message, attachments = selected_attachments(item)
+                for attachment in attachments:
+                    attempted += 1
                     admin_user = bot.get_user(ADMIN_USER_ID)
                     if admin_user is None:
                         admin_user = await bot.fetch_user(ADMIN_USER_ID)
@@ -304,18 +307,7 @@ async def queue_worker(channel_id):
                         staged_path: str,
                         user=admin_user,
                     ) -> None:
-                        await append_csv_line(
-                            CSV_LOG,
-                            [
-                                utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                                message.channel.name,
-                                filename,
-                                str(message.author),
-                                staged_path,
-                            ],
-                        )
-
-                        job_id = (channel_id, filename)
+                        job_id = (channel_id, getattr(message, "id", None), staged_path)
                         async with active_jobs_lock:
                             if job_id in active_jobs:
                                 logger.warning(f"Duplicate job skipped: {job_id}")
@@ -360,6 +352,11 @@ async def queue_worker(channel_id):
                         )
 
             finally:
+                if attempted < len(attachments):
+                    logger.warning(
+                        "Fallback message stopped; remaining attachments unattempted=%s",
+                        len(attachments) - attempted,
+                    )
                 queue.task_done()  # ✅ Only after successful .get()
 
         except asyncio.CancelledError:

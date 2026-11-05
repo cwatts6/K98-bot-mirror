@@ -4,6 +4,8 @@ import pytest
 
 from services import location_import_service as svc
 
+pytestmark = pytest.mark.usefixtures("legacy_optional_audit")
+
 
 @pytest.fixture(autouse=True)
 def _disable_location_audit(monkeypatch):
@@ -89,7 +91,7 @@ async def test_import_location_csv_bytes_returns_merge_failure():
 
     assert result.ok is False
     assert result.rows_parsed == 1
-    assert result.message == "❌ Failed to import rows: `RuntimeError: db unavailable`"
+    assert result.message == "⚠️ Import outcome unconfirmed: `RuntimeError: db unavailable`"
 
 
 @pytest.mark.asyncio
@@ -233,7 +235,7 @@ async def test_import_location_csv_bytes_preserves_success_when_refresh_signal_f
 
     assert result.ok is True
     assert "Imported **2** rows." in result.message
-    assert complete_calls[-1][1]["status"] == "failed"
+    assert complete_calls[-1][1]["status"] == "completed"
     assert complete_calls[-1][1]["rows_in_source"] == 1
 
 

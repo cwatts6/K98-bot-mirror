@@ -229,7 +229,7 @@ def test_complete_combined_packet_binds_sql_then_source_and_preserves_contracts(
         name: json.loads(raw)
         for name, raw in successor_seed(
             initial,
-            {"DL_bot.py": sha256(b"old\n")},
+            {"application_feature.py": sha256(b"old\n")},
             deployment_id=str(uuid4()),
             review_id=str(uuid4()),
             pipe_id=str(uuid4()),
@@ -258,8 +258,8 @@ def test_complete_combined_packet_binds_sql_then_source_and_preserves_contracts(
         ),
     )
     blobs = {
-        ("a" * 40, "DL_bot.py"): b"old\n",
-        ("c" * 40, "DL_bot.py"): b"new\n",
+        ("a" * 40, "application_feature.py"): b"old\n",
+        ("c" * 40, "application_feature.py"): b"new\n",
         ("c" * 40, RELEASE_DESCRIPTION): json.dumps(d).encode(),
     }
     from tests.updater_source_assertions import installed_tool_fixture
@@ -268,7 +268,7 @@ def test_complete_combined_packet_binds_sql_then_source_and_preserves_contracts(
     observation["bindings"]["contract_verifier_sha256"] = archive_hash
     result = prepare_update(
         observation,
-        ["DL_bot.py", RELEASE_DESCRIPTION],
+        ["application_feature.py", RELEASE_DESCRIPTION],
         lambda *key: blobs.get(key),
         tmp_path / "packet",
         tools,

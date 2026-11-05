@@ -871,7 +871,13 @@ if __name__ == "__main__":
         flush_logs()
         sys.exit(1)
     finally:
-        # ensure lock release on any path
+        # bot.run has closed its loop. Even an exceptional return must settle the
+        # non-daemon optional writers before releasing process ownership. A
+        # failed close remains an error, never a successful drain receipt.
+        from services import optional_upload_lifecycle
+
+        asyncio.run(optional_upload_lifecycle.shutdown())
+        # Release only after physical optional I/O settlement on every exit path.
         try:
             # Only clear the PID file if it still points to *this* process
             try:

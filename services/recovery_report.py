@@ -91,7 +91,9 @@ def incident_report(service, row):
                     else (
                         "verification_required"
                         if blocked
-                        else "resolved" if row["State"] == "resolved" else "guided_confirmation"
+                        else "resolved"
+                        if row["State"] == "resolved"
+                        else "guided_confirmation"
                     )
                 ),
                 **{key: details[key] for key in ("label", "check", "effect") if key in details},
@@ -302,8 +304,12 @@ def _operation_report():
         if type(omitted) is not int or omitted < 0:
             omitted = 0
         result["omitted_operations"] = omitted + rejected
+        upload = result.get("upload_observations", {})
+        upload_partial = type(upload) is dict and (
+            upload.get("coverage") == "partial" or upload.get("pending", 0) != 0
+        )
         result["coverage"] = dict(
-            status="partial" if omitted or rejected else "available",
+            status="partial" if omitted or rejected or upload_partial else "available",
             reason="operation_preview_invalid_or_bound" if omitted or rejected else None,
             available=len(source["operations"]) + omitted,
             included=len(result["operations"]),

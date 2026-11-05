@@ -267,7 +267,7 @@ async def test_player_location_route_completes_audit_before_success_notification
     assert audit_calls[0][2]["rows_in_source"] == 1
     assert audit_calls[0][2]["rows_staged"] == 3
     assert audit_calls[0][2]["details"]["terminal_before_discord_notification"] is True
-    assert any("Player Location Import ❌" == title for title in sent_titles)
+    assert sent_titles == ["Player Location Import ✅"]
 
 
 @pytest.mark.asyncio
@@ -311,7 +311,7 @@ async def test_player_location_route_refresh_failure_preserves_user_success(monk
     assert refresh_phase[2]["phase_status"] == "failed"
     complete_calls = [call for call in audit_calls if call[0] == "complete"]
     assert len(complete_calls) == 1
-    assert complete_calls[0][2]["status"] == "failed"
+    assert complete_calls[0][2]["status"] == "completed"
     assert complete_calls[0][2]["rows_in_source"] == 1
     assert complete_calls[0][2]["details"]["error"] == "signal failed"
 
@@ -375,7 +375,7 @@ async def test_player_location_route_importer_exception_sends_error(monkeypatch)
 
     assert handled is True
     _ch, title, fields, color, mention = sent[-1]
-    assert title == "Player Location Import ❌"
+    assert title == "Import outcome unconfirmed ⚠️"
     assert fields["Error"] == "RuntimeError: boom"
     assert color == 0xE74C3C
     assert mention is None

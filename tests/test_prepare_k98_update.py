@@ -563,7 +563,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
         name: json.loads(value)
         for name, value in successor_seed(
             initial,
-            {"DL_bot.py": sha256(raw)},
+            {"application_feature.py": sha256(raw)},
             deployment_id=str(uuid4()),
             review_id=str(uuid4()),
             pipe_id=str(uuid4()),
@@ -602,8 +602,8 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
             ),
         )
         blobs = {
-            (str(index + 1) * 40, "DL_bot.py"): raw,
-            (str(index + 2) * 40, "DL_bot.py"): content,
+            (str(index + 1) * 40, "application_feature.py"): raw,
+            (str(index + 2) * 40, "application_feature.py"): content,
         }
         # First rollout adds the externally installed tool; the next ordinary
         # update retains it while still deriving a fresh seed and release ID.
@@ -614,7 +614,7 @@ def test_full_packages_for_two_updates_need_no_handwritten_specification(tmp_pat
                 blobs[str(index + 1) * 40, path] = tool_raw
         result = prepare_update(
             observation,
-            ["DL_bot.py", *(sorted(TOOL_SOURCE_PATHS) if not index else [])],
+            ["application_feature.py", *(sorted(TOOL_SOURCE_PATHS) if not index else [])],
             lambda *key: blobs.get(key),
             tmp_path / f"update-{index}",
             tools,

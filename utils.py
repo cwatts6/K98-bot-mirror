@@ -316,7 +316,6 @@ def load_stat_cache() -> dict:
                 v["GovernorID"] = normalize_governor_id(v.get("GovernorID"))
             # Prefer INCLUDED / later LAST_REFRESH if duplicate keys occur
             if nk in normalised:
-
                 if score_player_stats_rec(v) > score_player_stats_rec(normalised[nk]):
                     normalised[nk] = v
 
@@ -651,29 +650,18 @@ async def download_attachment(
                             async for chunk in resp.content.iter_chunked(64 * 1024):
                                 await f.write(chunk)
 
-                        # Local import to avoid circular import at module import time
-                        try:
-                            from file_utils import append_csv_line as _append_csv_line
-                        except Exception:
-                            _append_csv_line = None
+                        from services.download_log_service import record_download
 
-                        if _append_csv_line:
-                            try:
-                                # Use centralized CSV_LOG constant instead of hard-coded filename
-                                await _append_csv_line(
-                                    CSV_LOG,
-                                    [
-                                        utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                                        channel_name or "unknown",
-                                        filename,
-                                        str(user) if user else "unknown",
-                                        save_path,
-                                    ],
-                                )
-                            except Exception:
-                                logger.warning(
-                                    "[DOWNLOAD] Failed to append to CSV log for %s", filename
-                                )
+                        await record_download(
+                            CSV_LOG,
+                            [
+                                utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                                channel_name or "unknown",
+                                filename,
+                                str(user) if user else "unknown",
+                                save_path,
+                            ],
+                        )
                         return True
                     else:
                         logger.warning(
@@ -686,26 +674,18 @@ async def download_attachment(
             logger.exception(f"[DOWNLOAD] Attempt {attempt} failed for {filename}")
         await asyncio.sleep(delay_seconds)
 
-    # try to log failure
-    try:
-        from file_utils import append_csv_line as _append_csv_line
-    except Exception:
-        _append_csv_line = None
+    from services.download_log_service import record_download
 
-    if _append_csv_line:
-        try:
-            await _append_csv_line(
-                CSV_LOG,
-                [
-                    utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                    channel_name or "unknown",
-                    filename,
-                    str(user) if user else "unknown",
-                    "DOWNLOAD FAILED",
-                ],
-            )
-        except Exception:
-            logger.warning("[DOWNLOAD] Failed to append failure to CSV log for %s", filename)
+    await record_download(
+        CSV_LOG,
+        [
+            utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            channel_name or "unknown",
+            filename,
+            str(user) if user else "unknown",
+            "DOWNLOAD FAILED",
+        ],
+    )
     return False
 
 
@@ -898,11 +878,11 @@ def fmt_short(n: int | float | None) -> str:
         n = float(n)
         abs_n = abs(n)
         if abs_n >= 1_000_000_000:
-            return f"{n/1_000_000_000:.1f}B"
+            return f"{n / 1_000_000_000:.1f}B"
         if abs_n >= 1_000_000:
-            return f"{n/1_000_000:.1f}M"
+            return f"{n / 1_000_000:.1f}M"
         if abs_n >= 1_000:
-            return f"{n/1_000:.1f}k"
+            return f"{n / 1_000:.1f}k"
         return f"{int(n)}"
     except Exception:
         return str(n)

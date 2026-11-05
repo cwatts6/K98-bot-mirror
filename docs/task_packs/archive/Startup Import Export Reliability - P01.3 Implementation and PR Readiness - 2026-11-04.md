@@ -1,5 +1,7 @@
 # P01.3 implementation and PR readiness — 4 November 2026
 
+> **Archived 5 November 2026.** This completed record is archived; its original design/release instructions and pending gates are historical. Current outcome: [P01.3 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md). Next task: [P01.4 review/scope](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 Status: implementation and local validation complete; both independent branches and PR descriptions ready for publication/review. Nothing has been published, merged, installed or restarted. This receipt supersedes the earlier design-only status, while retaining its agreed scope and limits.
 
 ## Delivered behavior

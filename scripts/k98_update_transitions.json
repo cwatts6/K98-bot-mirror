@@ -2810,6 +2810,211 @@
           "after_sha256": "3dc22b5a825edaf3d67ed03d5d04a5cc070019d33683b00bcc5683308ec6a09f"
         }
       ]
+    },
+    {
+      "id": "p014_upload_outcomes_optional_io_v1",
+      "members": [
+        {
+          "path": "DL_bot.py",
+          "before_sha256": "3ffb1600b82602a0cdd83d1223c1e3f7844e10e3ba01dea785f688ce2d76f74c",
+          "after_sha256": "d4d64e5d9d70a09419092dea72e48dc7a1c5d027b69cadd76ef83cdb69e9e54f"
+        },
+        {
+          "path": "bot_helpers.py",
+          "before_sha256": "fb9211479237db736ffec8b567cf683ec6ef7f321c6d9a04fa5d14a134b8ab27",
+          "after_sha256": "96bdf6c743ed2967c65e7721dba4d9224781ac6dff90dbb7c118c10a4ef67900"
+        },
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "1a39f3115231e88aad96ab9ca69b84144e298a3fe089958d9579b1af452d4970",
+          "after_sha256": "6d0f9bcea09590c7635a65a8652683dfec59e2b03b36d937e312c12949e5b2d7"
+        },
+        {
+          "path": "core/operation_evidence.py",
+          "before_sha256": "71affbf9cf2d0c5920c693f53b682bb2c830e1391ada88fc1938f61e70ad9bd9",
+          "after_sha256": "6071ec9adc84273b3d0ef2cb69e36ec74f6c7dcedc623eed521cf83c29ebd559"
+        },
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "ee9371ead0616d762fcffca49e72102fc6ef9c549bc3d14e01d1fb901719e7c7",
+          "after_sha256": "ee9371ead0616d762fcffca49e72102fc6ef9c549bc3d14e01d1fb901719e7c7"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "7dbb13089315fdf0d214053d68e31f1c098546d17668ca31534d2705894c886f",
+          "after_sha256": "7dbb13089315fdf0d214053d68e31f1c098546d17668ca31534d2705894c886f"
+        },
+        {
+          "path": "kvk/dal/kvk_all_import_dal.py",
+          "before_sha256": "f41c09ef56b68f117a8139f45cbcaf76384c5b69b92391686e120e97378fca7f",
+          "after_sha256": "e5b6560c27f9c90b6cebd6f874681e01cbc9520e943d5b0f23285cddba894190"
+        },
+        {
+          "path": "kvk_all_importer.py",
+          "before_sha256": "edffd40e8e3c181d2e5f88d6b48ea82fca1a4b6e4cbfa6d05e088b83ec2cd9bf",
+          "after_sha256": "a382af59f22e4645b14794f88472b59f72726eefc8e586497344bf1b842ad773"
+        },
+        {
+          "path": "location_importer.py",
+          "before_sha256": "c7b22431b2f3523aeb950bef239731413a0663c27786ef3c8e6ab23290c6658d",
+          "after_sha256": "90e75c26f6c3be3fd9e9884e74684ef51d5f71a023f44b6a07cd8451faee07f3"
+        },
+        {
+          "path": "prekvk_importer.py",
+          "before_sha256": "f8bcf2647ac87a181e8b1838f36f91bb0f8131637ec8d460a96d6a40b02fd038",
+          "after_sha256": "eeee9ea8147cc6b62653723d72da50441d760e175a202b806e4ba4c2657680f0"
+        },
+        {
+          "path": "processing_pipeline.py",
+          "before_sha256": "9dabd901761be2b5f1f2c08769ed955247136efb02f1199a6ee8f27fbc0d2ad4",
+          "after_sha256": "a22448b88e1a02c589c71185b8d6b611b95c208af5aabb256818d946505e088c"
+        },
+        {
+          "path": "services/download_log_service.py",
+          "before_sha256": null,
+          "after_sha256": "9d9a38d7f7e73fa83e1a417ce5fc0ddb54b99b1529a0a37bbff1e3c1d95624ce"
+        },
+        {
+          "path": "services/fallback_queue_item.py",
+          "before_sha256": null,
+          "after_sha256": "795b916533e912a6b7a9b9adedde24b500db26d68537fe90479a4498d8e29844"
+        },
+        {
+          "path": "services/fallback_upload_staging_service.py",
+          "before_sha256": "ce7700affdf6b20c911d4198d31be2107b230b27e036ef17001792a576e03b55",
+          "after_sha256": "ce7700affdf6b20c911d4198d31be2107b230b27e036ef17001792a576e03b55"
+        },
+        {
+          "path": "services/honor_import_audit_service.py",
+          "before_sha256": "ebbc3fbd0e7c87f308106d4207b35e014f56051275499285d739cf1b68001d29",
+          "after_sha256": "ed78701acf8dc3ecfb234ef0f9dc57aa0585196efa2c74affaf6868d634ca90b"
+        },
+        {
+          "path": "services/kvk_all_import_audit_service.py",
+          "before_sha256": "83a52220bde6d84145ecffa7715f10f20f76582a2e80b7f044944e581e40aa7c",
+          "after_sha256": "101405e79123f1060e0f4126eaa87be2cc2da0f73e2a23128d5628aa52e61bdd"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "d1de03902ddbecbee8dd341c49c2af7fa73c75a351528986899cff9adfe52890",
+          "after_sha256": "dd6afc432cba152a5553572464b4419b7aa4aad9acbcb847ff085c068c82e145"
+        },
+        {
+          "path": "services/location_import_service.py",
+          "before_sha256": "677bd268261d3c8d182e7ac695531370783192a085b8efb48f497acee575c88f",
+          "after_sha256": "efabd7f89d281d70a3ad2e69ec4dee2930ddebaed83daf79a619f9cfc8d88cd1"
+        },
+        {
+          "path": "services/operation_diagnostics.py",
+          "before_sha256": "56424fdaa45ba0c2d5ed3dd0c47d44c3c7dd57f0649560cc44b43a8c8dfb1a00",
+          "after_sha256": "ca465e719cbacb01f07a2728c17d98eb2cd42e996125bf67f0117d625d9a7fcd"
+        },
+        {
+          "path": "services/optional_import_audit_worker.py",
+          "before_sha256": null,
+          "after_sha256": "feb9e2a0c6ea128f774ab88c18ec5f17f0c467975339bafaa58a1f1d13c193b6"
+        },
+        {
+          "path": "services/optional_upload_lifecycle.py",
+          "before_sha256": null,
+          "after_sha256": "d294382490b7fe01d69748035b3acb532d37f1206b5dcb7bc9ecfe0b45d3f6c4"
+        },
+        {
+          "path": "services/optional_upload_observations.py",
+          "before_sha256": null,
+          "after_sha256": "786b06e45bcb14aca66a7e885fffc5ce7fa167d32956cdc8cc1abd8309e9cace"
+        },
+        {
+          "path": "services/optional_upload_transport.py",
+          "before_sha256": null,
+          "after_sha256": "5a35b0069e2af08510b32f66460a2b6fec0127ae30629ead900b9242a5161548"
+        },
+        {
+          "path": "services/prekvk_import_audit_service.py",
+          "before_sha256": "d045ff17e4ad7afdfc57da3981d17fdbe7494f7f870f1ce5f89fade5feb2706b",
+          "after_sha256": "083c1d5019e344133bcbad604dfa20fc20d904c43c25cbd37fdf19214a57f572"
+        },
+        {
+          "path": "services/recovery_complete_report.py",
+          "before_sha256": "3dc22b5a825edaf3d67ed03d5d04a5cc070019d33683b00bcc5683308ec6a09f",
+          "after_sha256": "3dc22b5a825edaf3d67ed03d5d04a5cc070019d33683b00bcc5683308ec6a09f"
+        },
+        {
+          "path": "services/recovery_evidence_bundle.py",
+          "before_sha256": "43c50c832318e76c3f82d806abdbe623955c6068fdbd4b60e8cdfc6ff3216a09",
+          "after_sha256": "a95caf62ecf868294495d3c6400ba943b31046775fb1902582d14ab0b375f1d3"
+        },
+        {
+          "path": "services/recovery_report.py",
+          "before_sha256": "6dc48e246bec5ebee177052f4dcebf193898d77e5dcd55b70532798a1727eb62",
+          "after_sha256": "e8082b3816fff54f7dd467c26eaf507b6ad977c6c7996e9ae13661e2ea8e8be4"
+        },
+        {
+          "path": "services/upload_lifecycle.py",
+          "before_sha256": null,
+          "after_sha256": "bdcc554d4c287c3292c63baaf956bdd623cc9adeb6ea84bb4385955fe128d82e"
+        },
+        {
+          "path": "services/upload_outcome_service.py",
+          "before_sha256": null,
+          "after_sha256": "7ac3ced34774a7687b40a613c6e3857975f943c504c0f6264bed4547276f87ce"
+        },
+        {
+          "path": "services/weekly_activity_import_audit_service.py",
+          "before_sha256": "87dc264f9279bb1adbabc8345dbdc1a31d71aaa081599a975e1735dde180f57f",
+          "after_sha256": "e553edeaf36aa9d9dde36a9d0f96fff076275a8fe4e8d97c5d5077a40cceed65"
+        },
+        {
+          "path": "stats/dal/import_audit_dal.py",
+          "before_sha256": "c9d2043734f112556f0d1597d60af8604163c9e73daecc672f59051a0f02e3b6",
+          "after_sha256": "978e9466282859181108ac3f11e0cc0cf360d98da23280c5f4b2af5e5143bf25"
+        },
+        {
+          "path": "stats_module.py",
+          "before_sha256": "71d789afe66cc10db7bb4d9ace6eff74b5ecd8076b4d6e1c5c3c83b88b475fcf",
+          "after_sha256": "a37651ba830183b8611b30a5247bcf8d26c93b26c4f77217c85dcf5a855388d3"
+        },
+        {
+          "path": "upload_routes/common.py",
+          "before_sha256": "462ee01e1cb35ccf6cc7eaa834a211b32eb37327f9ee579ca99170b7760ac2bb",
+          "after_sha256": "549de88727c49ae1df9bf20df4fa96733cf7893039541f98ab6482df408f97ec"
+        },
+        {
+          "path": "upload_routes/fallback_queue_route.py",
+          "before_sha256": "d04561bb5479060c3c18c481c466dc23d0cd9f76108d90d05ae52bcc552f812a",
+          "after_sha256": "edb362ce5d523d6aaa6d7472d0cad959256c0ed16e0fb40ff37511159ba47f67"
+        },
+        {
+          "path": "upload_routes/honor_route.py",
+          "before_sha256": "272cdffbb439ad0bc85890438ef9d3ed3bcfe2b23692c505685f488290984f4c",
+          "after_sha256": "bf1a9641b74aff31811d9a13d4fe0ab009b5839c44bdb3e17fbea74526c48795"
+        },
+        {
+          "path": "upload_routes/kvk_all_route.py",
+          "before_sha256": "ecb1d4e09aeafd6337adfccbcafd6d99565947c538c81996d1300033b3390a70",
+          "after_sha256": "4ed2c8adfd380584e86c4c01b8942b609ffe767c956c9451100076e00a6e8ec9"
+        },
+        {
+          "path": "upload_routes/player_location_route.py",
+          "before_sha256": "a55108355d87e26af305fa6d3a3aeaf6e8ee51275abc45f119380b3207e66df6",
+          "after_sha256": "f26d5729b4ccda9f7431eef73047d57e345b4b4ba6d2f669affb03eaed35ee8a"
+        },
+        {
+          "path": "upload_routes/prekvk_route.py",
+          "before_sha256": "7a0a7299f5607e9c5582aeee45a825adce4b992fce636e216c826e7e48dd4934",
+          "after_sha256": "3fcc2b6af02cd2ec0d2b52644415e99eca3266d0e2e107c292080fde1224275e"
+        },
+        {
+          "path": "upload_routes/weekly_activity_route.py",
+          "before_sha256": "b5d8a95dc4231d483272049d31a93aeefbf55ef8ab878338d4522d24a63c261f",
+          "after_sha256": "29c0531eee096a31ca5c5ceb4d8e4def29e9c8d653ca2c82b3b80360ed0b6f73"
+        },
+        {
+          "path": "utils.py",
+          "before_sha256": "49bf71ad8754826ccb38c04b27f54663050380c8b6ce63c4e8906a720da50a30",
+          "after_sha256": "08bd7fa5bb70cdd0f69bbafbb1971f82308913092795dee86e7cd4c27b0047b6"
+        }
+      ]
     }
   ]
 }

@@ -287,38 +287,10 @@ def _normalize_step_result(raw) -> tuple[bool | CaptureCheckpointPending, str, s
 
 # === Helper: offload callables properly ===
 async def _offload_callable_py(fn, *args, name: str | None = None, meta: dict | None = None):
-    """
-    Offload a direct Python callable using run_step -> run_blocking_in_thread -> asyncio.to_thread.
-    Returns the callable result (not metadata).
-    """
-    from services.legacy_export_snapshot_service import _writer_runtime, drain_thread
+    """Run a finite callable once, retaining ownership until physical settlement."""
+    from core.owned_work import drain_thread
 
-    if _writer_runtime() is not None:
-        # One invocation, propagated owner context, and a drained late thread.
-        # A helper exception is never grounds to rerun a committed procedure.
-        return await drain_thread(fn, *args)
-    try:
-        from file_utils import run_blocking_in_thread, run_step  # type: ignore
-    except Exception:
-        run_step = None
-        run_blocking_in_thread = None
-
-    meta = meta or {}
-    if run_step is not None:
-        try:
-            return await run_step(fn, *args, name=name, meta=meta)
-        except Exception:
-            # fall through to thread fallback
-            pass
-
-    if run_blocking_in_thread is not None:
-        try:
-            return await run_blocking_in_thread(fn, *args, name=name, meta=meta)
-        except Exception:
-            pass
-
-    # final fallback
-    return await asyncio.to_thread(fn, *args)
+    return await drain_thread(fn, *args)
 
 
 # === Execute SQL Stored Procedure and Wait (NON-BLOCKING) ===
@@ -561,7 +533,9 @@ async def run_sql_procedure(
         classification = (
             "checkpoint_pending"
             if sql_state == "completed"
-            else "failed" if sql_state in {"rolled_back", "partial"} else "outcome_unconfirmed"
+            else "failed"
+            if sql_state in {"rolled_back", "partial"}
+            else "outcome_unconfirmed"
         )
         log_outcome = logger.info if sql_state == "completed" else logger.error
         log_outcome("[SQL_PROC] outcome=%s; diagnostics=%s", classification, sql_error_facts(e))

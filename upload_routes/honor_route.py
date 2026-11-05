@@ -9,6 +9,7 @@ import logging
 import re
 from typing import Any
 
+from core.owned_work import drain_awaitable
 from honor_importer import ingest_honor_snapshot, parse_honor_xlsx
 from services.honor_import_audit_service import (
     HONOR_AUDIT_INGEST_PHASE,
@@ -23,8 +24,21 @@ from services.honor_import_audit_service import (
     record_honor_audit_phase,
     start_honor_audit_batch,
 )
+from services.upload_lifecycle import tracked_upload
+from services.upload_outcome_service import (
+    UploadOutcome,
+    delivery_details,
+    display_count,
+    display_delivery,
+)
 from stats_alerts.delivery_outcomes import log_delivery
-from upload_routes.common import message_source_fields, resolve_notify_channel, schedule_best_effort
+from upload_routes.common import (
+    message_source_fields,
+    observe_optional,
+    observe_upload_failure,
+    resolve_notify_channel,
+    schedule_factory_best_effort,
+)
 from utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -71,6 +85,7 @@ async def _refresh_stats_embed(deps: HonorRouteDeps, is_test: bool):
     return await stats_refresh(deps.bot, ts, True, is_test=is_test)
 
 
+@tracked_upload
 async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
     """Handle KVK Honor workbook imports from the configured upload channel."""
     if message.channel.id != deps.honor_channel_id or not message.attachments:
@@ -93,14 +108,15 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             "Expected": "1198_honor.xlsx  • also accepts *1198_honor*.xlsx with optional TEST_/DEMO_/SAMPLE_ prefix",
             **message_source_fields(message),
         }
-        await deps.send_embed(notify_ch, "KVK Honor Import ⚠️", fields, 0xE67E22)
+        await observe_optional(deps.send_embed, notify_ch, "KVK Honor Import ⚠️", fields, 0xE67E22)
         return True
 
+    outcome = UploadOutcome()
     audit_context: HonorImportAuditContext | None = None
     audit_ref: Any = None
     audit_terminal_recorded = False
     parse_succeeded = False
-    row_count = 0
+    row_count = None
     kvk_no: int | None = None
     scan_id: int | None = None
     external_batch_id: str | None = None
@@ -126,23 +142,27 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             ),
             is_test=is_test,
         )
-        audit_ref = await deps.start_audit_batch(
+        audit_ref = await observe_optional(
+            deps.start_audit_batch,
             context=audit_context,
             xlsx_bytes=file_bytes,
         )
 
         parse_started = deps.now_utc()
         try:
-            pre_df = await deps.offload_callable(
-                parse_honor_xlsx,
-                file_bytes,
-                name="parse_honor_xlsx",
-                prefer_process=True,
-                meta={"filename": target.filename},
+            pre_df = await drain_awaitable(
+                deps.offload_callable(
+                    parse_honor_xlsx,
+                    file_bytes,
+                    name="parse_honor_xlsx",
+                    prefer_process=True,
+                    meta={"filename": target.filename},
+                )
             )
             row_count = len(pre_df)
             parse_succeeded = True
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=HONOR_AUDIT_PARSE_PHASE,
                 phase_status="completed",
@@ -153,8 +173,9 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             )
         except Exception as exc:
             logger.debug("honor_upload_row_count_parse_failed", exc_info=True)
-            row_count = 0
-            await deps.record_audit_phase(
+            row_count = None
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=HONOR_AUDIT_PARSE_PHASE,
                 phase_status="failed",
@@ -168,17 +189,22 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
         ingest_started = deps.now_utc()
         external_batch_id = None
         try:
-            kvk_no, scan_id = await deps.offload_callable(
-                ingest_honor_snapshot,
-                file_bytes,
-                source_filename=target.filename,
-                scan_ts_utc=message.created_at,
-                name="ingest_honor_snapshot",
-                prefer_process=True,
-                meta={"filename": target.filename},
+            outcome = UploadOutcome("outcome_unconfirmed", "entered")
+            kvk_no, scan_id = await drain_awaitable(
+                deps.offload_callable(
+                    ingest_honor_snapshot,
+                    file_bytes,
+                    source_filename=target.filename,
+                    scan_ts_utc=message.created_at,
+                    name="ingest_honor_snapshot",
+                    prefer_process=True,
+                    meta={"filename": target.filename},
+                )
             )
+            outcome = UploadOutcome("committed", "settled")
             external_batch_id = honor_external_batch_id(kvk_no, scan_id)
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=HONOR_AUDIT_INGEST_PHASE,
                 phase_status="completed",
@@ -195,7 +221,8 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
                 set_batch_status="staged",
             )
         except Exception as exc:
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=HONOR_AUDIT_INGEST_PHASE,
                 phase_status="failed",
@@ -210,7 +237,10 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
                     error=str(exc),
                 ),
             )
-            await deps.fail_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                deps.record_audit_phase,
+                deps.fail_audit_batch,
                 audit_ref,
                 error_type=type(exc).__name__,
                 error_text=str(exc),
@@ -227,27 +257,9 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             audit_terminal_recorded = True
             raise
 
-        fields = {
-            "KVK": str(kvk_no),
-            "ScanID": str(scan_id),
-            "Rows": str(row_count),
-            "Filename": target.filename,
-            **message_source_fields(message),
-        }
-        await deps.send_embed(
-            notify_ch,
-            "KVK Honor Import ✅" + (" (TEST)" if is_test else ""),
-            fields,
-            0x2ECC71,
-        )
+        schedule_factory_best_effort(deps.create_task, deps.trigger_log_backup_background)
 
-        schedule_best_effort(
-            deps.create_task,
-            deps.trigger_log_backup_background(),
-            logger,
-            "Failed to schedule background log-backup trigger",
-        )
-
+        delivery = None
         refresh_failed: Exception | None = None
         refresh_started = deps.now_utc()
         try:
@@ -258,7 +270,8 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
         except Exception as exc:
             refresh_failed = exc
             logger.debug("Failed to refresh stats embed after KVK Honor import", exc_info=True)
-        await deps.record_audit_phase(
+        await observe_optional(
+            deps.record_audit_phase,
             audit_ref,
             phase_name=HONOR_AUDIT_REFRESH_PHASE,
             phase_status="failed" if refresh_failed else "completed",
@@ -268,36 +281,62 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             duration_ms=audit_duration_ms(refresh_started),
             error_type=type(refresh_failed).__name__ if refresh_failed else None,
             error_text=str(refresh_failed) if refresh_failed else None,
-            details=honor_audit_details(
-                audit_context,
-                rows_parsed=row_count if parse_succeeded else None,
-                kvk_no=kvk_no,
-                scan_id=scan_id,
-                error=str(refresh_failed) if refresh_failed else None,
-                refresh_failed=refresh_failed is not None,
-            ),
+            details={
+                **honor_audit_details(
+                    audit_context,
+                    rows_parsed=row_count,
+                    kvk_no=kvk_no,
+                    scan_id=scan_id,
+                    error=str(refresh_failed) if refresh_failed else None,
+                    refresh_failed=refresh_failed is not None,
+                ),
+                **delivery_details(delivery),
+            },
         )
-        await deps.complete_audit_batch(
+        fields = {
+            "KVK": str(kvk_no),
+            "ScanID": str(scan_id),
+            "Rows": display_count(row_count),
+            "Refresh": display_delivery(delivery, refresh_failed),
+            "Filename": target.filename,
+            **message_source_fields(message),
+        }
+        await observe_optional(
+            deps.send_embed,
+            notify_ch,
+            "KVK Honor Import ✅" + (" (TEST)" if is_test else ""),
+            fields,
+            0x2ECC71,
+        )
+
+        await observe_optional(
+            deps.complete_audit_batch,
             audit_ref,
-            status="failed" if refresh_failed else "completed",
+            status="completed",
             rows_in_source=row_count if parse_succeeded else None,
             rows_staged=row_count if parse_succeeded else None,
             rows_written=row_count if parse_succeeded else None,
             rows_skipped=0 if parse_succeeded else None,
             external_batch_id=external_batch_id,
-            details=honor_audit_details(
-                audit_context,
-                rows_parsed=row_count if parse_succeeded else None,
-                kvk_no=kvk_no,
-                scan_id=scan_id,
-                error=str(refresh_failed) if refresh_failed else None,
-                refresh_failed=refresh_failed is not None,
-            ),
+            details={
+                **honor_audit_details(
+                    audit_context,
+                    rows_parsed=row_count,
+                    kvk_no=kvk_no,
+                    scan_id=scan_id,
+                    error=str(refresh_failed) if refresh_failed else None,
+                    refresh_failed=refresh_failed is not None,
+                ),
+                **delivery_details(delivery),
+            },
         )
         audit_terminal_recorded = True
     except Exception as e:
         if audit_ref is not None and not audit_terminal_recorded:
-            await deps.fail_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                deps.record_audit_phase,
+                deps.fail_audit_batch,
                 audit_ref,
                 error_type=type(e).__name__,
                 error_text=str(e),
@@ -324,5 +363,17 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             "Filename": target.filename,
             **message_source_fields(message),
         }
-        await deps.send_embed(notify_ch, "KVK Honor Import ❌", fields, 0xE74C3C)
+        await observe_optional(
+            deps.send_embed,
+            notify_ch,
+            (
+                "Import outcome unconfirmed ⚠️"
+                if outcome.business == "outcome_unconfirmed"
+                else "Import committed; follow-up unavailable ⚠️"
+                if outcome.business == "committed"
+                else "KVK Honor Import ❌"
+            ),
+            fields,
+            0xE74C3C,
+        )
     return True

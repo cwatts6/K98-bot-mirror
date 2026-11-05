@@ -1,8 +1,12 @@
 # Startup, import and export reliability: action census
 
-> **Current programme checkpoint - 4 November 2026 (E68/E69):** P01.2a is deployed and accepted for its declared reporting/evidence scope at private `67c4e12a8ecf0c25280770860480ac65a6826602`.
+> **Current E91, 5 November 2026:** The [complete local qualification receipt](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md) records the full original P01.4 design implemented and qualified locally, with both optional workers enabled in the unpublished candidate. Cost, physical-drain, diagnostic-priority, updater, regression and Changes-review gates passed. No CSV scope was deferred. Publication/deployment and natural-activity acceptance remain outstanding; earlier E88-E90 disabled/pending statements below are historical. Existing changes and archive moves are preserved.
+
+> **Current E85/E86 - 5 November 2026: P01.3 CLOSED.** Passive health, persistent Refresh and the complete-ZIP correction are merged, deployed and live-validated at private `6ec393f71626d15fcb8c50c840854fb681d5f09e`. See [P01.3 closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md) and [P01.4 handover/scope](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md). P01.4 (F17/F30) is next, review/scope only. P01.1/P01.2a remain accepted; P01.2b is closed by decision without feature delivery. P01.4-P01.6/P02-P05 and exact incident recovery remain open. Dated checkpoints below retain historical evidence, not current approval or scheduling authority. The [new documentation carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md) covers this local closeout update.
+
+> **Historical programme checkpoint - 4 November 2026 (E68/E69):** P01.2a is deployed and accepted for its declared reporting/evidence scope at private `67c4e12a8ecf0c25280770860480ac65a6826602`.
 > Read the [P01.2a closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2a%20Closeout%20-%202026-11-04.md) for delivered corrections, evidence limits, learnings and remaining owners; [P01.2b handover](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Handover%20and%20Scope%20-%202026-11-04.md) is the next review/design task.
-> Earlier dated statuses, holds and next-action instructions in this document are retained history and are superseded for current scheduling. P01.3-P01.6/P02-P05 and exact incident recovery remain open; no replay of accepted work.
+> The earlier checkpoint is retained history. Current remaining work is P01.4-P01.6/P02-P05 and exact incident recovery; P01.3 is closed at E85. Do not replay accepted work.
 
 Date: 2 November 2026. Source baseline: `a025adb7a69aac321fd62794b871ed5903338f44`.
 

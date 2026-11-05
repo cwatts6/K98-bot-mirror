@@ -8,6 +8,9 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
+from core.owned_work import drain_awaitable
+from services.upload_lifecycle import tracked_upload
+from services.upload_outcome_service import UploadOutcome
 from services.weekly_activity_import_audit_service import (
     WEEKLY_ACTIVITY_AUDIT_BACKUP_PHASE,
     WEEKLY_ACTIVITY_AUDIT_INGEST_PHASE,
@@ -21,7 +24,13 @@ from services.weekly_activity_import_audit_service import (
     weekly_activity_audit_details,
     weekly_activity_external_batch_id,
 )
-from upload_routes.common import message_source_fields, resolve_notify_channel, schedule_best_effort
+from upload_routes.common import (
+    message_source_fields,
+    observe_optional,
+    observe_upload_failure,
+    resolve_notify_channel,
+    schedule_factory_best_effort,
+)
 from utils import utcnow
 from weekly_activity_importer import ingest_weekly_activity_excel, parse_activity_excel
 
@@ -30,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 async def count_weekly_activity_source_rows(content: bytes) -> int:
     """Parse weekly activity workbook bytes off the event loop and return source rows."""
-    parsed_df = await asyncio.to_thread(parse_activity_excel, content)
+    parsed_df = await drain_awaitable(asyncio.to_thread(parse_activity_excel, content))
     return len(parsed_df)
 
 
@@ -59,6 +68,7 @@ def _is_weekly_activity_filename(filename: str) -> bool:
     return filename.lower().endswith("1198_alliance_activity.xlsx")
 
 
+@tracked_upload
 async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteDeps) -> bool:
     """Handle weekly alliance activity workbooks from the configured upload channel."""
     if message.channel.id != deps.activity_upload_channel_id or not message.attachments:
@@ -78,6 +88,7 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
         "weekly_activity_upload",
     )
 
+    outcome = UploadOutcome()
     audit_context: WeeklyActivityImportAuditContext | None = None
     audit_ref: Any = None
     audit_terminal_recorded = False
@@ -105,7 +116,8 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 int(message.author.id) if getattr(message.author, "id", None) is not None else None
             ),
         )
-        audit_ref = await deps.start_audit_batch(
+        audit_ref = await observe_optional(
+            deps.start_audit_batch,
             context=audit_context,
             xlsx_bytes=file_bytes,
         )
@@ -114,7 +126,8 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
         try:
             rows_parsed = await deps.count_source_rows(file_bytes)
             parse_succeeded = True
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=WEEKLY_ACTIVITY_AUDIT_PARSE_PHASE,
                 phase_status="completed",
@@ -128,7 +141,8 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
             )
         except Exception as exc:
             rows_parsed = 0
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=WEEKLY_ACTIVITY_AUDIT_PARSE_PHASE,
                 phase_status="failed",
@@ -143,7 +157,10 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                     error=str(exc),
                 ),
             )
-            await deps.fail_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                deps.record_audit_phase,
+                deps.fail_audit_batch,
                 audit_ref,
                 error_type=type(exc).__name__,
                 error_text=str(exc),
@@ -162,23 +179,27 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
 
         ingest_started = deps.now_utc()
         try:
-            snap_id, row_count = await deps.offload_callable(
-                ingest_weekly_activity_excel,
-                content=file_bytes,
-                snapshot_ts_utc=message.created_at,
-                message_id=message.id,
-                channel_id=message.channel.id,
-                server=deps.server,
-                database=deps.database,
-                username=deps.username,
-                password=deps.password,
-                source_filename=target.filename,
-                name="ingest_weekly_activity_excel",
-                prefer_process=True,
-                meta={"filename": target.filename},
+            outcome = UploadOutcome("outcome_unconfirmed", "entered")
+            snap_id, row_count = await drain_awaitable(
+                deps.offload_callable(
+                    ingest_weekly_activity_excel,
+                    content=file_bytes,
+                    snapshot_ts_utc=message.created_at,
+                    message_id=message.id,
+                    channel_id=message.channel.id,
+                    server=deps.server,
+                    database=deps.database,
+                    username=deps.username,
+                    password=deps.password,
+                    source_filename=target.filename,
+                    name="ingest_weekly_activity_excel",
+                    prefer_process=True,
+                    meta={"filename": target.filename},
+                )
             )
         except Exception as exc:
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=WEEKLY_ACTIVITY_AUDIT_INGEST_PHASE,
                 phase_status="failed",
@@ -194,8 +215,10 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 ),
             )
             raise
+        outcome = UploadOutcome("duplicate" if snap_id == 0 else "committed", "settled")
         if snap_id == 0:
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=WEEKLY_ACTIVITY_AUDIT_INGEST_PHASE,
                 phase_status="duplicate",
@@ -211,7 +234,8 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 ),
                 set_batch_status="duplicate",
             )
-            await deps.complete_audit_batch(
+            await observe_optional(
+                deps.complete_audit_batch,
                 audit_ref,
                 status="duplicate",
                 rows_in_source=rows_parsed,
@@ -227,7 +251,8 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
             )
             audit_terminal_recorded = True
             try:
-                await deps.send_embed(
+                await observe_optional(
+                    deps.send_embed,
                     target_ch,
                     "Alliance Activity Import",
                     {"Status": "Duplicate detected for this week. Skipped."},
@@ -237,7 +262,8 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 logger.exception("weekly_activity_duplicate_notification_failed")
         else:
             external_batch_id = weekly_activity_external_batch_id(snap_id)
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=WEEKLY_ACTIVITY_AUDIT_INGEST_PHASE,
                 phase_status="completed",
@@ -254,14 +280,13 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 set_batch_status="staged",
             )
             backup_started = deps.now_utc()
-            backup_schedule_error = schedule_best_effort(
+            backup_schedule_error = schedule_factory_best_effort(
                 deps.create_task,
-                deps.trigger_log_backup_background(),
-                logger,
-                "Failed to schedule background log-backup trigger",
+                deps.trigger_log_backup_background,
             )
             backup_phase_status = "failed" if backup_schedule_error is not None else "completed"
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=WEEKLY_ACTIVITY_AUDIT_BACKUP_PHASE,
                 phase_status=backup_phase_status,
@@ -285,7 +310,8 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                     error=str(backup_schedule_error) if backup_schedule_error is not None else None,
                 ),
             )
-            await deps.complete_audit_batch(
+            await observe_optional(
+                deps.complete_audit_batch,
                 audit_ref,
                 status="completed",
                 rows_in_source=rows_parsed,
@@ -302,15 +328,19 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
             )
             audit_terminal_recorded = True
             try:
-                await deps.send_embed(
+                await observe_optional(
+                    deps.send_embed,
                     target_ch,
                     "Alliance Activity Import \u2705",
                     {
                         "SnapshotId": str(snap_id),
-                        "Rows": str(row_count),
+                        "Snapshot Rows": str(rows_parsed),
+                        "Delta Rows": str(row_count),
                         "Filename": target.filename,
                         **message_source_fields(message),
-                        "Note": "",
+                        "Note": "Backup task accepted; completion unverified"
+                        if backup_schedule_error is None
+                        else "Backup scheduling unavailable",
                     },
                     0x2ECC71,
                 )
@@ -318,7 +348,10 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 logger.exception("weekly_activity_success_notification_failed")
     except Exception as e:
         if audit_ref is not None and not audit_terminal_recorded:
-            await deps.fail_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                deps.record_audit_phase,
+                deps.fail_audit_batch,
                 audit_ref,
                 error_type=type(e).__name__,
                 error_text=str(e),
@@ -341,9 +374,16 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
             )
             audit_terminal_recorded = True
         try:
-            await deps.send_embed(
+            await observe_optional(
+                deps.send_embed,
                 target_ch,
-                "Alliance Activity Import \u274c",
+                (
+                    "Import outcome unconfirmed ⚠️"
+                    if outcome.business == "outcome_unconfirmed"
+                    else "Import committed; follow-up unavailable ⚠️"
+                    if outcome.business == "committed"
+                    else "Alliance Activity Import \u274c"
+                ),
                 {
                     "Error": f"{type(e).__name__}: {e}",
                     "Filename": target.filename,

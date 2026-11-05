@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
+from core.owned_work import drain_awaitable
 from location_importer import load_staging_and_replace, parse_output_csv
 from services.location_import_service import (
     LOCATION_AUDIT_PARSE_PHASE,
@@ -20,6 +21,9 @@ from services.location_import_service import (
     start_location_audit_batch,
 )
 from services.location_refresh_signal import signal_location_refresh_complete
+from services.upload_lifecycle import tracked_upload
+from services.upload_outcome_service import UploadOutcome, display_count
+from upload_routes.common import observe_optional, observe_upload_failure
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,7 @@ class PlayerLocationRouteDeps:
     warm_profile_cache: Callable[[], None] | None = None
 
 
+@tracked_upload
 async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteDeps) -> bool:
     """Handle automatic `scan_1198.csv` imports from the location upload channel."""
     if message.channel.id != deps.player_location_channel_id or not message.attachments:
@@ -53,6 +58,7 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
     except Exception:
         logger.debug("Failed to resolve notify channel for player location upload", exc_info=True)
 
+    outcome = UploadOutcome()
     try:
         csv_bytes = await target.read()
         audit_context = LocationImportAuditContext(
@@ -69,7 +75,8 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             entry_point="location_auto_upload",
             sql_operation="replace",
         )
-        audit_ref = await start_location_audit_batch(
+        audit_ref = await observe_optional(
+            start_location_audit_batch,
             context=audit_context,
             csv_bytes=csv_bytes,
         )
@@ -77,7 +84,8 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
         try:
             rows = parse_output_csv(csv_bytes)
         except Exception as exc:
-            await record_location_audit_phase(
+            await observe_optional(
+                record_location_audit_phase,
                 audit_ref,
                 phase_name=LOCATION_AUDIT_PARSE_PHASE,
                 phase_status="failed",
@@ -89,7 +97,10 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                     "error": str(exc),
                 },
             )
-            await fail_location_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                record_location_audit_phase,
+                fail_location_audit_batch,
                 audit_ref,
                 error_type=type(exc).__name__,
                 error_text=str(exc),
@@ -102,7 +113,8 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             raise
 
         if not rows:
-            await record_location_audit_phase(
+            await observe_optional(
+                record_location_audit_phase,
                 audit_ref,
                 phase_name=LOCATION_AUDIT_PARSE_PHASE,
                 phase_status="skipped",
@@ -115,7 +127,10 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                     "rows_parsed": 0,
                 },
             )
-            await fail_location_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                record_location_audit_phase,
+                fail_location_audit_batch,
                 audit_ref,
                 status="skipped",
                 error_type="NoValidLocationRows",
@@ -128,7 +143,8 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                     "rows_parsed": 0,
                 },
             )
-            await deps.send_embed(
+            await observe_optional(
+                deps.send_embed,
                 target_ch,
                 "Player Location Import",
                 {
@@ -140,7 +156,8 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             )
             return True
 
-        await record_location_audit_phase(
+        await observe_optional(
+            record_location_audit_phase,
             audit_ref,
             phase_name=LOCATION_AUDIT_PARSE_PHASE,
             phase_status="completed",
@@ -154,7 +171,10 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
 
         ok = await deps.ensure_sql_headroom_or_notify(target_ch)
         if not ok:
-            await fail_location_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                record_location_audit_phase,
+                fail_location_audit_batch,
                 audit_ref,
                 status="skipped",
                 error_type="SqlHeadroomUnavailable",
@@ -170,14 +190,18 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             return True
 
         try:
-            staging_rows, total_tracked = await deps.offload_callable(
-                load_staging_and_replace,
-                rows,
-                name="load_staging_and_replace",
-                prefer_process=True,
+            outcome = UploadOutcome("outcome_unconfirmed", "entered")
+            write_result = await drain_awaitable(
+                deps.offload_callable(
+                    load_staging_and_replace,
+                    rows,
+                    name="load_staging_and_replace",
+                    prefer_process=True,
+                )
             )
         except Exception as exc:
-            await record_location_audit_phase(
+            await observe_optional(
+                record_location_audit_phase,
                 audit_ref,
                 phase_name=LOCATION_AUDIT_REPLACE_PHASE,
                 phase_status="failed",
@@ -191,7 +215,10 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                     "error": str(exc),
                 },
             )
-            await fail_location_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                record_location_audit_phase,
+                fail_location_audit_batch,
                 audit_ref,
                 error_type=type(exc).__name__,
                 error_text=str(exc),
@@ -208,7 +235,10 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             )
             raise
 
-        await record_location_audit_phase(
+        staging_rows, total_tracked = write_result
+        outcome = UploadOutcome("committed", "settled")
+        await observe_optional(
+            record_location_audit_phase,
             audit_ref,
             phase_name=LOCATION_AUDIT_REPLACE_PHASE,
             phase_status="completed",
@@ -229,7 +259,8 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             signal_location_refresh_complete()
         except Exception as exc:
             refresh_failed = exc
-            await record_location_audit_phase(
+            await observe_optional(
+                record_location_audit_phase,
                 audit_ref,
                 phase_name=LOCATION_AUDIT_REFRESH_PHASE,
                 phase_status="failed",
@@ -247,7 +278,8 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                 },
             )
         else:
-            await record_location_audit_phase(
+            await observe_optional(
+                record_location_audit_phase,
                 audit_ref,
                 phase_name=LOCATION_AUDIT_REFRESH_PHASE,
                 phase_status="completed",
@@ -262,13 +294,14 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                 },
             )
 
-        await complete_location_audit_batch(
+        await observe_optional(
+            complete_location_audit_batch,
             audit_ref,
-            status="failed" if refresh_failed else "completed",
+            status="completed",
             rows_in_source=len(rows),
             rows_staged=staging_rows,
             rows_written=staging_rows,
-            rows_skipped=max(0, len(rows) - int(staging_rows or 0)),
+            rows_skipped=max(0, len(rows) - staging_rows) if staging_rows is not None else None,
             details={
                 "entry_point": audit_context.entry_point,
                 "sql_operation": audit_context.sql_operation,
@@ -280,12 +313,17 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             },
         )
 
-        await deps.send_embed(
+        await observe_optional(
+            deps.send_embed,
             target_ch,
             "Player Location Import ✅",
             {
-                "Imported Rows": str(staging_rows),
-                "Total Tracked": str(total_tracked),
+                "Imported Rows": display_count(staging_rows),
+                "Connection cleanup": getattr(write_result, "cleanup", "settled"),
+                "Refresh signal": "Unavailable"
+                if refresh_failed
+                else "Requested; completion unverified",
+                "Total Tracked": display_count(total_tracked),
                 "Source Channel": f"#{message.channel.name} ({message.channel.id})",
                 "Uploaded By": f"{message.author} ({message.author.id})",
             },
@@ -310,9 +348,16 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             logger.debug("Failed to warm profile cache after player location import", exc_info=True)
 
     except Exception as e:
-        await deps.send_embed(
+        await observe_optional(
+            deps.send_embed,
             target_ch,
-            "Player Location Import ❌",
+            (
+                "Import outcome unconfirmed ⚠️"
+                if outcome.business == "outcome_unconfirmed"
+                else "Import committed; follow-up unavailable ⚠️"
+                if outcome.business == "committed"
+                else "Player Location Import ❌"
+            ),
             {
                 "Error": f"{type(e).__name__}: {e}",
                 "Source Channel": f"#{message.channel.name} ({message.channel.id})",

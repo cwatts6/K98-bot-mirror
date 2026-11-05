@@ -1,5 +1,7 @@
 # P01.3 handover: passive health presentation
 
+> **Archived 5 November 2026.** This completed record is archived; its original design/release instructions and pending gates are historical. Current outcome: [P01.3 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md). Next task: [P01.4 review/scope](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 > E81 implementation update: P01.3 runtime and persistent Refresh are implemented locally. Local validation and both independent PR packages are complete; see the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md). Earlier design-only status is historical. No publication or deployment has occurred.
 
 Current E80: full P01.3 implementation, local validation and PR preparation are authorized, including persistent Refresh. Recheck equivalent callers, full H01-H09 coverage and value/non-interference throughout. Earlier design-only holds below are superseded for this implementation; operational actions remain separate.
@@ -47,4 +49,4 @@ Design deterministic tests proving zero probe/SQL/provider/recovery calls during
 
 This handover is documentation-only: architecture/deferred/security-routing/test selection and link/archive checks apply; runtime tests and security scan are skipped. A future command/health/SQL-facing implementation requires the relevant skills and an exact Changes security review, Deep off. No full/deep audit is implied. Step 1 remains review/scope; present the smallest reviewable design and validation plan before coding.
 
-[P01.2b closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md); [P01 shared design](Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md); [tracker](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md); [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-04.md).
+[P01.2b closeout](Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md); [P01 shared design](../Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md); [tracker](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md); [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-04.md).

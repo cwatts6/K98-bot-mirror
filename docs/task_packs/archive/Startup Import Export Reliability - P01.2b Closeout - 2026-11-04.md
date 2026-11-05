@@ -26,4 +26,4 @@ P01.2b feature-specific manifests and delivery gates are archived conditional de
 
 The three P01.2b design/review/handover documents are archived with links rebased; this closeout is archived alongside them. The former P01.2b carry-forward checklist is renamed to the active programme-wide checklist because its cross-package documentation obligation remains. Preserve all prior ten archive moves, these four relocations and the new closeout/handover in the next appropriate authorized reliability PR and private promotion. No PR, merge, deployment, restart, SQL/provider request or runtime change was made.
 
-[P01.3 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md); [programme documentation carry-forward](../Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-04.md).
+[P01.3 handover](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md); [programme documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-04.md).

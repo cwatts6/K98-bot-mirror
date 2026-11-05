@@ -16,6 +16,7 @@ import threading
 import time
 
 from core.operation_evidence import optional
+from services.optional_upload_observations import UploadObservations, is_upload_row
 
 MAX_EVENT = 8192
 MAX_V2_EVENT = 2048
@@ -57,6 +58,7 @@ V2_FIELDS = {
     "failed_count",
     "unattempted",
     "outcome_unconfirmed",
+    "diagnostic_loss",
 }
 NEW_STAGES = {
     "rehydrate_tracked_views",
@@ -130,6 +132,7 @@ class DiagnosticSink:
         self.queue = deque()
         self.lock = threading.Lock()
         self.wake = threading.Event()
+        self.uploads = UploadObservations(self.wake)
         self.closing = threading.Event()
         self.closed = False
         self.dropped = 0
@@ -208,7 +211,31 @@ class DiagnosticSink:
         if type(event) is dict and event.get("state") in _critical:
             self.critical_dropped = min(MAX_COUNTER, self.critical_dropped + 1)
 
+    def _make_room(self, upload, reason):
+        optional_rows = [key for key, row in self.records.items() if is_upload_row(row)]
+        if upload and len(optional_rows) >= 64:
+            victim = next((key for key in optional_rows if self.records[key]["complete"]), None)
+            if victim is None:
+                self.uploads._count("retention_omitted")
+                return False
+            self._evict(victim, reason)
+        if len(self.records) < MAX_OPERATIONS:
+            return True
+        victim = next(iter(optional_rows), None)
+        if victim is None and not upload:
+            victim = next((key for key, row in self.records.items() if row["complete"]), None)
+        if victim is None:
+            if upload:
+                self.uploads._count("retention_omitted")
+            else:
+                self.dropped += 1
+                self.refused_operations += 1
+            return False
+        self._evict(victim, reason)
+        return True
+
     def close(self):
+        self.uploads.close()
         # Called only after business owners drain. Retain all accepted observations.
         with self.lock:
             self.closed = True
@@ -260,6 +287,8 @@ class DiagnosticSink:
     def _evict(self, reference, reason, cutoff=None):
         from core.operation_evidence import _incarnation
 
+        if is_upload_row(self.records[reference]):
+            self.uploads._count("retention_omitted")
         del self.records[reference]
         self.evicted = min(MAX_COUNTER, self.evicted + 1)
         prior = self.eviction_provenance.get(reason, {})
@@ -331,6 +360,7 @@ class DiagnosticSink:
         rows = sorted(
             reversed(snapshot["operations"]),
             key=lambda row: (
+                is_upload_row(row),
                 row.get("schema") == "legacy_projection",
                 row["first_failure"] is None,
             ),
@@ -358,6 +388,7 @@ class DiagnosticSink:
             counter_saturated=any(
                 value == MAX_COUNTER for value in self._counter_totals().values()
             ),
+            upload_observations=self.uploads.report(),
             authority="diagnostic_only",
             sql_holder="unavailable_P02",
         )
@@ -495,6 +526,9 @@ class DiagnosticSink:
             terminal.get("stage") == "operation"
             and terminal.get("state") == "settled"
             and restored["first_failure"] is None
+        ) or (
+            terminal.get("stage") in {"upload_audit", "download_log"}
+            and terminal.get("state") == "settled"
         )
         return restored
 
@@ -552,6 +586,7 @@ class DiagnosticSink:
                 self.invalid += 1
                 self.unknown_historical_counters.add(name)
         self._restore_provenance(selected)
+        self.uploads.restore(selected.get("upload_observations"))
         for version, document in documents.items():
             for row in document["operations"]:
                 try:
@@ -559,18 +594,8 @@ class DiagnosticSink:
                     # V2 wins shared identities. V1-only roots from a downgrade
                     # remain explicitly legacy; never fabricate missing milestones.
                     if restored["reference"] not in self.records:
-                        if len(self.records) >= MAX_OPERATIONS:
-                            disposable = next(
-                                (key for key, value in self.records.items() if value["complete"]),
-                                None,
-                            )
-                            if disposable is None:
-                                self.refused_operations = min(
-                                    MAX_COUNTER, self.refused_operations + 1
-                                )
-                                self.dropped = min(MAX_COUNTER, self.dropped + 1)
-                                continue
-                            self._evict(disposable, "restore_capacity")
+                        if not self._make_room(is_upload_row(restored), "restore_capacity"):
+                            continue
                         self.records[restored["reference"]] = restored
                     elif version == "v1" and restored["transitions"]:
                         existing = self.records.get(restored["reference"])
@@ -695,6 +720,7 @@ class DiagnosticSink:
                 "failed_count",
                 "unattempted",
                 "outcome_unconfirmed",
+                "diagnostic_loss",
             }:
                 if type(value) not in (int, float) or not 0 <= value <= 1e20:
                     raise ValueError("Invalid diagnostic number")
@@ -781,16 +807,21 @@ class DiagnosticSink:
         self._validate(event)
         reference = event["reference"]
         row = self.records.get(reference)
+        if event["stage"] in {"upload_audit", "download_log"} and row is not None:
+            if not is_upload_row(row):
+                self.uploads._count("retention_omitted")
+                return
+            prior_events = list(row["transitions"]) + [row.get("first_failure") or {}]
+            event = dict(
+                event,
+                diagnostic_loss=max(
+                    event.get("diagnostic_loss", 0),
+                    *(old.get("diagnostic_loss", 0) for old in prior_events),
+                ),
+            )
         if row is None:
-            if len(self.records) >= MAX_OPERATIONS:
-                completed = next(
-                    (key for key, value in self.records.items() if value["complete"]), None
-                )
-                if completed is None:
-                    self.dropped += 1
-                    self.refused_operations += 1
-                    return
-                self._evict(completed, "capacity")
+            if not self._make_room(event["stage"] in {"upload_audit", "download_log"}, "capacity"):
+                return
             row = self.records[reference] = dict(
                 reference=reference,
                 transitions=[],
@@ -846,7 +877,7 @@ class DiagnosticSink:
             event["stage"] == "operation"
             and event["state"] == "settled"
             and row["first_failure"] is None
-        )
+        ) or (event["stage"] in {"upload_audit", "download_log"} and event["state"] == "settled")
 
     def _milestones(self, row, event):
         row["schema"] = "operation-projection/2"
@@ -1002,6 +1033,7 @@ class DiagnosticSink:
             schema="operation-observations/2",
             operations=list(self.records.values()),
             retention_days=30,
+            upload_observations=self.uploads.report(),
             **self._counter_totals(),
             counter_provenance=self._counter_provenance(),
             eviction_provenance=deepcopy(self.eviction_provenance),
@@ -1034,7 +1066,11 @@ class DiagnosticSink:
         # Encoded overhead belongs inside the file bound. Failure roots remain
         # protected; saturation is visible rather than evicting original failures.
         while document_size() > MAX_FILE - 128:
-            completed = next((key for key, row in self.records.items() if row["complete"]), None)
+            completed = next((key for key, row in self.records.items() if is_upload_row(row)), None)
+            if completed is None:
+                completed = next(
+                    (key for key, row in self.records.items() if row["complete"]), None
+                )
             if completed is None:
                 trimmable = next(
                     (row for row in self.records.values() if len(row["transitions"]) > 1), None
@@ -1069,12 +1105,16 @@ class DiagnosticSink:
             ),
             default=None,
         )
+        document["upload_observations"] = self.uploads.report()
         # The writer owns validated primitive events. Copy the small mutable
         # containers directly instead of recursively visiting every primitive
         # through deepcopy while business threads compete for the GIL. Events
         # are copied too, so neither a later writer update nor a report reader
         # can mutate an already published generation.
-        self.snapshot = dict(document, operations=[row for row, _ in self._published_rows.values()])
+        self.snapshot = dict(
+            document,
+            operations=sorted((row for row, _ in self._published_rows.values()), key=is_upload_row),
+        )
         if self.directory is not None:
             self._write("v2", "observations-v2.json", document)
             self._write("v1", "observations.json", self._legacy(document))
@@ -1116,6 +1156,13 @@ class DiagnosticSink:
                     # Yield the sink's batch to ready business/event-loop threads.
                     # No producer waits here and close still drains every event.
                     time.sleep(0)
+            for event in self.uploads.take(64 if closed else 16):
+                try:
+                    self._accept(event)
+                except Exception:
+                    self.uploads.partial = True
+            if self.uploads.slots:
+                self.wake.set()
             try:
                 self._publish()
             except Exception:
@@ -1170,3 +1217,20 @@ def full_snapshot():
     return (
         _sink.full_snapshot() if _sink is not None else {"operations": [], "status": "unavailable"}
     )
+
+
+def offer_upload_observation(reference, state, loss=0, *, kind="sql"):
+    if _sink is not None:
+        try:
+            return _sink.uploads.offer(reference, state, loss, kind)
+        except Exception:
+            _sink.uploads.partial = True
+    return False
+
+
+def upload_worker_summary(kind, state, unavailable=0, error_type=None, dropped=0, failures=0):
+    if _sink is not None:
+        try:
+            _sink.uploads.summary(kind, state, unavailable, error_type, dropped, failures)
+        except Exception:
+            _sink.uploads.partial = True

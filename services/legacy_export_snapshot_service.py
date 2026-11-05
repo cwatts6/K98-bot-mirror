@@ -503,26 +503,47 @@ def _writer_scope(kind, *, owner_token=None):
         _owner.reset(token)
 
 
-def admitted_writer(kind):
+def admitted_writer(kind, *, preserve_kvk_commit=False):
     """Compatibility seam for synchronous writers and explicitly passed tokens."""
+
+    if preserve_kvk_commit and kind != "all_kvk":
+        raise ValueError("Commit preservation is scoped to KVK uploads")
 
     def decorate(function):
         @wraps(function)
         def run(*args, owner_token=None, **kwargs):
-            with writer_scope(kind, owner_token=owner_token) as owner:
-                result = function(*args, **kwargs)
-                if (
-                    owner is not None
-                    and isinstance(result, dict)
-                    and result.get("success") is False
-                ):
-                    owner.failed = True
+            from services.upload_outcome_service import CommittedKvkResult
+
+            result = None
+            try:
+                with writer_scope(kind, owner_token=owner_token) as owner:
+                    result = function(*args, **kwargs)
+                    if (
+                        owner is not None
+                        and isinstance(result, dict)
+                        and result.get("success") is False
+                    ):
+                        owner.failed = True
+            except Exception as exc:
+                if not preserve_kvk_commit or not isinstance(result, CommittedKvkResult):
+                    raise
+                # writer_scope has already performed its existing authority/cleanup
+                # protocol. Retain the acknowledged business result, not permission
+                # to export an unfinalized capture. No retry, release or new owner.
+                result.pop("export_preparation_id", None)
+                result["capture_outcome"] = "unconfirmed"
+                result["capture_error_type"] = type(exc).__name__
+                return result
             if (
                 owner is not None
                 and owner.closed
                 and owner.failed
                 and not (isinstance(result, dict) and result.get("success") is False)
             ):
+                if preserve_kvk_commit and isinstance(result, CommittedKvkResult):
+                    result.pop("export_preparation_id", None)
+                    result["capture_outcome"] = "unconfirmed"
+                    return result
                 raise SnapshotUnavailable("Writer outcome requires reconciliation.")
             if owner is not None and owner.closed and not owner.failed and isinstance(result, dict):
                 result["export_preparation_id"] = owner.claim.preparation_id

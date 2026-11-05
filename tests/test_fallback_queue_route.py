@@ -143,12 +143,15 @@ async def test_fallback_route_accepts_existing_extensions(filename: str):
     handled = await route.handle_fallback_queue_upload(message, deps)
 
     assert handled is True
-    assert queue.items == [message]
+    assert len(queue.items) == 1
+    assert queue.items[0].message is message
     assert live_queue["jobs"] == [
         {
             "filename": filename,
             "source_message_id": message.id,
             "source_channel_id": message.channel.id,
+            "source_attachment_id": None,
+            "attachment_index": 0,
             "user": "uploader",
             "channel": "uploads",
             "uploaded": "2026-05-26T12:30:00+00:00",
@@ -194,7 +197,8 @@ async def test_fallback_route_live_queue_append_failure_is_non_fatal():
     handled = await route.handle_fallback_queue_upload(message, deps)
 
     assert handled is True
-    assert queue.items == [message]
+    assert len(queue.items) == 1
+    assert queue.items[0].message is message
     assert live_queue["jobs"] == []
     assert len(updated) == 1
     assert len(created) == 1
@@ -208,7 +212,8 @@ async def test_fallback_route_embed_update_failure_is_non_fatal():
     handled = await route.handle_fallback_queue_upload(message, deps)
 
     assert handled is True
-    assert queue.items == [message]
+    assert len(queue.items) == 1
+    assert queue.items[0].message is message
     assert len(live_queue["jobs"]) == 1
     assert len(updated) == 1
     assert len(created) == 1
@@ -224,7 +229,8 @@ async def test_fallback_route_backup_scheduling_failure_is_non_fatal():
     handled = await route.handle_fallback_queue_upload(message, deps)
 
     assert handled is True
-    assert queue.items == [message]
+    assert len(queue.items) == 1
+    assert queue.items[0].message is message
     assert len(live_queue["jobs"]) == 1
     assert len(updated) == 1
     assert len(created) == 1
@@ -243,14 +249,15 @@ async def test_fallback_route_backup_awaitable_construction_failure_is_non_fatal
     handled = await route.handle_fallback_queue_upload(message, deps)
 
     assert handled is True
-    assert queue.items == [message]
+    assert len(queue.items) == 1
+    assert queue.items[0].message is message
     assert len(live_queue["jobs"]) == 1
     assert len(updated) == 1
     assert created == []
 
 
 @pytest.mark.asyncio
-async def test_fallback_route_preserves_enqueue_per_accepted_attachment_behavior():
+async def test_fallback_route_admits_one_immutable_selected_message():
     deps, queue, live_queue, updated, created = _deps()
     message = _message(
         attachments=[
@@ -263,7 +270,9 @@ async def test_fallback_route_preserves_enqueue_per_accepted_attachment_behavior
     handled = await route.handle_fallback_queue_upload(message, deps)
 
     assert handled is True
-    assert queue.items == [message, message]
+    assert len(queue.items) == 1
+    assert queue.items[0].message is message
+    assert [a.filename for a in queue.items[0].attachments] == ["first.xlsx", "second.csv"]
     assert [job["filename"] for job in live_queue["jobs"]] == ["first.xlsx", "second.csv"]
-    assert len(updated) == 2
-    assert len(created) == 2
+    assert len(updated) == 1
+    assert len(created) == 1

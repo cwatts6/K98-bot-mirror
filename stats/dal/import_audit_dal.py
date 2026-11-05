@@ -3,11 +3,73 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
 from constants import _conn_trusted
 from file_utils import fetch_one_dict
+
+
+class AuditConnectionCleanupUnconfirmed(RuntimeError):
+    """Retain the session when close failed; no retry or physical-drain claim."""
+
+    def __init__(self, connection):
+        super().__init__("Optional audit connection cleanup is unconfirmed")
+        self.connection = connection
+
+
+@contextmanager
+def optional_upload_connection():
+    """Dedicated, fail-closed optional audit connection; never a producer session."""
+    import pyodbc
+
+    from constants import ODBC_DRIVER, SQL_DATABASE, SQL_SERVER
+
+    conn = pyodbc.connect(
+        f"DRIVER={{{ODBC_DRIVER}}};SERVER={SQL_SERVER};DATABASE={SQL_DATABASE};Trusted_Connection=yes;",
+        autocommit=True,
+        timeout=2,
+    )
+    try:
+        conn.timeout = 2
+        if conn.autocommit is not True:
+            raise RuntimeError("Optional audit requires autocommit")
+        yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception as exc:
+            raise AuditConnectionCleanupUnconfirmed(conn) from exc
+
+
+def fetch_import_audit_batch_by_correlation(
+    *,
+    correlation_id: str,
+    import_kind: str,
+    source_type: str,
+    connection_factory: Callable[[], Any] = _conn_trusted,
+) -> ImportAuditBatchRef | None:
+    """Exact correlation inspection only; never latest-domain rebinding or replay."""
+    from uuid import UUID
+
+    correlation_id = str(UUID(correlation_id))
+    with connection_factory() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT ImportAuditBatchId, CorrelationId FROM dbo.ImportAuditBatch "
+            "WHERE CorrelationId = ? AND ImportKind = ? AND SourceType = ?;",
+            correlation_id,
+            import_kind,
+            source_type,
+        )
+        row = fetch_one_dict(cur)
+        if not row:
+            return None
+        identity = int(row["ImportAuditBatchId"])
+        if identity <= 0 or UUID(str(row["CorrelationId"])) != UUID(correlation_id):
+            raise ValueError("Audit correlation acknowledgement mismatch")
+        return ImportAuditBatchRef(identity, correlation_id)
 
 
 @dataclass(frozen=True, slots=True)

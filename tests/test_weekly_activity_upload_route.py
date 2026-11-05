@@ -221,11 +221,12 @@ async def test_weekly_activity_route_success_preserves_import_contract_and_embed
     assert title == "Alliance Activity Import \u2705"
     assert fields == {
         "SnapshotId": "42",
-        "Rows": "7",
+        "Snapshot Rows": "7",
+        "Delta Rows": "7",
         "Filename": "1198_alliance_activity.xlsx",
         "Channel": "#activity (10)",
         "Uploader": "uploader (123456789)",
-        "Note": "",
+        "Note": "Backup task accepted; completion unverified",
     }
     assert color == 0x2ECC71
     assert mention is None
@@ -321,18 +322,18 @@ async def test_weekly_activity_route_import_exception_sends_existing_error():
     assert handled is True
     assert created == []
     _ch, title, fields, color, mention = sent[-1]
-    assert title == "Alliance Activity Import \u274c"
+    assert title == "Import outcome unconfirmed ⚠️"
     assert fields["Error"] == "RuntimeError: boom"
     assert fields["Filename"] == "1198_alliance_activity.xlsx"
     assert fields["Channel"] == "#activity (10)"
     assert fields["Uploader"] == "uploader (123456789)"
     assert color == 0xE74C3C
     assert mention is None
-    assert audit["phases"][-1][1]["phase_name"] == route.WEEKLY_ACTIVITY_AUDIT_INGEST_PHASE
+    assert audit["phases"][-1][1]["phase_name"] == "upload_observation"
     assert audit["phases"][-1][1]["phase_status"] == "failed"
-    assert audit["failed"][-1][1]["error_type"] == "RuntimeError"
-    assert audit["failed"][-1][1]["rows_in_source"] == 7
-    assert audit["failed"][-1][1].get("external_batch_id") is None
+
+    assert audit["failed"] == []
+    assert audit["phases"][-1][1]["details"]["business_outcome"] == "outcome_unconfirmed"
 
 
 @pytest.mark.asyncio
@@ -374,11 +375,12 @@ async def test_weekly_activity_route_success_embed_failure_does_not_fail_committ
     assert title == "Alliance Activity Import \u2705"
     assert fields == {
         "SnapshotId": "42",
-        "Rows": "7",
+        "Snapshot Rows": "7",
+        "Delta Rows": "7",
         "Filename": "1198_alliance_activity.xlsx",
         "Channel": "#activity (10)",
         "Uploader": "uploader (123456789)",
-        "Note": "",
+        "Note": "Backup task accepted; completion unverified",
     }
     assert color == 0x2ECC71
     assert mention is None
@@ -398,8 +400,8 @@ async def test_weekly_activity_route_error_embed_failure_is_swallowed():
 
     assert handled is True
     assert created == []
-    assert sent[-1][1] == "Alliance Activity Import \u274c"
-    assert audit["failed"][-1][1]["error_type"] == "RuntimeError"
+    assert sent[-1][1] == "Import outcome unconfirmed ⚠️"
+    assert audit["failed"] == []
 
 
 @pytest.mark.asyncio

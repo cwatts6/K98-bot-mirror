@@ -9,6 +9,7 @@ import pyodbc
 
 from constants import DATABASE, PASSWORD, SERVER, USERNAME
 from file_utils import fetch_one_dict
+from services.upload_outcome_service import LocationWriteResult
 
 log = logging.getLogger(__name__)
 
@@ -136,7 +137,19 @@ def _normalize_rows_args(*rows_args) -> list[tuple]:
     return flattened
 
 
-def load_staging_and_merge(*rows_args) -> tuple[int, int]:
+def _write_result(result, count_column):
+    values = {str(key).lower(): value for key, value in (result or {}).items()}
+    counts = []
+    for key in (count_column.lower(), "totaltracked"):
+        value = values.get(key)
+        try:
+            counts.append(int(value) if value is not None else None)
+        except (ValueError, TypeError, OverflowError):
+            counts.append(None)
+    return LocationWriteResult(*counts)
+
+
+def load_staging_and_merge(*rows_args) -> tuple[int | None, int | None]:
     """
     Truncate staging, bulk-insert rows, run merge proc.
     Returns (staging_rows, total_tracked).
@@ -164,6 +177,7 @@ def load_staging_and_merge(*rows_args) -> tuple[int, int]:
         return (0, 0)
 
     conn = _get_conn()
+    acknowledged = None
     try:
         with conn.cursor() as cur:
             # cur.execute("TRUNCATE TABLE dbo.PlayerLocation_Staging;")
@@ -179,31 +193,28 @@ def load_staging_and_merge(*rows_args) -> tuple[int, int]:
             )
             cur.execute("EXEC dbo.sp_ImportPlayerLocationFromStaging;")
             result = fetch_one_dict(cur)
+        receipt = _write_result(result, "StagingRows")
         conn.commit()
-
-        # Normalize the procedure result to the expected (imported_rows, total_tracked)
-        if not result:
-            # If the proc returned nothing, fall back to sensible defaults
-            staging_rows = len(rows)
-            total_tracked = 0
-            return staging_rows, total_tracked
-
-        vals_iter = iter(result.values())
-        first_val = next(vals_iter, None)
-        second_val = next(vals_iter, None)
-
-        staging_rows = int(first_val) if first_val is not None else len(rows)
-        total_tracked = int(second_val) if second_val is not None else 0
-        return staging_rows, total_tracked
+        acknowledged = receipt
+        return receipt
 
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            if acknowledged is not None:
+                acknowledged.cleanup = "unconfirmed"
+            else:
+                log.warning("location_connection_close_unconfirmed", exc_info=True)
 
 
-def load_staging_and_replace(*rows_args) -> tuple[int, int]:
+def load_staging_and_replace(*rows_args) -> tuple[int | None, int | None]:
     """
     Clears staging, bulk-inserts rows, then atomically replaces dbo.PlayerLocation
     only if staging has >0 rows. Returns (imported_rows, total_tracked).
@@ -245,6 +256,7 @@ def load_staging_and_replace(*rows_args) -> tuple[int, int]:
         return (0, 0)
 
     conn = _get_conn()
+    acknowledged = None
     try:
         with conn.cursor() as cur:
             # Clear staging (requires ALTER on staging for TRUNCATE; otherwise use DELETE)
@@ -265,22 +277,22 @@ def load_staging_and_replace(*rows_args) -> tuple[int, int]:
             cur.execute("EXEC dbo.sp_ReplacePlayerLocationFromStaging;")
             result = fetch_one_dict(cur)
 
+        receipt = _write_result(result, "ImportedRows")
         conn.commit()
-
-        # Normalize the procedure result to the expected (imported_rows, total_tracked)
-        if not result:
-            return (0, 0)
-
-        vals_iter = iter(result.values())
-        first_val = next(vals_iter, None)
-        second_val = next(vals_iter, None)
-
-        imported_rows = int(first_val) if first_val is not None else 0
-        total_tracked = int(second_val) if second_val is not None else imported_rows
-        return imported_rows, total_tracked
+        acknowledged = receipt
+        return receipt
 
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            if acknowledged is not None:
+                acknowledged.cleanup = "unconfirmed"
+            else:
+                log.warning("location_connection_close_unconfirmed", exc_info=True)

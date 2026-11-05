@@ -7,6 +7,8 @@ import pytest
 from services import honor_import_audit_service as audit
 from stats.dal.import_audit_dal import ImportAuditBatchRef
 
+pytestmark = pytest.mark.usefixtures("legacy_optional_audit")
+
 
 def test_honor_external_batch_id_uses_kvk_and_scan_id():
     assert audit.honor_external_batch_id(1198, 7) == "1198:7"

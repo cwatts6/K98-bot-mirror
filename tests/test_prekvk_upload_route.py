@@ -266,7 +266,7 @@ async def test_prekvk_route_success_preserves_import_contract_and_side_effects()
 
 
 @pytest.mark.asyncio
-async def test_prekvk_route_refresh_failure_fails_audit_batch_with_error_details():
+async def test_prekvk_route_refresh_failure_preserves_audit_batch_with_error_details():
     audit_events = []
     deps, sent, _offloads, created, stats = _deps(
         audit_events=audit_events,
@@ -287,9 +287,7 @@ async def test_prekvk_route_refresh_failure_fails_audit_batch_with_error_details
     assert refresh_phase["phase_status"] == "failed"
     assert refresh_phase["error_type"] == "RuntimeError"
     assert refresh_phase["error_text"] == "refresh unavailable"
-    assert audit_events[-1][0] == "fail"
-    assert audit_events[-1][2]["error_type"] == "RuntimeError"
-    assert audit_events[-1][2]["error_text"] == "refresh unavailable"
+    assert audit_events[-1][0] == "complete"
     assert audit_events[-1][2]["rows_in_source"] == 3
     assert audit_events[-1][2]["rows_staged"] == 3
     assert audit_events[-1][2]["rows_written"] == 3
@@ -406,7 +404,7 @@ async def test_prekvk_route_importer_exception_sends_existing_error():
     assert created == []
     assert stats == []
     _ch, title, fields, color, _mention = sent[-1]
-    assert title == "Pre-KVK Import ❌"
+    assert title == "Import outcome unconfirmed ⚠️"
     assert fields["Error"] == "RuntimeError: boom"
     assert color == 0xE74C3C
 

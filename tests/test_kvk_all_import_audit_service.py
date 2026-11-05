@@ -7,6 +7,8 @@ import pytest
 from services import kvk_all_import_audit_service as audit
 from stats.dal.import_audit_dal import ImportAuditBatchRef
 
+pytestmark = pytest.mark.usefixtures("legacy_optional_audit")
+
 
 @pytest.mark.asyncio
 async def test_start_kvk_all_audit_batch_passes_metadata_and_hash(monkeypatch):

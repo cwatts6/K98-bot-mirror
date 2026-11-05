@@ -321,7 +321,7 @@ def _first_scalar(cursor: Any) -> Any:
     return next(iter(row.values()))
 
 
-@admitted_writer("all_kvk")
+@admitted_writer("all_kvk", preserve_kvk_commit=True)
 def ingest_prepared_import(
     *,
     con: pyodbc.Connection,
@@ -538,6 +538,8 @@ def ingest_prepared_import(
         except Exception:
             pass
         raise
+    # Normalize required result values before the commit acknowledgement boundary.
+    kvk_no, scan_id, row_count = int(kvk_no), int(scan_id), int(row_count)
     record_writer_completion(
         cursor=cur,
         procedure="KVK ingest and recompute",
@@ -547,28 +549,42 @@ def ingest_prepared_import(
     )
     con.commit()
 
-    cur = con.cursor()
     negative_count_started = time.perf_counter()
-    cur.execute(NEGATIVE_COUNT_SQL, (kvk_no, scan_id))
-    negative_value = _first_scalar(cur)
+    negatives = None
+    negative_error = None
+    try:
+        cur = con.cursor()
+        cur.execute(NEGATIVE_COUNT_SQL, (kvk_no, scan_id))
+        negative_value = _first_scalar(cur)
+        if negative_value is not None:
+            negatives = int(negative_value)
+        else:
+            negative_error = "MissingScalar"
+    except Exception as exc:
+        negative_error = type(exc).__name__
     negative_count_ms = (time.perf_counter() - negative_count_started) * 1000.0
-    negatives = int(negative_value) if negative_value is not None else 0
 
-    return {
-        "kvk_no": int(kvk_no),
-        "scan_id": int(scan_id),
-        "row_count": int(row_count),
-        "negatives": negatives,
-        "staged_rows": staged_rows,
-        "stage_rows_ms": stage_rows_ms,
-        "stage_insert_ms": stage_insert_ms,
-        "precheck_ms": precheck_ms,
-        "ingest_ms": ingest_ms,
-        "recompute_ms": recompute_ms,
-        "negative_count_ms": negative_count_ms,
-        "proc_ms": ingest_ms,
-        "sheet": sheet_name,
-        "schema_version": SCHEMA_VERSION,
-        "schema": schema_metadata,
-        "success": True,
-    }
+    from services.upload_outcome_service import CommittedKvkResult
+
+    return CommittedKvkResult(
+        {
+            "business_outcome": "committed",
+            "negative_count_error": negative_error,
+            "kvk_no": int(kvk_no),
+            "scan_id": int(scan_id),
+            "row_count": int(row_count),
+            "negatives": negatives,
+            "staged_rows": staged_rows,
+            "stage_rows_ms": stage_rows_ms,
+            "stage_insert_ms": stage_insert_ms,
+            "precheck_ms": precheck_ms,
+            "ingest_ms": ingest_ms,
+            "recompute_ms": recompute_ms,
+            "negative_count_ms": negative_count_ms,
+            "proc_ms": ingest_ms,
+            "sheet": sheet_name,
+            "schema_version": SCHEMA_VERSION,
+            "schema": schema_metadata,
+            "success": True,
+        }
+    )

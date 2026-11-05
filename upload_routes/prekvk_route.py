@@ -9,6 +9,7 @@ import logging
 import re
 from typing import Any
 
+from core.owned_work import drain_awaitable
 from prekvk_importer import import_prekvk_bytes
 from services.prekvk_import_audit_service import (
     PREKVK_AUDIT_HISTORY_TABLE,
@@ -25,7 +26,14 @@ from services.prekvk_import_audit_service import (
     record_prekvk_audit_phase,
     start_prekvk_audit_batch,
 )
+from services.upload_lifecycle import tracked_upload
+from services.upload_outcome_service import UploadOutcome, delivery_details, display_delivery
 from stats_alerts.delivery_outcomes import log_delivery
+from upload_routes.common import (
+    observe_optional,
+    observe_upload_failure,
+    schedule_factory_best_effort,
+)
 from utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -154,7 +162,8 @@ async def _record_importer_audit_phases(
         status in {"accepted", "duplicate"} or str(importer_phase or "").startswith("db")
     )
 
-    await deps.record_audit_phase(
+    await observe_optional(
+        deps.record_audit_phase,
         audit_ref,
         phase_name=PREKVK_AUDIT_PARSE_PHASE,
         phase_status="completed" if parsed else "failed",
@@ -193,7 +202,8 @@ async def _record_importer_audit_phases(
         ingest_error_type = error_type
         ingest_error_text = error_text
 
-    await deps.record_audit_phase(
+    await observe_optional(
+        deps.record_audit_phase,
         audit_ref,
         phase_name=PREKVK_AUDIT_INGEST_PHASE,
         phase_status=ingest_status,
@@ -216,6 +226,7 @@ async def _record_importer_audit_phases(
     )
 
 
+@tracked_upload
 async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
     """Handle PreKvK workbook imports from the configured upload channel."""
     if message.channel.id != deps.prekvk_channel_id or not message.attachments:
@@ -229,7 +240,8 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
     )
 
     if not target:
-        await deps.send_embed(
+        await observe_optional(
+            deps.send_embed,
             notify_ch,
             "Pre-KVK Import ⚠️",
             {
@@ -242,6 +254,7 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
         )
         return True
 
+    outcome = UploadOutcome()
     audit_context: PreKvkImportAuditContext | None = None
     audit_ref: Any = None
     audit_terminal_recorded = False
@@ -271,7 +284,8 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
 
         if detected_kvk_no is None:
             logger.error("[DL_BOT] Could not determine current KVK number; aborting Pre-KVK import")
-            await deps.send_embed(
+            await observe_optional(
+                deps.send_embed,
                 notify_ch,
                 "Pre-KVK Import ❌",
                 {
@@ -297,33 +311,47 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
             ),
             kvk_no=detected_kvk_no,
         )
-        audit_ref = await deps.start_audit_batch(
+        audit_ref = await observe_optional(
+            deps.start_audit_batch,
             context=audit_context,
             xlsx_bytes=file_bytes,
         )
 
         import_started = deps.now_utc()
-        result = await deps.offload_callable(
-            import_prekvk_bytes,
-            file_bytes,
-            target.filename,
-            kvk_no=detected_kvk_no,
-            uploader_discord_id=(
-                int(message.author.id) if getattr(message.author, "id", None) is not None else None
-            ),
-            channel_id=(
-                int(message.channel.id)
-                if getattr(message.channel, "id", None) is not None
-                else None
-            ),
-            message_id=int(message.id) if getattr(message, "id", None) is not None else None,
-            return_metadata=True,
-            name="import_prekvk_bytes",
-            prefer_process=True,
-            meta={"filename": target.filename, "kvk_no": detected_kvk_no},
+        outcome = UploadOutcome("outcome_unconfirmed", "entered")
+        result = await drain_awaitable(
+            deps.offload_callable(
+                import_prekvk_bytes,
+                file_bytes,
+                target.filename,
+                kvk_no=detected_kvk_no,
+                uploader_discord_id=(
+                    int(message.author.id)
+                    if getattr(message.author, "id", None) is not None
+                    else None
+                ),
+                channel_id=(
+                    int(message.channel.id)
+                    if getattr(message.channel, "id", None) is not None
+                    else None
+                ),
+                message_id=int(message.id) if getattr(message, "id", None) is not None else None,
+                return_metadata=True,
+                name="import_prekvk_bytes",
+                prefer_process=True,
+                meta={"filename": target.filename, "kvk_no": detected_kvk_no},
+            )
         )
         ok, note, rows = result[0], result[1], result[2]
+        outcome = UploadOutcome(
+            ("duplicate" if "duplicate file skipped" in (note or "").lower() else "committed")
+            if ok
+            else "failed_confirmed",
+            "settled",
+        )
         metadata = _metadata_dict(result)
+        if metadata.get("business_outcome") == "outcome_unconfirmed":
+            outcome = UploadOutcome("outcome_unconfirmed", "settled")
         external_batch_table, external_batch_id = _external_batch_from_metadata(metadata)
         rows_in_source = _metadata_int(metadata, "rows_in_source")
         rows_written = _metadata_int(metadata, "rows_written")
@@ -343,26 +371,12 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
 
         if ok:
             duplicate_skip = "duplicate file skipped" in (note or "").lower()
-            await deps.send_embed(
-                notify_ch,
-                ("Pre-KVK Snapshot Skipped" if duplicate_skip else "Pre-KVK Snapshot Imported ✅"),
-                {
-                    "KVK": str(detected_kvk_no),
-                    "Rows": str(rows),
-                    "Filename": target.filename,
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                    "Note": note,
-                },
-                0xF1C40F if duplicate_skip else 0x2ECC71,
-            )
-
+            delivery = None
+            refresh_error = None
             if not duplicate_skip:
-                try:
-                    deps.create_task(deps.trigger_log_backup_background())
-                except Exception:
-                    logger.exception("Failed to schedule background log-backup trigger")
+                schedule_factory_best_effort(deps.create_task, deps.trigger_log_backup_background)
 
+                delivery = None
                 refresh_error: Exception | None = None
                 refresh_started = deps.now_utc()
                 try:
@@ -377,7 +391,8 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                     logger.debug(
                         "Failed to refresh stats embed after Pre-KVK import", exc_info=True
                     )
-                await deps.record_audit_phase(
+                await observe_optional(
+                    deps.record_audit_phase,
                     audit_ref,
                     phase_name=PREKVK_AUDIT_REFRESH_PHASE,
                     phase_status="failed" if refresh_error else "completed",
@@ -415,25 +430,16 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                     "rows_skipped": 0,
                     "external_batch_table": external_batch_table,
                     "external_batch_id": external_batch_id,
-                    "details": terminal_details,
+                    "details": {**terminal_details, **delivery_details(delivery)},
                 }
-                if refresh_error:
-                    await deps.fail_audit_batch(
-                        audit_ref,
-                        error_type=type(refresh_error).__name__,
-                        error_text=str(refresh_error),
-                        **terminal_kwargs,
-                    )
-                else:
-                    await deps.complete_audit_batch(
-                        audit_ref,
-                        status="completed",
-                        **terminal_kwargs,
-                    )
+                await observe_optional(
+                    deps.complete_audit_batch, audit_ref, status="completed", **terminal_kwargs
+                )
                 audit_terminal_recorded = True
             else:
                 rows_skipped = rows_in_source if rows_in_source is not None else rows
-                await deps.complete_audit_batch(
+                await observe_optional(
+                    deps.complete_audit_batch,
                     audit_ref,
                     status="duplicate",
                     rows_in_source=rows_in_source,
@@ -451,9 +457,30 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                     ),
                 )
                 audit_terminal_recorded = True
+            await observe_optional(
+                deps.send_embed,
+                notify_ch,
+                ("Pre-KVK Snapshot Skipped" if duplicate_skip else "Pre-KVK Snapshot Imported ✅"),
+                {
+                    "KVK": str(detected_kvk_no),
+                    "Rows": str(rows),
+                    "Filename": target.filename,
+                    "Channel": f"#{message.channel.name} ({message.channel.id})",
+                    "Uploader": f"{message.author} ({message.author.id})",
+                    "Note": note,
+                    "Refresh": "Not requested (duplicate)"
+                    if duplicate_skip
+                    else display_delivery(delivery, refresh_error),
+                },
+                0xF1C40F if duplicate_skip else 0x2ECC71,
+            )
+
         else:
             rows_skipped = rows_in_source if rows_in_source is not None else rows
-            await deps.fail_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                deps.record_audit_phase,
+                deps.fail_audit_batch,
                 audit_ref,
                 error_type=_metadata_text(metadata, "error_type") or "PreKvkImportFailed",
                 error_text=note or "Unknown",
@@ -473,9 +500,12 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                 ),
             )
             audit_terminal_recorded = True
-            await deps.send_embed(
+            await observe_optional(
+                deps.send_embed,
                 notify_ch,
-                "Pre-KVK Import ❌",
+                "Import outcome unconfirmed ⚠️"
+                if outcome.business == "outcome_unconfirmed"
+                else "Pre-KVK Import ❌",
                 {
                     "Filename": target.filename,
                     "Channel": f"#{message.channel.name} ({message.channel.id})",
@@ -486,7 +516,10 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
             )
     except Exception as e:
         if audit_ref is not None and not audit_terminal_recorded:
-            await deps.fail_audit_batch(
+            await observe_upload_failure(
+                outcome,
+                deps.record_audit_phase,
+                deps.fail_audit_batch,
                 audit_ref,
                 error_type=type(e).__name__,
                 error_text=str(e),
@@ -506,9 +539,16 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                 ),
             )
             audit_terminal_recorded = True
-        await deps.send_embed(
+        await observe_optional(
+            deps.send_embed,
             notify_ch,
-            "Pre-KVK Import ❌",
+            (
+                "Import outcome unconfirmed ⚠️"
+                if outcome.business == "outcome_unconfirmed"
+                else "Import committed; follow-up unavailable ⚠️"
+                if outcome.business == "committed"
+                else "Pre-KVK Import ❌"
+            ),
             {
                 "Error": f"{type(e).__name__}: {e}",
                 "Filename": target.filename,

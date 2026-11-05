@@ -448,7 +448,7 @@ async def _log_interaction_usage(ir: discord.Interaction):
         if app_ctx == "autocomplete":
             data = ir.data or {}
             # 'name' is the command the option belongs to; keep it short & neutral
-            cmd_name = f"autocomplete:{data.get('name','unknown')}"
+            cmd_name = f"autocomplete:{data.get('name', 'unknown')}"
         else:
             # component (button/select): prefer custom_id
             data = ir.data or {}
@@ -1058,6 +1058,10 @@ async def _graceful_teardown():
     if _shutdown_once.is_set():
         return
     _shutdown_once.set()
+    from services import upload_lifecycle
+
+    upload_lifecycle.close_admission()
+    await upload_lifecycle.drain()
     await _stop_health_dashboard()
     from event_cache import refresh_service
     from profile_cache import _service as profile_service
@@ -1198,10 +1202,9 @@ async def _graceful_teardown():
         logger.exception("[SHUTDOWN] Failed stopping usage tracker.")
 
     # Business owners have settled; keep entered diagnostic I/O owned through shutdown.
-    from core.owned_work import drain_thread
-    from services.operation_diagnostics import shutdown as shutdown_operation_diagnostics
+    from services import optional_upload_lifecycle
 
-    await drain_thread(shutdown_operation_diagnostics)
+    await optional_upload_lifecycle.shutdown()
 
     # **NEW**: drop webhook/HTTP/stream handlers but keep file handlers alive
     try:
@@ -1235,6 +1238,10 @@ async def on_ready():
     from logging_setup import configure_operation_diagnostics
 
     configure_operation_diagnostics()
+    from constants import CSV_LOG
+    from services import optional_upload_lifecycle
+
+    optional_upload_lifecycle.configure(CSV_LOG)
 
     await run_startup_phases(
         [
@@ -1819,6 +1826,6 @@ async def full_startup_sequence():
 
             break
         except Exception as e:
-            logger.error(f"[BOOT] on_ready attempt {attempt+1} failed: {e}")
+            logger.error(f"[BOOT] on_ready attempt {attempt + 1} failed: {e}")
             await asyncio.sleep(5)
     logger.info("[BOOT] full_startup_sequence completed successfully")

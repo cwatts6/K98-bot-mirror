@@ -616,6 +616,52 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P014_UPLOAD_PATHS = frozenset(
+    {
+        "DL_bot.py",
+        "bot_helpers.py",
+        "bot_instance.py",
+        "core/operation_evidence.py",
+        "core/owned_work.py",
+        "file_utils.py",
+        "kvk/dal/kvk_all_import_dal.py",
+        "kvk_all_importer.py",
+        "location_importer.py",
+        "prekvk_importer.py",
+        "processing_pipeline.py",
+        "services/download_log_service.py",
+        "services/fallback_queue_item.py",
+        "services/fallback_upload_staging_service.py",
+        "services/honor_import_audit_service.py",
+        "services/kvk_all_import_audit_service.py",
+        "services/legacy_export_snapshot_service.py",
+        "services/location_import_service.py",
+        "services/operation_diagnostics.py",
+        "services/optional_import_audit_worker.py",
+        "services/optional_upload_lifecycle.py",
+        "services/optional_upload_observations.py",
+        "services/optional_upload_transport.py",
+        "services/prekvk_import_audit_service.py",
+        "services/recovery_complete_report.py",
+        "services/recovery_evidence_bundle.py",
+        "services/recovery_report.py",
+        "services/upload_lifecycle.py",
+        "services/upload_outcome_service.py",
+        "services/weekly_activity_import_audit_service.py",
+        "stats/dal/import_audit_dal.py",
+        "stats_module.py",
+        "upload_routes/common.py",
+        "upload_routes/fallback_queue_route.py",
+        "upload_routes/honor_route.py",
+        "upload_routes/kvk_all_route.py",
+        "upload_routes/player_location_route.py",
+        "upload_routes/prekvk_route.py",
+        "upload_routes/weekly_activity_route.py",
+        "utils.py",
+    }
+)
+
+
 P013_HEALTH_ARCHIVE_PATHS = frozenset({"services/recovery_complete_report.py"})
 
 
@@ -784,13 +830,13 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    # Fixed P01.3 family plus Windows newlines; still a bounded installed file.
-    if len(raw) > 139264:
+    # Fixed P01.4 successor plus Windows newlines; still a bounded installed file.
+    if len(raw) > 155648:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 63:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 64:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -810,6 +856,8 @@ def reviewed_transitions():
                 )
             )
         )
+        if item["id"] == "p014_upload_outcomes_optional_io_v1":
+            member_limit = len(P014_UPLOAD_PATHS)
         if item["id"] in REQUEST_SETTLEMENT_TRANSITIONS:
             member_limit = len(REQUEST_SETTLEMENT_PATHS)
         if item["id"] in identities or not 1 <= len(item["members"]) <= member_limit:
@@ -882,6 +930,9 @@ def reviewed_transitions():
             fixed_monitoring_reliability = (
                 item["id"] == "p1_monitoring_reliability_v1"
                 and path in MONITORING_RELIABILITY_PATHS
+            )
+            fixed_p014 = (
+                item["id"] == "p014_upload_outcomes_optional_io_v1" and path in P014_UPLOAD_PATHS
             )
             fixed_p013 = (
                 item["id"] == "p013_passive_health_v1" and path in P013_PASSIVE_HEALTH_PATHS
@@ -1003,6 +1054,7 @@ def reviewed_transitions():
                     or fixed_procconfig_admission
                     or fixed_monitoring_reliability
                     or fixed_p012a
+                    or fixed_p014
                     or fixed_p013
                     or fixed_p011
                     or fixed_mge_final
@@ -1143,6 +1195,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed coordination lifecycle transition required.")
         if item["id"] == "procconfig_admission_recovery_v1" and paths != PROCCONFIG_ADMISSION_PATHS:
             raise ValueError("Complete fixed ProcConfig admission transition required.")
+        if item["id"] == "p014_upload_outcomes_optional_io_v1" and paths != P014_UPLOAD_PATHS:
+            raise ValueError("Complete fixed P01.4 upload transition required.")
         if item["id"] == "p013_passive_health_v1" and paths != P013_PASSIVE_HEALTH_PATHS:
             raise ValueError("Complete fixed P01.3 passive-health transition required.")
         if item["id"] == "p013_health_archive_v1" and paths != P013_HEALTH_ARCHIVE_PATHS:

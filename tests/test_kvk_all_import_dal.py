@@ -154,6 +154,32 @@ class MockConnection:
         self.commit_calls += 1
 
 
+@pytest.mark.parametrize("diagnostic", [None, "bad", OSError("negative query failed")])
+def test_postcommit_negative_diagnostic_cannot_erase_receipt(monkeypatch, diagnostic):
+    connection = MockConnection()
+    monkeypatch.setattr(dal, "admit_legacy", lambda *a, **k: 13)
+    monkeypatch.setattr(dal, "scan_ts_within_kvk_details", lambda *a, **k: True)
+
+    def scalar(cursor):
+        if isinstance(diagnostic, Exception):
+            raise diagnostic
+        return diagnostic
+
+    monkeypatch.setattr(dal, "_first_scalar", scalar)
+    result = dal.ingest_prepared_import(
+        con=connection,
+        prepared=_prepared_frame(),
+        content=b"abc",
+        source_filename="fixture.xlsx",
+        uploader_id=1,
+        scan_ts_utc=dt.datetime(2026, 9, 13, tzinfo=dt.UTC),
+    )
+    assert result["business_outcome"] == "committed"
+    assert result["negatives"] is None
+    assert (result["kvk_no"], result["scan_id"], result["row_count"]) == (13, 2, 1)
+    assert connection.commit_calls == 2
+
+
 def test_rows_for_stage_uses_declared_column_order() -> None:
     prepared = _prepared_frame()
 

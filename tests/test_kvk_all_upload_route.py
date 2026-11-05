@@ -100,6 +100,7 @@ def _success_result(**overrides):
         "recompute_ms": 125.0,
         "sheet": "Full Data",
         "success": True,
+        "export_preparation_id": "exact-preparation",
     }
     result.update(overrides)
     return result
@@ -162,7 +163,7 @@ def _deps(**overrides):
             return result
         return overrides.get("offload_result", _success_result())
 
-    def auto_export_scheduler(kvk_no, notify_ch, bot_loop):
+    def auto_export_scheduler(kvk_no, notify_ch, bot_loop, *, preparation_id=None):
         scheduled_exports.append((kvk_no, notify_ch, bot_loop))
 
         async def _noop():
@@ -434,9 +435,7 @@ async def test_kvk_all_route_kvk_details_rejection_correlates_diagnostic_id():
     assert fields["Error"] == "Scan timestamp outside KVK_Details ranges."
     fail_events = [event for event in audit_events if event[0] == "fail"]
     assert fail_events[-1][2]["error_type"] == "KvkDetailsTimestampRejected"
-    assert fail_events[-1][2]["external_batch_table"] == route.KVK_ALL_AUDIT_DIAGNOSTIC_TABLE
-    assert fail_events[-1][2]["external_batch_id"] == "42"
-    assert fail_events[-1][2]["rows_staged"] == 7
+    assert fail_events[-1][2]["details"]["rows_staged"] == 7
 
 
 @pytest.mark.asyncio
@@ -454,13 +453,15 @@ async def test_kvk_all_route_exception_diagnostic_id_records_kvk_details_rejecti
 
     assert handled is True
     _ch, title, fields, _color, _mention = sent[-1]
-    assert title == "KVK All-Kingdom Import \u274c"
+    assert title == "Import outcome unconfirmed ⚠️"
     assert fields["Error"] == "RuntimeError: Scan timestamp outside KVK_Details ranges."
-    fail_events = [event for event in audit_events if event[0] == "fail"]
+    fail_events = [
+        event
+        for event in audit_events
+        if event[0] == "phase" and event[2].get("phase_name") == "upload_observation"
+    ]
     assert fail_events[-1][2]["error_type"] == "KvkDetailsTimestampRejected"
-    assert fail_events[-1][2]["external_batch_table"] == route.KVK_ALL_AUDIT_DIAGNOSTIC_TABLE
-    assert fail_events[-1][2]["external_batch_id"] == "42"
-    assert fail_events[-1][2]["rows_staged"] == 7
+    assert fail_events[-1][2]["details"]["rows_staged"] == 7
 
 
 @pytest.mark.asyncio
@@ -510,12 +511,16 @@ async def test_kvk_all_route_unexpected_exception_renders_error_and_continues():
     assert handled is True
     assert len(offloads) == 2
     _ch, title, fields, color, _mention = sent[-1]
-    assert title == "KVK All-Kingdom Import \u274c"
+    assert title == "Import outcome unconfirmed ⚠️"
     assert fields["Error"] == "RuntimeError: boom"
     assert fields["File"] == "bad.xlsx"
     assert color == 0xE74C3C
     assert msg.channel.sent[0]["embed"].field_dict()["ScanID"] == "5"
-    fail_events = [event for event in audit_events if event[0] == "fail"]
+    fail_events = [
+        event
+        for event in audit_events
+        if event[0] == "phase" and event[2].get("phase_name") == "upload_observation"
+    ]
     assert fail_events[0][2]["error_type"] == "RuntimeError"
     complete_events = [event for event in audit_events if event[0] == "complete"]
     assert complete_events[-1][2]["external_batch_id"] == "13:5"
@@ -534,9 +539,7 @@ async def test_kvk_all_route_post_ingest_send_failure_completes_import_audit():
     handled = await route.handle_kvk_all_upload(msg, deps)
 
     assert handled is True
-    _ch, title, fields, _color, _mention = sent[-1]
-    assert title == "KVK All-Kingdom Import \u274c"
-    assert fields["Error"] == "RuntimeError: discord send failed"
+    assert sent == []  # No second message after an unconfirmed send.
     assert [event for event in audit_events if event[0] == "fail"] == []
     complete_events = [event for event in audit_events if event[0] == "complete"]
     assert complete_events[-1][2]["external_batch_id"] == "13:6"

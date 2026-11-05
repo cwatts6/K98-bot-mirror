@@ -1,5 +1,7 @@
 # P01.3: passive health presentation design and qualification
 
+> **Archived 5 November 2026.** This completed record is archived; its original design/release instructions and pending gates are historical. Current outcome: [P01.3 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md). Next task: [P01.4 review/scope](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 > E81 implementation update: P01.3 runtime and persistent Refresh are implemented locally. Local validation and both independent PR packages are complete; see the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md). Earlier design-only status is historical. No publication or deployment has occurred.
 
 Current E80, 4 November 2026: the operator approved the full P01.3 implementation and validation, explicitly including persistent Refresh, and requested PR preparation with related-caller/value checks throughout. Earlier approval-pending statements below are historical. Publication, merge, deployment, live SQL/provider probes and recovery actions are not included in this authorization.
@@ -12,7 +14,7 @@ E79 supersedes the initial 15-minute freshness, nonblocking reader-lock and pres
 
 The supplied screenshot shows the pinned Bot Health card with Refresh/last-20-errors buttons and Discord's interaction-timeout notice. It does not establish which callback path failed. Source inspection at the retained pin shows `HealthView(timeout=30)` and Refresh awaiting SQL/Sheets/log work before acknowledgement (`bot_instance.py:795-866`). Both idle expiry and late acknowledgement require qualification. This supersedes the earlier decision to preserve the view timeout; it does not authorize runtime implementation.
 
-[Scope/handover](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md), [programme scope](Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md), [tracker](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md), [shared P01 contract](Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md), [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-04.md).
+[Scope/handover](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md), [programme scope](../Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md), [tracker](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md), [shared P01 contract](../Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md), [documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-04.md).
 
 ## Binding engineering acceptance
 

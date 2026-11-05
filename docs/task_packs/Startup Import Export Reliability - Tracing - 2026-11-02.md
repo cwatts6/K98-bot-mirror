@@ -1,8 +1,12 @@
 # Startup, import and export reliability: Stage 1 tracing
 
-> **Current programme checkpoint - 4 November 2026 (E68/E69):** P01.2a is deployed and accepted for its declared reporting/evidence scope at private `67c4e12a8ecf0c25280770860480ac65a6826602`.
+> **Current E91, 5 November 2026:** The [complete local qualification receipt](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md) records the full original P01.4 design implemented and qualified locally, with both optional workers enabled in the unpublished candidate. Cost, physical-drain, diagnostic-priority, updater, regression and Changes-review gates passed. No CSV scope was deferred. Publication/deployment and natural-activity acceptance remain outstanding; earlier E88-E90 disabled/pending statements below are historical. Existing changes and archive moves are preserved.
+
+> **Current E85/E86 - 5 November 2026: P01.3 CLOSED.** Passive health, persistent Refresh and the complete-ZIP correction are merged, deployed and live-validated at private `6ec393f71626d15fcb8c50c840854fb681d5f09e`. See [P01.3 closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md) and [P01.4 handover/scope](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md). P01.4 (F17/F30) is next, review/scope only. P01.1/P01.2a remain accepted; P01.2b is closed by decision without feature delivery. P01.4-P01.6/P02-P05 and exact incident recovery remain open. Dated checkpoints below retain historical evidence, not current approval or scheduling authority. The [new documentation carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md) covers this local closeout update.
+
+> **Historical programme checkpoint - 4 November 2026 (E68/E69):** P01.2a is deployed and accepted for its declared reporting/evidence scope at private `67c4e12a8ecf0c25280770860480ac65a6826602`.
 > Read the [P01.2a closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2a%20Closeout%20-%202026-11-04.md) for delivered corrections, evidence limits, learnings and remaining owners; [P01.2b handover](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Handover%20and%20Scope%20-%202026-11-04.md) is the next review/design task.
-> Earlier dated statuses, holds and next-action instructions in this document are retained history and are superseded for current scheduling. P01.3-P01.6/P02-P05 and exact incident recovery remain open; no replay of accepted work.
+> The earlier checkpoint is retained history. Current remaining work is P01.4-P01.6/P02-P05 and exact incident recovery; P01.3 is closed at E85. Do not replay accepted work.
 
 Date: 2 November 2026. Review only; no runtime or SQL changes.
 This handback completes the **main first-pass dispositions**, including Report 66 and the
@@ -81,7 +85,7 @@ exception behaviour only through a tracked-view wrapper while direct callers rem
 | C05 coordination | Snapshot service/DAL, coordination DAL, queue, claim admission, producer session, commit/capture and release. | Distinguish process-local producer turn, SQL application lock, durable reservation and incident status. Clearing one is not proof that the others are finished. Retain owner/fence/version checks at mutation; remove observer ownership of producer guards after qualified replacement. F03/F09. |
 | C06 authority | Runtime client -> authenticated pipe -> serial authority broker -> execution authority, account lock, provider dispatch/result event, pacing and closure. | Retain request identity, peer authentication and exact-result evidence. Settle completed provider work without resending it. Observation shares the serial server and can delay later requests even without SQL conflict. F02/F12. |
 | C07 recovery | Recovery monitor discovery and existing incident refresh; outcome worker; configuration/read/producer/pipeline/evidence adapters. | Typed waiting and some automation exist. Monitor orchestration also executes accepted or allowlisted actions and persists observations. Separate those effects and budgets rather than labelling the entire loop passive. F04/F09/F10. |
-| C08 status/report | `/status`, recurring health embed, health probes, recovery centre/detail/recheck and report export. | Centre lists and exported reports use retained rows. Status launches active probes; detail review invokes refresh/reconciliation. Reuse retained-status presentation, make active effects explicit. F04/F11. |
+| C08 status/report | `/status`, recurring health embed, health probes, recovery centre/detail/recheck and report export. | Historical trace: centre/report retained reads, status-triggered probes and detail refresh/reconciliation. E85 closes F11 with passive status/card/Refresh and health reports. F04 still requires explicit classification of actual recovery actions. |
 | C09 history | Mutable incident evidence, source adapter evidence, `recovery_report` allowlist, complete paginated report. | Preserve meaningful original/subsequent failures separately from current state; include pipeline detail safely. A missing report field does not prove its source never existed. F05/F06. |
 | C10 secondary/lifetime | `maintenance_worker`, `file_utils`, stats offload helpers, display-only `stats_alerts/kvk_meta`, target warmup, queue presentation and shutdown ownership. | Protected runtime uses owned/drained work. Legacy stats offload fallbacks can re-enter after exceptions and need separate disposition; they are not the enabled protected path. Display metadata can fall back to an active configuration read. Shutdown must drain real work without mistaking an observer deadline for worker termination. |
 
@@ -163,6 +167,8 @@ Deciding to continue remaining business stages, discard work or repeat an uncert
 is not equivalent to acknowledging an already completed stage.
 
 ### F11: viewing health starts consequential work
+
+**Disposition at E85: CLOSED for P01.3.** The trace below records the original defect and pinned historical source. Passive presentation, persistent Refresh and complete/ordinary health report delivery are now reviewed, merged, deployed and live-validated. Preserve real write-boundary controls; the trace does not describe current display behavior.
 
 `commands/admin_cmds.py:1132` and the recurring health embed in `bot_instance.py` call SQL
 and Sheets health checks. `HealthProbe` shares an in-flight task, but does not retain a

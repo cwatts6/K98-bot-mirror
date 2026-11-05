@@ -9,6 +9,7 @@ import logging
 import os
 from typing import Any
 
+from core.owned_work import drain_awaitable
 from kvk_all_importer import ingest_kvk_all_excel
 from services.kvk_all_import_audit_service import (
     KVK_ALL_AUDIT_ATTACHMENT_READ_PHASE,
@@ -31,6 +32,13 @@ from services.kvk_all_import_audit_service import (
     kvk_all_source_type,
     record_kvk_all_audit_phase,
     start_kvk_all_audit_batch,
+)
+from services.upload_lifecycle import tracked_upload
+from services.upload_outcome_service import UploadOutcome
+from upload_routes.common import (
+    observe_optional,
+    observe_upload_failure,
+    schedule_factory_best_effort,
 )
 
 logger = logging.getLogger(__name__)
@@ -201,7 +209,8 @@ async def _record_structured_failure_audit(
     )
 
     if result.get("prepare_ms") is not None:
-        await deps.record_audit_phase(
+        await observe_optional(
+            deps.record_audit_phase,
             audit_ref,
             phase_name=KVK_ALL_AUDIT_PARSE_PHASE,
             phase_status="completed",
@@ -211,7 +220,8 @@ async def _record_structured_failure_audit(
         )
 
     if result.get("missing_stage_columns"):
-        await deps.record_audit_phase(
+        await observe_optional(
+            deps.record_audit_phase,
             audit_ref,
             phase_name=KVK_ALL_AUDIT_STAGE_PHASE,
             phase_status="failed",
@@ -222,7 +232,8 @@ async def _record_structured_failure_audit(
             details=details,
         )
     elif result.get("stage_insert_ms") is not None:
-        await deps.record_audit_phase(
+        await observe_optional(
+            deps.record_audit_phase,
             audit_ref,
             phase_name=KVK_ALL_AUDIT_STAGE_PHASE,
             phase_status="completed",
@@ -232,7 +243,8 @@ async def _record_structured_failure_audit(
             details=details,
             set_batch_status="staged",
         )
-        await deps.record_audit_phase(
+        await observe_optional(
+            deps.record_audit_phase,
             audit_ref,
             phase_name=KVK_ALL_AUDIT_INGEST_PHASE,
             phase_status="failed",
@@ -243,7 +255,8 @@ async def _record_structured_failure_audit(
             details=details,
         )
     else:
-        await deps.record_audit_phase(
+        await observe_optional(
+            deps.record_audit_phase,
             audit_ref,
             phase_name=KVK_ALL_AUDIT_PARSE_PHASE,
             phase_status="failed",
@@ -254,7 +267,8 @@ async def _record_structured_failure_audit(
         )
 
     external_id = _diagnostic_external_id(result)
-    await deps.fail_audit_batch(
+    await observe_optional(
+        deps.fail_audit_batch,
         audit_ref,
         error_type=error_type,
         error_text=error_text,
@@ -268,6 +282,7 @@ async def _record_structured_failure_audit(
     )
 
 
+@tracked_upload
 async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
     """Handle KVK all-kingdom uploads from the configured Pro Kingdom channel."""
     if message.channel.id != deps.prokingdom_channel_id or not message.attachments:
@@ -291,7 +306,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
     ]
 
     if not excel_attachments:
-        await deps.send_embed(
+        await observe_optional(
+            deps.send_embed,
             notify_ch,
             "KVK All-Kingdom Import \u26a0\ufe0f",
             {
@@ -304,6 +320,7 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
         return True
 
     for attachment in excel_attachments:
+        outcome = UploadOutcome()
         audit_context: KvkAllImportAuditContext | None = None
         audit_ref: Any = None
         audit_terminal_recorded = False
@@ -338,11 +355,13 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     else None
                 ),
             )
-            audit_ref = await deps.start_audit_batch(
+            audit_ref = await observe_optional(
+                deps.start_audit_batch,
                 context=audit_context,
                 content=file_bytes,
             )
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=KVK_ALL_AUDIT_ATTACHMENT_READ_PHASE,
                 phase_status="completed",
@@ -355,7 +374,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
             preflight_started = deps.now_utc()
             ok = await deps.ensure_sql_headroom_or_notify(notify_ch)
             if not ok:
-                await deps.record_audit_phase(
+                await observe_optional(
+                    deps.record_audit_phase,
                     audit_ref,
                     phase_name=KVK_ALL_AUDIT_SQL_PREFLIGHT_PHASE,
                     phase_status="failed",
@@ -368,7 +388,10 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                         error="SQL log headroom insufficient",
                     ),
                 )
-                await deps.fail_audit_batch(
+                await observe_upload_failure(
+                    outcome,
+                    deps.record_audit_phase,
+                    deps.fail_audit_batch,
                     audit_ref,
                     error_type="SqlHeadroomInsufficient",
                     error_text="SQL log headroom insufficient",
@@ -380,7 +403,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                 )
                 audit_terminal_recorded = True
                 continue
-            await deps.record_audit_phase(
+            await observe_optional(
+                deps.record_audit_phase,
                 audit_ref,
                 phase_name=KVK_ALL_AUDIT_SQL_PREFLIGHT_PHASE,
                 phase_status="completed",
@@ -389,22 +413,26 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                 details=kvk_all_audit_details(audit_context),
             )
 
-            result = await deps.offload_callable(
-                ingest_kvk_all_excel,
-                content=file_bytes,
-                source_filename=attachment.filename,
-                uploader_id=message.author.id,
-                scan_ts_utc=message.created_at,
-                server=os.environ.get("SQL_SERVER"),
-                database=os.environ.get("SQL_DATABASE"),
-                username=os.environ.get("SQL_USERNAME"),
-                password=os.environ.get("SQL_PASSWORD"),
-                name="ingest_kvk_all_excel",
-                prefer_process=True,
-                meta={"filename": attachment.filename},
+            outcome = UploadOutcome("outcome_unconfirmed", "entered")
+            result = await drain_awaitable(
+                deps.offload_callable(
+                    ingest_kvk_all_excel,
+                    content=file_bytes,
+                    source_filename=attachment.filename,
+                    uploader_id=message.author.id,
+                    scan_ts_utc=message.created_at,
+                    server=os.environ.get("SQL_SERVER"),
+                    database=os.environ.get("SQL_DATABASE"),
+                    username=os.environ.get("SQL_USERNAME"),
+                    password=os.environ.get("SQL_PASSWORD"),
+                    name="ingest_kvk_all_excel",
+                    prefer_process=True,
+                    meta={"filename": attachment.filename},
+                )
             )
 
             if isinstance(result, dict) and not result.get("success", True):
+                outcome = UploadOutcome("failed_confirmed", "settled")
                 logger.info(
                     "[KVK] Import failed for %s: %s", attachment.filename, result.get("error")
                 )
@@ -416,7 +444,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                         result,
                     )
                     audit_terminal_recorded = True
-                await deps.send_embed(
+                await observe_optional(
+                    deps.send_embed,
                     notify_ch,
                     "KVK All-Kingdom Import \u274c",
                     {
@@ -436,10 +465,11 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                 )
                 continue
 
+            outcome = UploadOutcome("committed", "settled")
             kvk_no = int(result["kvk_no"])
             scan_id = int(result["scan_id"])
             rows = int(result["row_count"])
-            neg = int(result["negatives"])
+            neg = _maybe_int(result.get("negatives"))
             dur_s = float(result["duration_s"])
             staged = int(result.get("staged_rows", rows))
             proc_ms = float(result.get("proc_ms", max(0.0, dur_s * 1000.0)))
@@ -461,7 +491,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     schema_version=result.get("schema_version"),
                     auto_export_enabled=deps.auto_export_enabled,
                 )
-                await deps.record_audit_phase(
+                await observe_optional(
+                    deps.record_audit_phase,
                     audit_ref,
                     phase_name=KVK_ALL_AUDIT_PARSE_PHASE,
                     phase_status="completed",
@@ -469,7 +500,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     duration_ms=_maybe_int(float(result.get("prepare_ms", 0))),
                     details=success_details,
                 )
-                await deps.record_audit_phase(
+                await observe_optional(
+                    deps.record_audit_phase,
                     audit_ref,
                     phase_name=KVK_ALL_AUDIT_STAGE_PHASE,
                     phase_status="completed",
@@ -479,7 +511,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     details=success_details,
                     set_batch_status="staged",
                 )
-                await deps.record_audit_phase(
+                await observe_optional(
+                    deps.record_audit_phase,
                     audit_ref,
                     phase_name=KVK_ALL_AUDIT_INGEST_PHASE,
                     phase_status="completed",
@@ -489,7 +522,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     details=success_details,
                     set_batch_status="procedure_started",
                 )
-                await deps.record_audit_phase(
+                await observe_optional(
+                    deps.record_audit_phase,
                     audit_ref,
                     phase_name=KVK_ALL_AUDIT_RECOMPUTE_PHASE,
                     phase_status="completed",
@@ -499,17 +533,20 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     details=success_details,
                     set_batch_status="downstream_rebuild_started",
                 )
-                await deps.record_audit_phase(
+                await observe_optional(
+                    deps.record_audit_phase,
                     audit_ref,
                     phase_name=KVK_ALL_AUDIT_NEGATIVE_PHASE,
-                    phase_status="completed",
+                    phase_status="completed" if neg is not None else "failed",
                     rows_in=rows,
                     rows_out=neg,
                     duration_ms=_maybe_int(float(result.get("negative_count_ms", 0))),
                     details=success_details,
                 )
 
-            neg_badge = "0" if neg == 0 else f"{neg} \u26a0\ufe0f"
+            neg_badge = (
+                "Unavailable" if neg is None else ("0" if neg == 0 else f"{neg} \u26a0\ufe0f")
+            )
             color = 0x2ECC71 if neg == 0 else 0xE67E22
             title = (
                 "KVK All-Kingdom Import \u2705"
@@ -529,47 +566,57 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     + (f" \u2022 recompute `{recompute_ms:.0f}ms`" if recompute_ms > 0 else "")
                 ),
                 "File": attachment.filename,
+                "Export": "Scheduling requested; delivery unverified"
+                if deps.auto_export_enabled and result.get("export_preparation_id")
+                else "Not scheduled",
+                "Capture": result.get(
+                    "capture_outcome",
+                    "available" if result.get("export_preparation_id") else "unavailable",
+                ),
                 "Sheet": sheet_used,
                 "Channel": f"#{message.channel.name} ({message.channel.id})",
                 "Uploader": f"{message.author} ({message.author.id})",
             }
 
-            embed = _build_result_embed(deps, title, color, fields)
-            view = _build_sheet_view(deps)
-            await notify_ch.send(embed=embed, view=view)
-
-            if deps.auto_export_enabled:
+            if deps.auto_export_enabled and result.get("export_preparation_id"):
                 export_started = deps.now_utc()
                 logger.info(
                     "[KVK_EXPORT] Scheduling auto-export for KVK %s (Scan %s)",
                     kvk_no,
                     scan_id,
                 )
-                deps.create_task(
-                    deps.auto_export_scheduler(
-                        kvk_no,
-                        notify_ch,
-                        deps.bot.loop,
-                        **(
-                            {"preparation_id": result["export_preparation_id"]}
-                            if result.get("export_preparation_id")
-                            else {}
-                        ),
-                    )
+                export_error = schedule_factory_best_effort(
+                    deps.create_task,
+                    deps.auto_export_scheduler,
+                    kvk_no,
+                    notify_ch,
+                    deps.bot.loop,
+                    preparation_id=result["export_preparation_id"],
+                )
+                fields["Export"] = (
+                    "Scheduling unavailable"
+                    if export_error
+                    else "Task accepted; durable job and delivery unverified"
                 )
                 if audit_context is not None:
-                    await deps.record_audit_phase(
+                    await observe_optional(
+                        deps.record_audit_phase,
                         audit_ref,
                         phase_name=KVK_ALL_AUDIT_AUTO_EXPORT_PHASE,
-                        phase_status="completed",
+                        phase_status="failed" if export_error else "completed",
                         started_at_utc=export_started.replace(tzinfo=None),
                         rows_in=rows,
                         rows_out=rows,
                         duration_ms=audit_duration_ms(export_started),
-                        details=success_details,
+                        details={
+                            **success_details,
+                            "schedule_outcome": "failed" if export_error else "task_accepted",
+                            "delivery": "unverified",
+                        },
                     )
             if audit_context is not None:
-                await deps.complete_audit_batch(
+                await observe_optional(
+                    deps.complete_audit_batch,
                     audit_ref,
                     rows_in_source=staged,
                     rows_staged=staged,
@@ -579,6 +626,10 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     details=success_details,
                 )
                 audit_terminal_recorded = True
+            embed = _build_result_embed(deps, title, color, fields)
+            view = _build_sheet_view(deps)
+            await observe_optional(notify_ch.send, embed=embed, view=view)
+
         except Exception as exc:
             if audit_ref is not None and audit_context is not None and not audit_terminal_recorded:
                 diagnostic_id = _maybe_int(getattr(exc, "kvk_diagnostic_id", None))
@@ -601,7 +652,8 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     error=str(exc),
                 )
                 if external_batch_id is not None and rows is not None:
-                    await deps.complete_audit_batch(
+                    await observe_optional(
+                        deps.complete_audit_batch,
                         audit_ref,
                         rows_in_source=staged,
                         rows_staged=staged,
@@ -611,7 +663,10 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                         details=terminal_details,
                     )
                 else:
-                    await deps.fail_audit_batch(
+                    await observe_upload_failure(
+                        outcome,
+                        deps.record_audit_phase,
+                        deps.fail_audit_batch,
                         audit_ref,
                         error_type=error_type,
                         error_text=str(exc),
@@ -627,9 +682,16 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     )
                 audit_terminal_recorded = True
             logger.exception("[KVK] Import failed for %s: %s", attachment.filename, exc)
-            await deps.send_embed(
+            await observe_optional(
+                deps.send_embed,
                 notify_ch,
-                "KVK All-Kingdom Import \u274c",
+                (
+                    "Import outcome unconfirmed ⚠️"
+                    if outcome.business == "outcome_unconfirmed"
+                    else "Import committed; follow-up unavailable ⚠️"
+                    if outcome.business == "committed"
+                    else "KVK All-Kingdom Import \u274c"
+                ),
                 {
                     "Error": f"{type(exc).__name__}: {exc}",
                     "File": attachment.filename,

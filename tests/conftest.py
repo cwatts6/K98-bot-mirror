@@ -46,6 +46,25 @@ if os.getenv("TEST_FAKE_HEAVY_DEPS", "0") == "1":
 # ----------------------------
 # Test helpers / fixtures
 # ----------------------------
+@pytest.fixture
+def legacy_optional_audit(monkeypatch):
+    """Opt-in compatibility tests; active worker behavior has separate coverage."""
+    from services import optional_import_audit_worker as worker
+
+    monkeypatch.setattr(worker, "QUALIFIED", False)
+    monkeypatch.setattr(worker, "_writer", None)
+    monkeypatch.setattr(worker, "_start_attempted", False)
+    monkeypatch.setattr(worker, "_stopped", False)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_upload_lifecycle(monkeypatch):
+    from services import upload_lifecycle
+
+    monkeypatch.setattr(upload_lifecycle, "_closed", False)
+    monkeypatch.setattr(upload_lifecycle, "_tasks", set())
+
+
 @pytest.fixture(autouse=True)
 def _isolate_configuration_attempt_receipts(monkeypatch, tmp_path):
     from services import configuration_attempt_recovery as attempts

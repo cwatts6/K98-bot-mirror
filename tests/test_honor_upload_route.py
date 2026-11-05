@@ -252,7 +252,7 @@ async def test_honor_route_test_mode_preserved_for_prefixed_filename():
 
 
 @pytest.mark.asyncio
-async def test_honor_route_parse_failure_preserves_zero_row_count():
+async def test_honor_route_parse_failure_preserves_unavailable_row_count():
     audit_events = []
     deps, sent, offloads, _created, _stats = _deps(
         parse_exception=ValueError("bad sheet"),
@@ -264,7 +264,7 @@ async def test_honor_route_parse_failure_preserves_zero_row_count():
     assert handled is True
     assert len(offloads) == 2
     _ch, _title, fields, _color, _mention = sent[-1]
-    assert fields["Rows"] == "0"
+    assert fields["Rows"] == "Unavailable"
     assert audit_events[1][0] == "phase"
     assert audit_events[1][2]["phase_name"] == route.HONOR_AUDIT_PARSE_PHASE
     assert audit_events[1][2]["phase_status"] == "failed"
@@ -286,21 +286,21 @@ async def test_honor_route_ingest_exception_sends_existing_error():
     assert created == []
     assert stats == []
     _ch, title, fields, color, mention = sent[-1]
-    assert title == "KVK Honor Import \u274c"
+    assert title == "Import outcome unconfirmed ⚠️"
     assert fields["Error"] == "RuntimeError: boom"
     assert fields["Filename"] == "1198_honor.xlsx"
     assert fields["Channel"] == "#honor (10)"
     assert fields["Uploader"] == "uploader (123456789)"
     assert color == 0xE74C3C
     assert mention is None
-    assert audit_events[-1][0] == "fail"
+    assert audit_events[-1][0] == "phase"
     assert audit_events[-1][2]["error_type"] == "RuntimeError"
-    assert audit_events[-1][2]["rows_in_source"] == 4
-    assert audit_events[-1][2]["rows_skipped"] == 4
+    assert audit_events[-1][2]["details"]["business_outcome"] == "outcome_unconfirmed"
+    assert not any(event[0] in {"complete", "fail"} for event in audit_events)
 
 
 @pytest.mark.asyncio
-async def test_honor_route_success_embed_exception_fails_audit_terminal_status():
+async def test_honor_route_success_embed_exception_preserves_audit_terminal_status():
     audit_events = []
     deps, sent, _offloads, created, stats = _deps(
         send_success_exception=RuntimeError("notify down"),
@@ -310,12 +310,11 @@ async def test_honor_route_success_embed_exception_fails_audit_terminal_status()
     handled = await route.handle_honor_upload(_message(), deps)
 
     assert handled is True
-    assert created == []
-    assert stats == []
-    assert sent[-1][1] == "KVK Honor Import \u274c"
-    assert sent[-1][2]["Error"] == "RuntimeError: notify down"
-    assert audit_events[-1][0] == "fail"
-    assert audit_events[-1][2]["error_type"] == "RuntimeError"
+    assert len(created) == 1
+    assert len(stats) == 1
+    assert len(sent) == 1
+    assert sent[-1][1] == "KVK Honor Import \u2705"
+    assert audit_events[-1][0] == "complete"
     assert audit_events[-1][2]["rows_in_source"] == 4
     assert audit_events[-1][2]["rows_staged"] == 4
     assert audit_events[-1][2]["rows_written"] == 4
@@ -344,7 +343,7 @@ async def test_honor_route_stats_refresh_failure_is_best_effort(caplog):
     assert refresh_phase[2]["phase_name"] == route.HONOR_AUDIT_REFRESH_PHASE
     assert refresh_phase[2]["phase_status"] == "failed"
     assert audit_events[-1][0] == "complete"
-    assert audit_events[-1][2]["status"] == "failed"
+    assert audit_events[-1][2]["status"] == "completed"
     assert audit_events[-1][2]["external_batch_id"] == "15:9"
 
 

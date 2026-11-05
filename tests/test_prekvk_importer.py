@@ -1,10 +1,49 @@
 import zipfile
 
 import pandas as pd
+import pytest
 
 import file_utils
 from prekvk import diagnostics_service
 import prekvk_importer as pki
+
+
+@pytest.mark.parametrize("error_type", [pki.pyodbc.IntegrityError, RuntimeError])
+@pytest.mark.parametrize("failure_at", ["commit", "close"])
+def test_commit_evidence_precedes_error_classification(monkeypatch, error_type, failure_at):
+    df = pd.DataFrame([{"GovernorID": 123, "Name": "Alice", "Prekvk Points": 10}])
+    _patch_read_excel(monkeypatch, df)
+    cur = MockCursor()
+    cur.queue_fetchone(None, columns=("x",))
+    cur.queue_fetchone((99,), columns=("ScanID",))
+
+    class FailingConn(MockConn):
+        def commit(self):
+            super().commit()
+            if failure_at == "commit":
+                raise error_type("unique follow-up error")
+
+        def __exit__(self, *args):
+            if failure_at == "close":
+                raise error_type("unique follow-up error")
+            return False
+
+    conn = FailingConn(cur)
+    _patch_conn(monkeypatch, cur, conn)
+    result = pki.import_prekvk_bytes(
+        b"fixture", "1198_prekvk.xlsx", kvk_no=13, return_metadata=True
+    )
+    ok, note, rows, metadata = result
+    assert conn.commits == 1 and len(cur.executemany_calls) == 1
+    assert metadata["status"] != "duplicate"
+    if failure_at == "close":
+        assert ok and rows == 1
+        assert metadata["business_outcome"] == "committed"
+        assert "committed" in note
+    else:
+        assert not ok
+        assert metadata["business_outcome"] == "outcome_unconfirmed"
+        assert "unconfirmed" in note
 
 
 def test_conn_prefers_get_conn_with_retries(monkeypatch):

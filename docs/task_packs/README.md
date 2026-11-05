@@ -1,41 +1,29 @@
 # Task Packs
 
-> **5 November 2026 — P01.3 deployed; complete ZIP correction approved:** Persistent Refresh, automatic refresh and command/card agreement are operator-confirmed. The [bounded ZIP correction](P01.3%20Complete%20ZIP%20Health%20Correction%20-%202026-11-05.md) fixes the new health component missing from final archive assembly. Earlier preparation-only checkpoints below are historical. Review/merge are authorized; deployment remains an operator step.
+> **Current E91, 5 November 2026:** The [complete local qualification receipt](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Complete%20Local%20Qualification%20-%202026-11-05.md) records the full original P01.4 design implemented and qualified locally, with both optional workers enabled in the unpublished candidate. Cost, physical-drain, diagnostic-priority, updater, regression and Changes-review gates passed. No CSV scope was deferred. Publication/deployment and natural-activity acceptance remain outstanding; earlier E88-E90 disabled/pending statements below are historical. Existing changes and archive moves are preserved.
 
-> **P01.3 local implementation (E81):** See the [implementation and PR-readiness receipt](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md) for passive-health, persistent Refresh, exact updater compatibility and final validation status. At that 4 November checkpoint, publication and deployment had not yet occurred; the 5 November status above supersedes it.
+> **E90, 5 November 2026:** The [whole-solution design](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Whole%20Solution%20Design%20-%202026-11-05.md) supersedes the recommendation to adopt SQL now and defer file logging. Preserve the full P01.4 scope: settle shared lifecycle and diagnostic isolation, then qualify both workers together. New controls identify a confound in the earlier file lag benchmark, not a qualification pass. Both workers remain disabled. Default recommendation is one complete deployment after validation; an earlier outcome/custody-only candidate remains an optional delivery choice. This review changes documentation only; implementation of the revised design and all publication/deployment remain pending.
 
-> **Current P01.3 implementation checkpoint - 4 November 2026 (E80):** Full passive-health implementation, persistent Refresh and local validation/PR preparation are approved. Earlier design-only holds are historical; publication and production actions remain separate.
+> **E89, 5 November 2026:** The [adoption decision packet](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Adoption%20Decision%20-%202026-11-05.md) records completed SQL-worker qualification, startup/close-failure corrections and the concrete file-logging choices. Both worker gates remain off pending the decision. The failed file gate and updater release blocker remain visible; P01.4 is not complete under its original scope. No publication or deployment occurred.
 
-> **Current E76 checkpoint - 4 November 2026:** [P01.2b closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md) is complete by operator decision, without deployment. The design records are archived. Proceed with [P01.3 passive-health review/scope](Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md) (F11); no implementation or production action is authorized. Earlier next-task wording is historical.
+> **E88, 5 November 2026:** Local P01.4 implementation and disposable development SQL qualification are recorded in the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Local%20Implementation%20and%20Qualification%20-%202026-11-05.md). Earlier approval-pending text is historical. Both optional workers remain disabled: file cost failed; SQL qualification/readiness is incomplete. P01.4 remains open, and updater source-pin tests block release. No publication or deployment occurred.
+
+> **Current E85/E86 - 5 November 2026: P01.3 CLOSED.** Passive health, persistent Refresh and the complete-ZIP correction are merged, deployed and live-validated at private `6ec393f71626d15fcb8c50c840854fb681d5f09e`. See [P01.3 closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Closeout%20-%202026-11-05.md) and [P01.4 handover/scope](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Handover%20and%20Scope%20-%202026-11-05.md). P01.4 (F17/F30) is next, review/scope only. P01.1/P01.2a remain accepted; P01.2b is closed by decision without feature delivery. P01.4-P01.6/P02-P05 and exact incident recovery remain open. Dated checkpoints below retain historical evidence, not current approval or scheduling authority. The [new documentation carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md) covers this local closeout update.
+
+> **P01.3 local implementation (E81):** See the [implementation and PR-readiness receipt](archive/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md) for passive-health, persistent Refresh, exact updater compatibility and final validation status. No publication or deployment has occurred.
+
+> **Historical E76 checkpoint - 4 November 2026:** [P01.2b closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Closeout%20-%202026-11-04.md) is complete by operator decision, without deployment. The design records are archived. Proceed with [P01.3 passive-health review/scope](archive/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Handover%20and%20Scope%20-%202026-11-04.md) (F11); no implementation or production action is authorized. Earlier next-task wording is historical.
 
 ## Startup, import and export reliability - current programme
 
 Start with the [overall programme scope](Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md) and [progress tracker](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md).
 
-P01 shared lifecycle evidence: **P01.1 delivered -> P01.2a delivered -> P01.2b proactive instrumentation declined (E75) -> P01.3-P01.6 outstanding**. Then P02 contention/admission, remaining P03 durable recovery/continuation, P04 convergence/history and P05 combined confirmation. Earlier P03a.1 recovery is complete; P03a.2 startup is accepted with whole-flow acceptance still open.
+P01 shared lifecycle evidence: **P01.1 delivered -> P01.2a delivered -> P01.2b proactive instrumentation declined (E75) -> P01.3 delivered and accepted (E85) -> P01.4-P01.6 outstanding**. Then P02 contention/admission, remaining P03 durable recovery/continuation, P04 convergence/history and P05 combined confirmation. Earlier P03a.1 recovery is complete; P03a.2 startup is accepted with whole-flow acceptance still open.
 
 Use existing evidence and simple issue-driven collection; preserve bot/startup safety. The [P01.2b handover](archive/Startup%20Import%20Export%20Reliability%20-%20P01.2b%20Handover%20and%20Scope%20-%202026-11-04.md) records the decision and accepted coverage limits. Delivered P01.1/P01.2a documents are now in the [archive register](archive/Startup%20Import%20Export%20Reliability%20-%20Archive%20Register%20-%202026-11-04.md). Active scope, design, census, tracing, tracker and cross-package validation remain here. Archived evidence retains its qualifications and unresolved obligations remain owned by active packets.
 
 
-Current MGE release preparation: [native SQL and updater qualification packet](P1%20MGE%20Finalisation%20-%20Native%20SQL%20and%20Updater%20Qualification%20Packet%20-%202026-10-29.md).
-This names the exact local targets, unsupported updater capabilities, native check
-matrix and separate publication/deployment approvals; no execution is authorized.
-
-> **Current MGE checkpoint — 29 October 2026:** A1b and its updater correction are
-> delivered; Report63 verifies the exercised actions and response-before-refresh
-> ordering. Exact running SHA remains operator-reported. See the [deployed closeout](P1%20MGE%20A1b%20-%20Deployed%20Closeout%20-%202026-10-29.md).
-> The approved [MGE finalisation follow-up](P1%20MGE%20Finalisation%20and%20Shared%20Board%20Lifecycle%20-%202026-10-29.md) owns immutable historical boards,
-> durable unfinished final delivery and the shared Ark/voting/calendar caller design.
-> Its local source work is separate from publication, SQL qualification and deployment.
-> Earlier A1a-current, A1b-local-only and approval-pending passages below are retained
-> historical evidence, not current instructions. A1b's completed-event startup sweep
-> was implemented and is now superseded by the clarified finalisation policy.
-> Queue closure reconciliation, CFG-51421, exact audit/cleanup, atomic/cross-process
-> writers, natural acceptance, P0 and wider B/C remain separate. Do not replay live actions.
-
-> **Historical local A1b checkpoint:** The revised scope is implemented locally and validated on Windows. See the [implementation and evidence record](P1%20MGE%20A1b%20-%20Implementation%20and%20Validation%20-%202026-10-28.md). Publication, merge and deployment remain separate. Earlier scope-only approval wording below is historical.
-
-> **Historical status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
+> **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
 > PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
 > and Discord online. Signup/edit/withdraw are verified on this runtime. A1a qualified
 > datasets and timing are delivered; the A1b design packet is prepared for approval.

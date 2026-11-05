@@ -126,7 +126,7 @@ def ingest_kvk_all_excel(
     return result
 
 
-@admitted_writer("all_kvk")
+@admitted_writer("all_kvk", preserve_kvk_commit=True)
 def _ingest_validated_workbook(
     *,
     prepared,
@@ -202,6 +202,5 @@ async def _auto_export_kvk(kvk_no: int, notify_channel, bot_loop, *, preparation
         logger.exception("[KVK_EXPORT] Auto-export crashed")
         if notify_channel:
             await notify_channel.send(
-                f"\u26a0\ufe0f Export failed for **KVK {kvk_no}**: "
-                f"`{type(exc).__name__}: {exc}`"
+                f"\u26a0\ufe0f Export failed for **KVK {kvk_no}**: `{type(exc).__name__}: {exc}`"
             )

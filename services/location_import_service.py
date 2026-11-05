@@ -10,8 +10,12 @@ import hashlib
 import logging
 from typing import Any
 
+from core.owned_work import drain_awaitable
 from location_importer import load_staging_and_merge, parse_output_csv
 from services import import_audit_service
+from services.optional_import_audit_worker import run_audit
+from services.upload_lifecycle import tracked_upload
+from services.upload_outcome_service import display_count
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +45,7 @@ class LocationImportResult:
     ok: bool
     message: str
     rows_parsed: int = 0
-    staging_rows: int = 0
+    staging_rows: int | None = None
     total_tracked: int | None = None
 
 
@@ -69,7 +73,7 @@ def validate_location_csv_attachment(
     if isinstance(size, int) and size > MAX_LOCATION_CSV_BYTES:
         return LocationCsvValidation(
             ok=False,
-            message=f"❌ File too large ({size/1024/1024:.1f} MB). Please keep CSV under **10 MB**.",
+            message=f"❌ File too large ({size / 1024 / 1024:.1f} MB). Please keep CSV under **10 MB**.",
         )
 
     return LocationCsvValidation(ok=True)
@@ -139,7 +143,8 @@ async def start_location_audit_batch(
     audit_runner: AuditThreadRunner = asyncio.to_thread,
 ):
     try:
-        return await audit_runner(
+        return await run_audit(
+            audit_runner,
             _start_location_audit_batch_sync,
             context,
             csv_bytes,
@@ -167,7 +172,8 @@ async def record_location_audit_phase(
     if batch_ref is None:
         return
     try:
-        await audit_runner(
+        await run_audit(
+            audit_runner,
             import_audit_service.record_phase_best_effort,
             batch_ref,
             phase_name=phase_name,
@@ -202,7 +208,8 @@ async def complete_location_audit_batch(
     if batch_ref is None:
         return
     try:
-        await audit_runner(
+        await run_audit(
+            audit_runner,
             import_audit_service.complete_batch_best_effort,
             batch_ref,
             status=status,
@@ -232,7 +239,8 @@ async def fail_location_audit_batch(
     if batch_ref is None:
         return
     try:
-        await audit_runner(
+        await run_audit(
+            audit_runner,
             import_audit_service.fail_batch_best_effort,
             batch_ref,
             status=status,
@@ -256,6 +264,7 @@ def _location_sql_phase(context: LocationImportAuditContext) -> str:
     )
 
 
+@tracked_upload
 async def import_location_csv_bytes(
     csv_bytes: bytes,
     *,
@@ -351,7 +360,8 @@ async def import_location_csv_bytes(
 
     sql_started = datetime.now(UTC)
     try:
-        staging_rows, total_tracked = await thread_runner(merge_rows, rows)
+        write_result = await drain_awaitable(thread_runner(merge_rows, rows))
+        staging_rows, total_tracked = write_result
     except Exception as exc:
         logger.exception("[/import_locations] load_staging_and_merge failed")
         await record_location_audit_phase(
@@ -366,21 +376,20 @@ async def import_location_csv_bytes(
             details=_audit_details(audit_context, rows_parsed=len(rows), error=str(exc)),
             audit_runner=audit_runner,
         )
-        await fail_location_audit_batch(
+        # The importer entered; an exception alone does not prove rollback.
+        await record_location_audit_phase(
             audit_ref,
+            phase_name="upload_observation",
+            phase_status="failed",
             error_type=type(exc).__name__,
             error_text=str(exc),
-            rows_in_source=len(rows),
-            rows_staged=0,
-            rows_written=0,
-            rows_skipped=len(rows),
-            details=_audit_details(audit_context, rows_parsed=len(rows), error=str(exc)),
+            details={"outcome_version": 1, "business_outcome": "outcome_unconfirmed"},
             audit_runner=audit_runner,
         )
         return LocationImportResult(
             ok=False,
             rows_parsed=len(rows),
-            message=f"❌ Failed to import rows: `{type(exc).__name__}: {exc}`",
+            message=f"⚠️ Import outcome unconfirmed: `{type(exc).__name__}: {exc}`",
         )
 
     await record_location_audit_phase(
@@ -444,11 +453,11 @@ async def import_location_csv_bytes(
 
     await complete_location_audit_batch(
         audit_ref,
-        status="failed" if refresh_failed else "completed",
+        status="completed",
         rows_in_source=len(rows),
         rows_staged=staging_rows,
         rows_written=staging_rows,
-        rows_skipped=max(0, len(rows) - int(staging_rows or 0)),
+        rows_skipped=max(0, len(rows) - staging_rows) if staging_rows is not None else None,
         details=_audit_details(
             audit_context,
             rows_parsed=len(rows),
@@ -460,9 +469,17 @@ async def import_location_csv_bytes(
     )
 
     duration = (datetime.now(UTC) - started).total_seconds()
-    count_part = f"Imported **{staging_rows}** row{'s' if staging_rows != 1 else ''}."
+    count_part = (
+        f"Imported **{display_count(staging_rows)}** row{'s' if staging_rows != 1 else ''}."
+    )
+    if staging_rows is None:
+        count_part = "Import committed; row count unavailable."
     tracked_part = f" Total tracked now **{total_tracked}**." if total_tracked is not None else ""
     message = f"✅ {count_part}{tracked_part} ⏱ {duration:.1f}s"
+    if getattr(write_result, "cleanup", "settled") != "settled":
+        message += " Connection cleanup unconfirmed."
+    if refresh_failed:
+        message += " Import committed; refresh signal unavailable."
 
     return LocationImportResult(
         ok=True,

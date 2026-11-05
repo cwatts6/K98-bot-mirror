@@ -179,6 +179,11 @@ async def run_step(func, *args, offload_sync_to_thread=False, name=None, meta=No
         func, *args, offload_sync_to_thread=offload_sync_to_thread, name=name, meta=meta, **kwargs
     )
     selected = stages.get(name or getattr(func, "__name__", ""))
+    if selected == "import":
+        from core.owned_work import drain_awaitable
+
+        # This finite stage reads the private upload. Prompts remain cancellable.
+        return await drain_awaitable(receipt_stage(selected, invoke))
     return await receipt_stage(selected, invoke) if selected else await invoke()
 
 

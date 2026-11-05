@@ -7,11 +7,12 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_p014_hash
 
 
 def test_historical_61_transitions_unchanged():
     transitions = updater.reviewed_transitions()
-    assert len(transitions) == 63
+    assert len(transitions) == 64
     assert hashlib.sha256(json.dumps(transitions[:61], sort_keys=True).encode()).hexdigest() == (
         "c161f4d47ee6b9204d51372df908d3a7f9b59d6182e0a8b51e3e97983b769f2e"
     )
@@ -29,7 +30,8 @@ def pair(monkeypatch):
     known = {}
     for member in fix["members"]:
         path = member["path"]
-        assert hashlib.sha256(new[path]).hexdigest() == member["after_sha256"], path
+        assert before_p014_hash(root, path) == member["after_sha256"], path
+        known[new[path]] = member["after_sha256"]
         if old[path] is not None:
             known[old[path]] = member["before_sha256"]
     original = updater.sha256
@@ -83,6 +85,6 @@ def test_fixed_family_cannot_be_shortened(monkeypatch):
 
 
 def test_registry_remains_size_bounded(monkeypatch):
-    monkeypatch.setattr(Path, "read_bytes", lambda _: b" " * 139265)
+    monkeypatch.setattr(Path, "read_bytes", lambda _: b" " * 155649)
     with pytest.raises(ValueError, match="exceeds bound"):
         updater.reviewed_transitions()
