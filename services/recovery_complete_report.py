@@ -260,7 +260,14 @@ def _assemble(service, actor, max_bytes, lease, components, descriptors, identit
                 ("summary.json", summary_data),
                 *[
                     (name, components[name])
-                    for name in ("startup.json", "diagnostic-health.json", "operations.jsonl")
+                    # Keep existing evidence priority; health remains optional and
+                    # uses the same bounded continuation path when it cannot fit.
+                    for name in (
+                        "startup.json",
+                        "diagnostic-health.json",
+                        "operations.jsonl",
+                        "health-observations.json",
+                    )
                     if name in components
                 ],
             ]:

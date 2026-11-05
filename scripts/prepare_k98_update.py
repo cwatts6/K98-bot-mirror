@@ -616,6 +616,9 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P013_HEALTH_ARCHIVE_PATHS = frozenset({"services/recovery_complete_report.py"})
+
+
 P013_PASSIVE_HEALTH_PATHS = frozenset(
     {
         "bot_instance.py",
@@ -787,7 +790,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 62:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 63:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -882,7 +885,7 @@ def reviewed_transitions():
             )
             fixed_p013 = (
                 item["id"] == "p013_passive_health_v1" and path in P013_PASSIVE_HEALTH_PATHS
-            )
+            ) or (item["id"] == "p013_health_archive_v1" and path in P013_HEALTH_ARCHIVE_PATHS)
             fixed_p012a = (
                 (
                     item["id"] == "p012a_recoverable_reports_v1"
@@ -1142,6 +1145,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed ProcConfig admission transition required.")
         if item["id"] == "p013_passive_health_v1" and paths != P013_PASSIVE_HEALTH_PATHS:
             raise ValueError("Complete fixed P01.3 passive-health transition required.")
+        if item["id"] == "p013_health_archive_v1" and paths != P013_HEALTH_ARCHIVE_PATHS:
+            raise ValueError("Complete fixed P01.3 health-archive transition required.")
         if item["id"] == "p012a_evidence_bundle_v1" and paths != P012A_EVIDENCE_BUNDLE_PATHS:
             raise ValueError("Complete fixed P01.2a evidence-bundle transition required.")
         if item["id"] == "p012a_report_correction_v1" and paths != P012A_REPORT_CORRECTION_PATHS:

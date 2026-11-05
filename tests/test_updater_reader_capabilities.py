@@ -91,7 +91,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     from tests.updater_source_assertions import before_p013_hash
 
     for transition in update.reviewed_transitions():
-        if transition["id"] == "p013_passive_health_v1":
+        if transition["id"] in {"p013_passive_health_v1", "p013_health_archive_v1"}:
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"], member["path"]

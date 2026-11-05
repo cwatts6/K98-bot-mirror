@@ -1,5 +1,7 @@
 # Developer Quickstart
 
+> **5 November 2026 — P01.3 deployed; complete ZIP correction approved:** Persistent Refresh, automatic refresh and command/card agreement are operator-confirmed. The [bounded ZIP correction](docs/task_packs/P01.3%20Complete%20ZIP%20Health%20Correction%20-%202026-11-05.md) fixes the new health component missing from final archive assembly. Earlier preparation-only checkpoints below are historical. Review/merge are authorized; deployment remains an operator step.
+
 > **P01.3 local implementation (E81):** See the [implementation and PR-readiness receipt](docs/task_packs/Startup%20Import%20Export%20Reliability%20-%20P01.3%20Implementation%20and%20PR%20Readiness%20-%202026-11-04.md) for passive-health, persistent Refresh, exact updater compatibility and final validation status. No publication or deployment has occurred.
 
 > **Current P01.3 implementation checkpoint - 4 November 2026 (E80):** Full passive-health implementation, persistent Refresh and local validation/PR preparation are approved. Earlier design-only holds are historical; publication and production actions remain separate.
