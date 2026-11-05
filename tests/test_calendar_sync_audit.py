@@ -8,12 +8,39 @@ from event_calendar import audit_dal, service
 from event_calendar.audit_dal import AuditResult
 from event_calendar.mutation_owner import get_owner
 from event_calendar.sheets_sync import SyncResult
-from event_calendar.sql_lifecycle import SqlOutcome
+from event_calendar.sql_lifecycle import SqlOutcome, SqlSession
 from event_calendar.sync_audit import SyncAudit
 
 
 def acknowledged(sync_id=42):
     return AuditResult(sync_id, SqlOutcome(effect="committed", cleanup="settled"))
+
+
+@pytest.mark.parametrize(
+    "projection", [{}, {"status": None}, {"status": ""}, {"status": 7}, {"status": "success"}]
+)
+def test_optional_finish_tolerates_missing_terminal_status(monkeypatch, projection):
+    calls = []
+
+    class Connection:
+        def cursor(self):
+            return self
+
+        def execute(self, statement, *args):
+            calls.append((statement, args))
+
+        def commit(self):
+            calls.append(("commit", ()))
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(audit_dal, "_session", lambda: SqlSession(Connection))
+    result = audit_dal.finish(731, projection, datetime.now(UTC))
+    assert result.sql.effect == "committed" and result.sql.cleanup == "settled"
+    update = next(args for statement, args in calls if statement.startswith("UPDATE"))
+    assert update[1] == ("success" if projection.get("status") == "success" else "outcome_unknown")
+    assert update[-1] == 731
 
 
 async def wait_entered(event):

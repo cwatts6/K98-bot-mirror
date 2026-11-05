@@ -52,6 +52,8 @@ def start(started) -> AuditResult:
 
 def finish(sync_id: int, result: dict, completed) -> AuditResult:
     session = _session()
+    status = result.get("status")
+    status = status[:32] if isinstance(status, str) and status else "outcome_unknown"
     try:
         with session:
             cursor = _cursor(session)
@@ -61,7 +63,7 @@ def finish(sync_id: int, result: dict, completed) -> AuditResult:
                    RowsUpsertedRecurring = ?, RowsUpsertedOneOff = ?, RowsUpsertedOverrides = ?,
                    InstancesGenerated = ?, ErrorMessage = ? WHERE SyncID = ?""",
                 completed.replace(tzinfo=None),
-                result["status"][:32],
+                status,
                 result.get("rows_read_recurring"),
                 result.get("rows_read_oneoff"),
                 result.get("rows_read_overrides"),

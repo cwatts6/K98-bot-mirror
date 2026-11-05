@@ -29,7 +29,7 @@ class GenerationResult:
     ok: bool
     status: str
     instances_generated: int = 0
-    instances_written: int | None = 0
+    instances_written: int | None = None
     cancelled_count: int = 0
     modified_count: int = 0
     error_message: str | None = None
@@ -416,4 +416,5 @@ def generate_calendar_instances(*, horizon_days: int = 365) -> GenerationResult:
             result.instances_written = None
         elif result.sql.effect == "rolled_back":
             result.status = "rolled_back"
+            result.instances_written = 0
     return result

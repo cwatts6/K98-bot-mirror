@@ -9,7 +9,9 @@ import pytest
 
 from event_calendar import cache_publisher, service
 from event_calendar.cache_publisher import PublishResult
+from event_calendar.event_generator import GenerationResult
 from event_calendar.mutation_owner import get_owner
+from event_calendar.sheets_sync import SyncResult
 from services import operation_diagnostics as diagnostics
 from tests.test_guided_recovery import ACTOR
 from tests.test_recovery_report import report_service
@@ -21,6 +23,63 @@ class ReadConnection:
 
     def close(self):
         return None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "method,physical,key,result,arguments",
+    [
+        (
+            "refresh",
+            "sync_sheets_to_sql",
+            "refreshed_utc",
+            SyncResult(True, "success"),
+            {"sheet_id": "offline"},
+        ),
+        (
+            "generate",
+            "generate_calendar_instances",
+            "generated_utc",
+            GenerationResult(True, "success"),
+            {},
+        ),
+        (
+            "publish_cache",
+            "publish_event_calendar_cache",
+            "published_utc",
+            PublishResult(True, "success"),
+            {},
+        ),
+    ],
+)
+async def test_standalone_stage_preserves_existing_timestamp_contract(
+    monkeypatch, method, physical, key, result, arguments
+):
+    started = datetime(2026, 11, 5, 19, 0, tzinfo=UTC)
+    monkeypatch.setattr(service, "now_utc", lambda: started)
+    monkeypatch.setattr(service, physical, lambda *a, **k: result)
+    get_owner().audit.close_admission()
+    output = await getattr(service.CalendarService(), method)(**arguments)
+    assert output["ok"] and output[key] == started.isoformat()
+
+
+def test_write_counts_are_unavailable_before_stage_entry(monkeypatch):
+    from event_calendar import event_generator, sheets_sync
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("offline fixture")
+
+    monkeypatch.setattr(cache_publisher, "get_conn_with_retries", unavailable)
+    monkeypatch.setattr(event_generator, "get_conn_with_retries", unavailable)
+    monkeypatch.setattr(sheets_sync, "fetch_sheet_csv", unavailable)
+    published = cache_publisher.publish_event_calendar_cache()
+    generated = event_generator.generate_calendar_instances()
+    synced = sheets_sync.sync_sheets_to_sql("offline")
+    assert not published.ok and published.events_written is None
+    assert published.primary == "not_attempted"
+    assert not generated.ok and generated.instances_written is None
+    assert not synced.ok and synced.rows_upserted_recurring is None
+    assert synced.rows_upserted_oneoff is None and synced.rows_upserted_overrides is None
 
 
 @pytest.fixture

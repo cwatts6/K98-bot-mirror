@@ -390,6 +390,12 @@ class CalendarService:
             result.update(
                 pipeline_run_id=run.reference, observer=run.observer, audit=owner.audit.snapshot()
             )
+            timestamp_key = {
+                "sync": "refreshed_utc",
+                "generate": "generated_utc",
+                "publish": "published_utc",
+            }[run.kind]
+            result[timestamp_key] = started.isoformat()
             return result
         complete = len(run.results) == 3 and all(r.get("ok") for r in run.results.values())
         publish = run.results.get("publish") or {}

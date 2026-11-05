@@ -115,9 +115,9 @@ class SyncResult:
     rows_read_recurring: int = 0
     rows_read_oneoff: int = 0
     rows_read_overrides: int = 0
-    rows_upserted_recurring: int | None = 0
-    rows_upserted_oneoff: int | None = 0
-    rows_upserted_overrides: int | None = 0
+    rows_upserted_recurring: int | None = None
+    rows_upserted_oneoff: int | None = None
+    rows_upserted_overrides: int | None = None
     instances_generated: int = 0
     error_message: str | None = None
     attempted: dict[str, int] = field(default_factory=dict)
@@ -563,4 +563,7 @@ def sync_sheets_to_sql(sheet_id: str) -> SyncResult:
             result.rows_upserted_overrides = None
         elif result.sql.effect == "rolled_back":
             result.status = "rolled_back"
+            result.rows_upserted_recurring = 0
+            result.rows_upserted_oneoff = 0
+            result.rows_upserted_overrides = 0
     return result

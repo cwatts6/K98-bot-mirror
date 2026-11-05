@@ -21,7 +21,7 @@ _TYPE_INDEX_PATH = Path(EVENT_TYPE_INDEX_FILE_PATH)
 class PublishResult:
     ok: bool
     status: str
-    events_written: int | None = 0
+    events_written: int | None = None
     cache_path: str = field(default_factory=lambda: str(_CACHE_PATH))
     type_index_path: str = field(default_factory=lambda: str(_TYPE_INDEX_PATH))
     error_message: str | None = None
@@ -133,6 +133,7 @@ def publish_event_calendar_cache(
             result.ok = True
             result.status = "skipped_empty_preserve_existing"
             result.primary = "preserved"
+            result.events_written = 0
             return result
         result.primary = "unknown"
         result.events_written = None

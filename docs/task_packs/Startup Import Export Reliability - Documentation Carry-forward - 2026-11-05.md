@@ -49,6 +49,8 @@
 - [docs/calendar/task4_runbook_local_validation.md](../calendar/task4_runbook_local_validation.md)
 - [docs/task_packs/Startup Import Export Reliability - P01.5 Local Implementation and Qualification - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Local%20Implementation%20and%20Qualification%20-%202026-11-05.md)
 
+- [docs/task_packs/Startup Import Export Reliability - P01.5 PR Review and Deployment Plan - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.5%20PR%20Review%20and%20Deployment%20Plan%20-%202026-11-05.md)
+
 ## Required source removals / archive moves
 
 - `docs/task_packs/Startup Import Export Reliability - P01.4 Adoption Decision - 2026-11-05.md` -> [docs/task_packs/archive/Startup Import Export Reliability - P01.4 Adoption Decision - 2026-11-05.md](archive/Startup%20Import%20Export%20Reliability%20-%20P01.4%20Adoption%20Decision%20-%202026-11-05.md)

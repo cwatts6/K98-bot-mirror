@@ -3,15 +3,16 @@
 import ast
 from copy import deepcopy
 from pathlib import Path
-import subprocess
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def command(name, namespace):
-    tree = ast.parse(Path("commands/admin_cmds.py").read_text(encoding="utf-8"))
+    tree = ast.parse((ROOT / "commands/admin_cmds.py").read_text(encoding="utf-8"))
     node = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == name)
     node.decorator_list = []
     compiled = compile(
@@ -27,20 +28,30 @@ def command(name, namespace):
     "name", ["calendar_refresh", "calendar_generate", "calendar_publish_cache", "calendar_status"]
 )
 def test_existing_authorization_decorators_and_argument_bounds_preserved(name):
-    before = ast.parse(
-        subprocess.check_output(
-            ["git", "show", "8806f7e96bfb32624e10029668c992a5c04651e1:commands/admin_cmds.py"]
-        ).decode()
-    )
-    after = ast.parse(Path("commands/admin_cmds.py").read_text(encoding="utf-8"))
-
-    def signature(tree):
-        node = next(
-            n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == name
-        )
-        return [ast.dump(d) for d in node.decorator_list], ast.dump(node.args)
-
-    assert signature(before) == signature(after)
+    tree = ast.parse((ROOT / "commands/admin_cmds.py").read_text(encoding="utf-8"))
+    node = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == name)
+    decorators = [ast.unparse(d) for d in node.decorator_list]
+    assert decorators[2:] == ["safe_command", "is_admin_and_notify_channel()", "track_usage()"]
+    registration = node.decorator_list[0]
+    assert ast.unparse(registration.func) == "ops_group.command"
+    options = {item.arg: item.value for item in registration.keywords}
+    assert ast.literal_eval(options["name"]) == name
+    assert ast.unparse(options["guild_ids"]) == "[GUILD_ID]"
+    assert ast.unparse(node.args.args[0].annotation) == "discord.ApplicationContext"
+    if name in {"calendar_generate", "calendar_publish_cache"}:
+        assert node.args.args[1].arg == "horizon_days"
+        horizon = {
+            item.arg: ast.literal_eval(item.value) for item in node.args.defaults[0].keywords
+        }
+        assert horizon == dict(required=False, default=365, min_value=1, max_value=1825)
+        if name == "calendar_publish_cache":
+            assert node.args.args[2].arg == "force_empty"
+            force = {
+                item.arg: ast.literal_eval(item.value) for item in node.args.defaults[1].keywords
+            }
+            assert force == dict(required=False, default=False)
+    else:
+        assert len(node.args.args) == 1 and not node.args.defaults
 
 
 @pytest.mark.asyncio

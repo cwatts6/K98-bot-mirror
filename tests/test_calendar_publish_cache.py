@@ -51,6 +51,7 @@ def test_publish_preserve_on_empty(monkeypatch, tmp_path):
     out = mod.publish_event_calendar_cache(horizon_days=7, force_empty=False)
     assert out.ok is True
     assert out.status == "skipped_empty_preserve_existing"
+    assert out.events_written == 0
 
 
 def test_publish_writes_two_files(monkeypatch, tmp_path):
