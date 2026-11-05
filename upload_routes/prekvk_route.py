@@ -344,9 +344,11 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
         )
         ok, note, rows = result[0], result[1], result[2]
         outcome = UploadOutcome(
-            ("duplicate" if "duplicate file skipped" in (note or "").lower() else "committed")
-            if ok
-            else "failed_confirmed",
+            (
+                ("duplicate" if "duplicate file skipped" in (note or "").lower() else "committed")
+                if ok
+                else "failed_confirmed"
+            ),
             "settled",
         )
         metadata = _metadata_dict(result)
@@ -468,9 +470,11 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                     "Channel": f"#{message.channel.name} ({message.channel.id})",
                     "Uploader": f"{message.author} ({message.author.id})",
                     "Note": note,
-                    "Refresh": "Not requested (duplicate)"
-                    if duplicate_skip
-                    else display_delivery(delivery, refresh_error),
+                    "Refresh": (
+                        "Not requested (duplicate)"
+                        if duplicate_skip
+                        else display_delivery(delivery, refresh_error)
+                    ),
                 },
                 0xF1C40F if duplicate_skip else 0x2ECC71,
             )
@@ -503,9 +507,11 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
             await observe_optional(
                 deps.send_embed,
                 notify_ch,
-                "Import outcome unconfirmed ⚠️"
-                if outcome.business == "outcome_unconfirmed"
-                else "Pre-KVK Import ❌",
+                (
+                    "Import outcome unconfirmed ⚠️"
+                    if outcome.business == "outcome_unconfirmed"
+                    else "Pre-KVK Import ❌"
+                ),
                 {
                     "Filename": target.filename,
                     "Channel": f"#{message.channel.name} ({message.channel.id})",
@@ -545,9 +551,11 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
             (
                 "Import outcome unconfirmed ⚠️"
                 if outcome.business == "outcome_unconfirmed"
-                else "Import committed; follow-up unavailable ⚠️"
-                if outcome.business == "committed"
-                else "Pre-KVK Import ❌"
+                else (
+                    "Import committed; follow-up unavailable ⚠️"
+                    if outcome.business == "committed"
+                    else "Pre-KVK Import ❌"
+                )
             ),
             {
                 "Error": f"{type(e).__name__}: {e}",

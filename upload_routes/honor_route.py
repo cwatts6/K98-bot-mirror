@@ -369,9 +369,11 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             (
                 "Import outcome unconfirmed ⚠️"
                 if outcome.business == "outcome_unconfirmed"
-                else "Import committed; follow-up unavailable ⚠️"
-                if outcome.business == "committed"
-                else "KVK Honor Import ❌"
+                else (
+                    "Import committed; follow-up unavailable ⚠️"
+                    if outcome.business == "committed"
+                    else "KVK Honor Import ❌"
+                )
             ),
             fields,
             0xE74C3C,

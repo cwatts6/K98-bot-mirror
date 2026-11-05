@@ -338,9 +338,11 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                         "Delta Rows": str(row_count),
                         "Filename": target.filename,
                         **message_source_fields(message),
-                        "Note": "Backup task accepted; completion unverified"
-                        if backup_schedule_error is None
-                        else "Backup scheduling unavailable",
+                        "Note": (
+                            "Backup task accepted; completion unverified"
+                            if backup_schedule_error is None
+                            else "Backup scheduling unavailable"
+                        ),
                     },
                     0x2ECC71,
                 )
@@ -380,9 +382,11 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 (
                     "Import outcome unconfirmed ⚠️"
                     if outcome.business == "outcome_unconfirmed"
-                    else "Import committed; follow-up unavailable ⚠️"
-                    if outcome.business == "committed"
-                    else "Alliance Activity Import \u274c"
+                    else (
+                        "Import committed; follow-up unavailable ⚠️"
+                        if outcome.business == "committed"
+                        else "Alliance Activity Import \u274c"
+                    )
                 ),
                 {
                     "Error": f"{type(e).__name__}: {e}",

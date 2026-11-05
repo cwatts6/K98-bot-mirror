@@ -320,9 +320,9 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             {
                 "Imported Rows": display_count(staging_rows),
                 "Connection cleanup": getattr(write_result, "cleanup", "settled"),
-                "Refresh signal": "Unavailable"
-                if refresh_failed
-                else "Requested; completion unverified",
+                "Refresh signal": (
+                    "Unavailable" if refresh_failed else "Requested; completion unverified"
+                ),
                 "Total Tracked": display_count(total_tracked),
                 "Source Channel": f"#{message.channel.name} ({message.channel.id})",
                 "Uploaded By": f"{message.author} ({message.author.id})",
@@ -354,9 +354,11 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             (
                 "Import outcome unconfirmed ⚠️"
                 if outcome.business == "outcome_unconfirmed"
-                else "Import committed; follow-up unavailable ⚠️"
-                if outcome.business == "committed"
-                else "Player Location Import ❌"
+                else (
+                    "Import committed; follow-up unavailable ⚠️"
+                    if outcome.business == "committed"
+                    else "Player Location Import ❌"
+                )
             ),
             {
                 "Error": f"{type(e).__name__}: {e}",

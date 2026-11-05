@@ -261,13 +261,15 @@ def import_prekvk_bytes(
             return (ok, note, rows)
         metadata: dict[str, Any] = {
             "status": status,
-            "business_outcome": "committed"
-            if commit_acknowledged
-            else "outcome_unconfirmed"
-            if commit_entered
-            else "duplicate"
-            if status == "duplicate"
-            else "rejected",
+            "business_outcome": (
+                "committed"
+                if commit_acknowledged
+                else (
+                    "outcome_unconfirmed"
+                    if commit_entered
+                    else "duplicate" if status == "duplicate" else "rejected"
+                )
+            ),
             "phase": phase_name or phase,
             "kvk_no": int(kvk_no),
             "rows_in_source": rows_in_source_value,

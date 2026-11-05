@@ -393,9 +393,7 @@ def collect_components(*, lease=None):
             status=(
                 "unavailable"
                 if snapshot.get("status") == "unavailable"
-                else "partial"
-                if rejected or upload_partial
-                else "available"
+                else "partial" if rejected or upload_partial else "available"
             ),
             included=len(valid),
             available=len(rows) if snapshot.get("status") != "unavailable" else "unknown",

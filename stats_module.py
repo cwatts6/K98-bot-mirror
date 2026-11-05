@@ -533,9 +533,7 @@ async def run_sql_procedure(
         classification = (
             "checkpoint_pending"
             if sql_state == "completed"
-            else "failed"
-            if sql_state in {"rolled_back", "partial"}
-            else "outcome_unconfirmed"
+            else "failed" if sql_state in {"rolled_back", "partial"} else "outcome_unconfirmed"
         )
         log_outcome = logger.info if sql_state == "completed" else logger.error
         log_outcome("[SQL_PROC] outcome=%s; diagnostics=%s", classification, sql_error_facts(e))

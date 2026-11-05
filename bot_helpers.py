@@ -253,7 +253,8 @@ async def clean_expired_jobs(days=7):
                 and "uploaded" in job
                 and (
                     # parse safely and normalise to UTC-aware before comparing
-                    ensure_aware_utc(datetime.fromisoformat(job["uploaded"])).timestamp() < cutoff
+                    ensure_aware_utc(datetime.fromisoformat(job["uploaded"])).timestamp()
+                    < cutoff
                 )
             )
         ]

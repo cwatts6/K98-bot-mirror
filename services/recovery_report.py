@@ -91,9 +91,7 @@ def incident_report(service, row):
                     else (
                         "verification_required"
                         if blocked
-                        else "resolved"
-                        if row["State"] == "resolved"
-                        else "guided_confirmation"
+                        else "resolved" if row["State"] == "resolved" else "guided_confirmation"
                     )
                 ),
                 **{key: details[key] for key in ("label", "check", "effect") if key in details},

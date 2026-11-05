@@ -566,9 +566,11 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                     + (f" \u2022 recompute `{recompute_ms:.0f}ms`" if recompute_ms > 0 else "")
                 ),
                 "File": attachment.filename,
-                "Export": "Scheduling requested; delivery unverified"
-                if deps.auto_export_enabled and result.get("export_preparation_id")
-                else "Not scheduled",
+                "Export": (
+                    "Scheduling requested; delivery unverified"
+                    if deps.auto_export_enabled and result.get("export_preparation_id")
+                    else "Not scheduled"
+                ),
                 "Capture": result.get(
                     "capture_outcome",
                     "available" if result.get("export_preparation_id") else "unavailable",
@@ -688,9 +690,11 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                 (
                     "Import outcome unconfirmed ⚠️"
                     if outcome.business == "outcome_unconfirmed"
-                    else "Import committed; follow-up unavailable ⚠️"
-                    if outcome.business == "committed"
-                    else "KVK All-Kingdom Import \u274c"
+                    else (
+                        "Import committed; follow-up unavailable ⚠️"
+                        if outcome.business == "committed"
+                        else "KVK All-Kingdom Import \u274c"
+                    )
                 ),
                 {
                     "Error": f"{type(exc).__name__}: {exc}",
