@@ -1,0 +1,5 @@
+# RP01 accepted — 2026-09-28
+
+Operator-supplied JSON normalized and retained in received-RP01-20260928T171142Z.json. Host 9SX2VF4, Completed, no failure, 31 ms. Eight exact directory boundaries returned without ReparsePoint; data owner BUILTIN\Administrators and SDDL match PD01 including the inherited local-account ACE. Both approved MDF/LDF paths absent. Free bytes 1,742,554,849,280 exceed 268,435,456,000-byte start floor. Point-in-time checks, not atomic reservations or proof of SQL write access.
+
+Proposal seal, all bound files and existing RP01/R01 approval seal verified. R01.sql SHA256 97fb8a69752e5e7f8707aff3c180d98f694fc176d4cb0567fa2cd35bb27534d1 unchanged. R01 remains approved, pending operator execution in fresh development SSMS master. No SQL was executed by the assistant. No further approval needed for the exact R01 batch; final recovery, integrity execution, installation and G5 remain outside this approval. Preserve all Results/Messages and any partial state. No retry or cleanup.
