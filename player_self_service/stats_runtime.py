@@ -36,6 +36,7 @@ class ReadRun:
     epoch: int = 0
     valid: bool = True
     task: asyncio.Task | None = None
+    native_future: asyncio.Future | None = field(default=None, repr=False)
     started: bool = False
     entered: bool = False
     settled: bool = False
@@ -189,27 +190,53 @@ class StatsRuntime:
                 run.error = error
                 raise
 
+        render_future = None
+        if render:
+            try:
+                # Submit before yielding to the loop, as the pre-P01.6 renderer
+                # did. A busy loop must not consume the render deadline before
+                # the dedicated executor has even received the work.
+                context = copy_context()
+                render_future = self.loop.run_in_executor(executor, context.run, work)
+                run.native_future = render_future
+                run.started = True
+            except BaseException:
+                self._settle(run, None)
+                raise
+
+            def render_completed(future):
+                # The native Future owns settlement even if the observer/owner
+                # Task is cancelled before its first turn or cannot be created.
+                # No caller cancels this Future; owner cancellation is shielded.
+                if not future.cancelled():
+                    error = future.exception()
+                    if error is not None and run.error is None:
+                        run.error = error
+                    self._settle(run, publish)
+
+            render_future.add_done_callback(render_completed)
+
         async def own():
             run.started = True
             try:
                 if render:
-                    context = copy_context()
-                    future = self.loop.run_in_executor(executor, context.run, work)
-                    return await drain_awaitable(future)
+                    return await drain_awaitable(render_future)
                 return await drain_thread(work)
             except Exception as error:
                 if run.error is None:
                     run.error = error
                 raise
             finally:
-                self._settle(run, publish)
+                if not render:
+                    self._settle(run, publish)
 
         coroutine = own()
         try:
             run.task = self.loop.create_task(coroutine)
         except BaseException:
             coroutine.close()
-            self._settle(run, None)
+            if not render:
+                self._settle(run, None)
             raise
 
         def completed(task):
@@ -269,7 +296,7 @@ class StatsRuntime:
         # Join each physical owner, even when another owner failed/cancelled.
         for run in tuple(self.jobs.values()):
             try:
-                await drain_awaitable(run.task)
+                await drain_awaitable(run.native_future if run.kind == "render" else run.task)
             except (asyncio.CancelledError, Exception):
                 continue
         if not any(run.kind == "render" for run in self.jobs.values()) and self.render_executor:

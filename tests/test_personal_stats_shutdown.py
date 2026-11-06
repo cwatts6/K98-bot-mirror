@@ -112,6 +112,10 @@ async def test_drain_cancellation_does_not_release_blocked_read_or_renderer():
     runtime.submit("render", work, executor=runtime.renderer_executor())
     drain = asyncio.create_task(runtime.drain())
     try:
+        # Render submission is now synchronous; its entry event no longer proves
+        # that the drain Task has received its first turn. Test cancellation of
+        # an entered drain, rather than cancelling an unstarted coroutine.
+        await asyncio.sleep(0)
         async with asyncio.timeout(2):
             while not entered.is_set():
                 await asyncio.sleep(0.001)

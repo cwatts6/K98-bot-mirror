@@ -1,5 +1,41 @@
 # Deferred Optimisations
 
+### Deferred Optimisation
+- Area: `services/recovery_runtime.py::_inspect_discovered`, recovery inspectors and `services/legacy_export_snapshot_service.py::LegacySnapshot`
+- Type: performance
+- Description: The 6 November P01.6 investigation observed about one CPU core continuously used by the Bot. A limited nonblocking profile retained 100 samples with one sampling error; 82 samples were in two recovery-check threads, predominantly decoding retained export snapshots and reconstructing cells/canonical JSON. This is not an exact CPU percentage or proof of concurrent recovery cycles. The sampled hot paths are unchanged from the pre-P01.6 source. Checks inspect saved work; they do not resend exports. Their cost can compete with rendering, but the complete causal contribution remains unmeasured.
+- Suggested Fix: After P01-P05, measure repeated snapshot verification within one bounded inspection pass and design identity-bound reuse or removal of redundant decode/encode work. Preserve integrity, source identity, permissions, uncertainty and recovery ownership; do not disable checks or skip hashes to improve timings. Compare process CPU, event-loop responsiveness and Stats rendering before and after under the same retained-work inventory.
+- Impact: high
+- Risk: high
+- Dependencies: Operator requested deferral until P01-P05 are complete; private latency/profile evidence from 6 November; separate design and validation of recovery invariants before implementation.
+
+### Deferred Optimisation
+- Area: Personal Stats fallback attachments and deployed Pycord interaction message handling
+- Type: consistency
+- Description: Production Pycord 2.6.1 omits the HTTP attachments field when passed an empty list. Personal Stats fallback already used `attachments=[]` before P01.6, so a timed-out Combat render can leave the previous Activity image above the new text fallback. The captured SDK source explains the supplied screenshot. Development Pycord 2.7.2 handles the empty list differently; local mocks alone cannot certify production attachment removal.
+- Suggested Fix: After P01-P05, qualify a narrow supported attachment-clearing strategy or a separately reviewed dependency upgrade against the deployed SDK. Verify actual outgoing payloads and original-message attachment removal for render failure, mode changes and replacement images. Keep fallback data and selected mode consistent; do not patch installed site-packages or silently upgrade dependencies.
+- Impact: medium
+- Risk: medium
+- Dependencies: Operator requested deferral until P01-P05; private captured SDK source and screenshot; dependency/startup compatibility and Discord validation for the selected solution.
+
+### Deferred Optimisation
+- Area: Personal Stats `_defer` and Accounts-to-Stats failure delivery
+- Type: consistency
+- Description: The pre-P01.6 acknowledgement helper swallows rejected acknowledgements and continues to data/render work; an unusable interaction can then fail editing and also fail its error follow-up with Unknown Webhook 10015. A controlled comparison reproduces this in both predecessor and P01.6. P01.6 additionally introduced a second acknowledgement attempt, removed by the rendering correction. The original production acknowledgement outcome was not logged, so this comparison does not prove the cause of the recorded production 10015 failure.
+- Suggested Fix: After P01-P05, define a single acknowledgement outcome contract and safe terminal behavior for expired/rejected interactions, including parent-view ownership when Accounts opens Stats. Add bounded redacted acknowledgement/delivery facts and tests for rejected acknowledgement, expiry and failed error delivery. Avoid repeated work or follow-ups on a known unusable token.
+- Impact: medium
+- Risk: medium
+- Dependencies: Operator requested deferral of pre-existing behavior until P01-P05; preserve P01.6 authorization and physical-worker ownership; production recurrence remains evidence to investigate, not a claim that the current correction resolves every 10015.
+
+### Deferred Optimisation
+- Area: `player_stats_cache.py::_build_cache_from_sql`, `_execute_sp_with_retries`, and startup KVK cache diagnostics
+- Type: consistency
+- Description: On 6 November 2026 at 15:25:01, after the P01.6 corrective restart, `SP_Stats_for_Upload` reported `sql_refresh_failed` and the cache successfully reused a validated 415-row SQL snapshot. The operator confirms that 29 September is the correct final KVK data date and no KVK is active; neither that date nor absent KVK reminders is a defect. The supplied warning does not identify the underlying refresh failure. This cache module and procedure are separate from the optimized Personal Stats procedure, and the Bot cache module was unchanged in the P01.6 release; the warning's actual cause remains unproven.
+- Suggested Fix: During a separately scoped startup-cache diagnostic follow-up, correlate the original refresh attempt with bounded, redacted SQL/admission error facts and distinguish an expected off-season no-op from a failed refresh. Preserve validated last-known-good provenance. Do not force a refresh, replay imports, alter source timestamps, or suppress the warning merely because the historical snapshot is valid. Personal Stats render timeouts and Accounts-to-Stats delivery failure remain active P01.6 acceptance investigations and are not deferred by this item.
+- Impact: medium
+- Risk: low
+- Dependencies: Follow up after P01-P05 as requested. Supplied 6 November successor startup log; operator confirmation of the final KVK date; original refresh failure evidence before selecting a fix. Calendar reminder scheduling and delivery are separate from KVK reminders.
+
 > **Current status - 28 October 2026, A1a deployed:** Mirror PR 454 and private
 > PR 702 are merged; private `87c1b39325daaa0ca1a8c0cbca656df82d7fa46b` is deployed
 > and Discord online. Signup/edit/withdraw are verified on this runtime. A1a qualified
@@ -303,11 +339,11 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Area: SQL repo `dbo.usp_GetPersonalStatsDaily`, `dbo.KingdomScanData4`, Alliance Activity/Fort sources, and `stats/dal/personal_stats_dal.py`
 - Type: performance
 - Description: The operator-approved 6 November P01.6 follow-up qualified a local daily-pipeline rewrite plus `IX_KS4_Governor_DayEnd`, preserving the 26-governor/180-day contract. Synthetic 26-governor reads fell from 99,796 to 27,327; same-index matched p95 improved about 17%. The index added about 15.2 MiB for 134,715 rows and about 18% insert latency / 10% log bytes in rolled-back trials. Eight-worker tests proved progress but not higher throughput. Local correctness, migration/rollback, native Bot integration and separate SQL Changes review passed; representative production performance is not certified.
-- Suggested Fix: Carry the reviewed SQL companion through separately authorized PR/promotion, explicitly target its deployment and retain rollback. During an approved representative acceptance window, check real account/data distributions, plans/grants, source-import write overhead, index size and concurrent progress; retain the existing bounds and private authorization contract. Do not add speculative indexes or treat local LPIM mitigation as evidence that production needs the same host policy. See the P01.6 implementation/qualification task pack for exact evidence and limits.
+- Suggested Fix: The SQL companion is deployed and its exact procedure/index and matching receipts were verified on 6 November. Continue representative acceptance: two captured fresh calls took approximately 55 ms and 1.215 seconds, with about 59 ms CPU for the latter; identify the residual wait before attributing it to the query or Bot. Check real account/data distributions, plans/grants, source-import write overhead, index size and concurrent progress; retain the existing bounds and private authorization contract. Do not add speculative indexes or treat local LPIM mitigation as evidence that production needs the same host policy. See the P01.6 implementation/qualification task pack for exact local evidence and limits.
 - Impact: high
 - Risk: medium
 - Dependencies: SQL branch `codex/p016-personal-stats-read-plan`; Bot P01.6 companion; operator-approved publication/deployment and representative acceptance window; current production statistics and exact target inventory.
-- Status: locally implemented and qualified — publication and representative production acceptance pending
+- Status: deployed and installation verified — representative production performance acceptance remains open
 - Last verified: 2026-11-06
 
 ### Deferred Optimisation

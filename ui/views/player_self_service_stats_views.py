@@ -763,7 +763,6 @@ class PersonalStatsView(discord.ui.View):
     @_observed_action
     async def change_mode(self, interaction: discord.Interaction, mode: StatsMode) -> None:
         generation = self._begin_transition()
-        await _defer(interaction)
         try:
             await self._deliver_transition(
                 interaction,
@@ -784,7 +783,6 @@ class PersonalStatsView(discord.ui.View):
     @_observed_action
     async def change_period(self, interaction: discord.Interaction, period: StatsPeriod) -> None:
         generation = self._begin_transition()
-        await _defer(interaction)
         try:
             payload = await self.payload_loader(
                 self.author_id,
@@ -830,7 +828,6 @@ class PersonalStatsView(discord.ui.View):
             return
         governor_id = self._token_map[token]
         generation = self._begin_transition()
-        await _defer(interaction)
         try:
             payload = await self.payload_loader(
                 self.author_id,
@@ -1105,7 +1102,6 @@ async def show_personal_stats_for_interaction(
     can_edit: Callable[[], bool] | None = None,
 ) -> PersonalStatsView | None:
     initial_started = time.perf_counter()
-    await _defer(interaction, ephemeral=entry_route == "command")
     avatar_task = asyncio.create_task(
         _read_avatar_bytes(getattr(interaction, "user", None), author_id=author_id)
     )

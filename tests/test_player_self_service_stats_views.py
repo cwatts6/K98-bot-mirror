@@ -348,6 +348,56 @@ async def test_initial_failure_does_not_expose_exception_or_sql_details() -> Non
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("entry", ["command", "page", "mode", "period", "scope"])
+async def test_owned_stats_boundary_does_not_repeat_failed_acknowledgement(entry):
+    interaction = _Interaction()
+    attempts = []
+
+    async def rejected(**kwargs):
+        attempts.append(kwargs)
+        raise discord.NotFound(
+            SimpleNamespace(status=404, reason="Not Found"),
+            {"code": 10062, "message": "Unknown interaction"},
+        )
+
+    async def payload_loader(*args, **kwargs):
+        return _payload()
+
+    interaction.response.defer = rejected
+    renderer = lambda *args, **kwargs: RenderedStatsCard("fixture.png", b"png")
+    view = None
+    try:
+        if entry in {"command", "page"}:
+            view = await show_personal_stats_for_interaction(
+                interaction,
+                author_id=42,
+                display_name="Fixture",
+                entry_route=entry,
+                payload_loader=payload_loader,
+                renderer=renderer,
+            )
+        else:
+            view = PersonalStatsView(
+                author_id=42,
+                display_name="Fixture",
+                payload=_payload(2),
+                avatar_bytes=None,
+                payload_loader=payload_loader,
+                renderer=renderer,
+            )
+            if entry == "mode":
+                await view.change_mode(interaction, StatsMode.ACTIVITY)
+            elif entry == "period":
+                await view.change_period(interaction, StatsPeriod.LAST_WEEK)
+            else:
+                await view.change_scope(interaction, next(iter(view._token_map)))
+        assert len(attempts) == 1
+    finally:
+        if view is not None:
+            view.stop()
+
+
+@pytest.mark.asyncio
 async def test_render_failure_uses_same_payload_fallback_without_second_fetch() -> None:
     interaction = _Interaction()
     payload_calls = 0

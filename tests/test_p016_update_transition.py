@@ -9,11 +9,11 @@ import pytest
 from scripts import prepare_k98_update as updater
 
 
-def test_all_65_historical_transitions_unchanged():
+def test_all_66_historical_transitions_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 66
-    assert hashlib.sha256(json.dumps(entries[:65], sort_keys=True).encode()).hexdigest() == (
-        "a8140a5fcf1324768672ef66770b9c1f44a6652db28caa8ad955d32b92a669ff"
+    assert len(entries) == 67
+    assert hashlib.sha256(json.dumps(entries[:66], sort_keys=True).encode()).hexdigest() == (
+        "1d31dce46f54023a020f8e34373deaf2084356747f20200190794d629a155f78"
     )
 
 
@@ -21,7 +21,9 @@ def test_all_65_historical_transitions_unchanged():
 def pair(monkeypatch):
     root = Path(__file__).resolve().parents[1]
     transition = next(
-        t for t in updater.reviewed_transitions() if t["id"] == "p016_personal_stats_ownership_v1"
+        t
+        for t in updater.reviewed_transitions()
+        if t["id"] == "p016_personal_stats_render_submission_v1"
     )
     before, after, known = {}, {}, {}
     for member in transition["members"]:
@@ -68,7 +70,9 @@ def test_every_member_is_exact(pair, path, damage):
 def test_old_reader_refuses_new_candidate(pair, monkeypatch):
     before, after = pair
     installed = [
-        t for t in updater.reviewed_transitions() if t["id"] != "p016_personal_stats_ownership_v1"
+        t
+        for t in updater.reviewed_transitions()
+        if t["id"] != "p016_personal_stats_render_submission_v1"
     ]
     monkeypatch.setattr(updater, "reviewed_transitions", lambda: installed)
     read = lambda revision, path: (before if revision == "before" else after).get(path)

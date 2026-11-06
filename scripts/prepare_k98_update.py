@@ -616,6 +616,9 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P016_PERSONAL_STATS_TRANSITIONS = frozenset(
+    {"p016_personal_stats_ownership_v1", "p016_personal_stats_render_submission_v1"}
+)
 P016_PERSONAL_STATS_PATHS = frozenset(
     {
         "DL_bot.py",
@@ -896,7 +899,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 66:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 67:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -918,7 +921,7 @@ def reviewed_transitions():
         )
         if item["id"] == "p015_calendar_ownership_v1":
             member_limit = len(P015_CALENDAR_PATHS)
-        if item["id"] == "p016_personal_stats_ownership_v1":
+        if item["id"] in P016_PERSONAL_STATS_TRANSITIONS:
             member_limit = len(P016_PERSONAL_STATS_PATHS)
         if item["id"] == "p014_upload_outcomes_optional_io_v1":
             member_limit = len(P014_UPLOAD_PATHS)
@@ -997,8 +1000,7 @@ def reviewed_transitions():
             )
             fixed_p015 = item["id"] == "p015_calendar_ownership_v1" and path in P015_CALENDAR_PATHS
             fixed_p016 = (
-                item["id"] == "p016_personal_stats_ownership_v1"
-                and path in P016_PERSONAL_STATS_PATHS
+                item["id"] in P016_PERSONAL_STATS_TRANSITIONS and path in P016_PERSONAL_STATS_PATHS
             )
             fixed_p014 = (
                 item["id"] == "p014_upload_outcomes_optional_io_v1" and path in P014_UPLOAD_PATHS
@@ -1268,7 +1270,7 @@ def reviewed_transitions():
             raise ValueError("Complete fixed ProcConfig admission transition required.")
         if item["id"] == "p015_calendar_ownership_v1" and paths != P015_CALENDAR_PATHS:
             raise ValueError("Complete fixed P01.5 calendar transition required.")
-        if item["id"] == "p016_personal_stats_ownership_v1" and paths != P016_PERSONAL_STATS_PATHS:
+        if item["id"] in P016_PERSONAL_STATS_TRANSITIONS and paths != P016_PERSONAL_STATS_PATHS:
             raise ValueError("Complete fixed P01.6 personal-stats transition required.")
         if item["id"] == "p014_upload_outcomes_optional_io_v1" and paths != P014_UPLOAD_PATHS:
             raise ValueError("Complete fixed P01.4 upload transition required.")
