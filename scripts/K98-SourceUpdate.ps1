@@ -736,7 +736,9 @@ function Verify-Native([switch]$Preflight) {
  $bindingHash=if($derived){$script:activeBindingsHash}else{$ExpectedBindingsSHA256}
  $verifyArguments=@('-I','-B',$script,'--bindings',$bindingPath,'--sha256',$bindingHash)
  if($Preflight){$verifyArguments+='--preflight'}
- if($null -ne $c.PSObject.Properties['sql']){$verifyArguments+='--sql-contracts'}
+ # Source-only releases also depend on the installed SQL startup contracts.
+ # Fail before drain on drift, including separately deployed companion SQL.
+ $verifyArguments+='--sql-contracts'
  & $c.venv.path @verifyArguments | Out-Host
  if($LASTEXITCODE -ne 0){throw 'New native publication not verified'}
 }
@@ -775,6 +777,7 @@ function Check-Readiness {
  }finally{$stream.Dispose()}
  if($text -notmatch '\[BOOT\] full_startup_sequence completed successfully' -or $text -notmatch 'Logged in as'){return $false}
  $health=Import-ExportStatus $text
+ if($health.reason -ceq 'runtime_admission_unavailable'){throw 'Discord is online but protected runtime admission failed; deployment health is unconfirmed. Preserve state; do not restart or replay work.'}
  $status=@{release_id=$c.release_id;target=$c.target;discord_status='online';import_export=$health}|ConvertTo-Json -Depth 5 -Compress|ConvertFrom-Json
  $statusPath=Join-Path $PSScriptRoot 'readiness-status.json'
  if(Test-Path -LiteralPath $statusPath) {

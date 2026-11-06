@@ -299,7 +299,7 @@ def test_pair_bootstrap_authenticates_source_before_selecting_archive(monkeypatc
         verifier, "verify_live_source", lambda c, **kw: steps.append("source") or {}
     )
     monkeypatch.setattr(verifier, "activate_release_archive", lambda c, p: steps.append("archive"))
-    monkeypatch.setattr(verifier, "verify_sql_contracts", lambda c, p: steps.append("sql"))
+    monkeypatch.setattr(verifier, "verify_sql_contracts", lambda c, p, **kw: steps.append("sql"))
     verifier.main()
     assert steps == ["source", "archive", "sql"]
 
