@@ -32,6 +32,14 @@ def before_p016_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
     if path not in prepare_k98_update.P016_PERSONAL_STATS_PATHS:
         return actual
+    render_successor = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "p016_personal_stats_render_submission_v1"
+    )
+    render_member = next(m for m in render_successor["members"] if m["path"] == path)
+    assert actual == render_member["after_sha256"], path
+    actual = render_member["before_sha256"]
     successor = next(
         t
         for t in prepare_k98_update.reviewed_transitions()

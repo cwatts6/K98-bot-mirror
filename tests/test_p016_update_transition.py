@@ -78,3 +78,28 @@ def test_old_reader_refuses_new_candidate(pair, monkeypatch):
     read = lambda revision, path: (before if revision == "before" else after).get(path)
     with pytest.raises(ValueError):
         updater.check_transition_inventory(set(after), read, "before", "after")
+
+
+@pytest.mark.parametrize(
+    "path", ["player_self_service/stats_runtime.py", "ui/views/player_self_service_stats_views.py"]
+)
+def test_historical_bridge_authenticates_render_successor_before_original_assertion(
+    path, monkeypatch
+):
+    from tests.updater_source_assertions import before_p016_hash
+
+    root = Path(__file__).resolve().parents[1]
+    original = next(
+        t for t in updater.reviewed_transitions() if t["id"] == "p016_personal_stats_ownership_v1"
+    )
+    member = next(m for m in original["members"] if m["path"] == path)
+    assert before_p016_hash(root, path) == member["before_sha256"]
+    read_bytes = Path.read_bytes
+
+    def changed_bytes(file):
+        raw = read_bytes(file)
+        return raw + b"# unreviewed bytes" if file == root / path else raw
+
+    monkeypatch.setattr(Path, "read_bytes", changed_bytes)
+    with pytest.raises(AssertionError, match=path):
+        before_p016_hash(root, path)

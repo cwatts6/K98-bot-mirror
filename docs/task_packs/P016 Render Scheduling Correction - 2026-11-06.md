@@ -29,6 +29,22 @@ Retain final test, lint, architecture, deferred-item, command-registration, smok
 operational-log-isolation and Changes security-review receipts with the release handoff.
 Local qualification and merges are distinct from host readiness and live acceptance.
 
+The expanded focused run passed 1,815 tests, including historical updater transitions,
+render ownership, shutdown, Stats views and application compatibility; the log-noise
+wrapper confirmed operational logs unchanged. Seven native Windows updater suites
+passed 233 checks. Full-suite and final private-head CI results belong in the release
+handoff, not inferred from these focused runs.
+
+Changes security reviews `34620890-7181-4302-b1b9-d9190c95257e` (runtime correction)
+and `9b3bef99-62ae-4ac4-988e-04da42cd08c1` (exact updater transition) completed with
+no findings. The subsequent delta from mirror `80483d3` changes only documentation,
+eleven historical test inventory counts, the test-only source-hash assertion bridge,
+and its negative tests. Runtime/updater bytes are unchanged; the bridge has no
+production imports and still rejects unreviewed source bytes before mapping historical
+hashes. A further security scan is skipped for this test/documentation-only delta.
+Historical prefix digest assertions remain unchanged. Retain final mirror/private
+preimage and postimage equivalence with the two immutable Changes review targets.
+
 ## Production findings and remaining limits
 
 - Two observed fresh Personal Stats procedure calls took about 55 ms and 1.215 seconds;
@@ -73,8 +89,12 @@ render time, delivery time and data time; retain fallback/old-SDK limitations ex
 Do not declare all render timeouts or Accounts errors resolved based on this scheduling fix.
 
 If a new release-related regression appears, stop acceptance and preserve receipts/logs.
-Use the supported protected rollback protocol or a reviewed forward revert of these
-Bot-only files onto private main, with matching source/startup policy and physical drain.
+The normal updater has no one-command reverse switch for this transition. Recovery must
+first establish the completed release stage; do not blindly resume a completed deployment.
+The rollback route is a separately reviewed forward revert of the affected Bot behavior
+onto private main, with an exact reverse transition, matching source/startup policy and
+physical drain. That reverse package must be prepared and qualified before it is run;
+the present package does not authorize arbitrary reverse hashes.
 The fallback baseline is the corrective startup-contract release above, not the earlier
 broken startup-contract version. Do not reset live Git, force-stop processes or roll back
 the SQL rewrite/index as part of this Bot correction. No cache or retained-work cleanup is
