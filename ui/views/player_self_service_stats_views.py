@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
+from functools import wraps
 from io import BytesIO
 import logging
 from math import ceil
@@ -28,7 +27,11 @@ from player_self_service.stats_models import (
     StatsScopeType,
 )
 from player_self_service.stats_renderer import RenderedStatsCard, render_personal_stats_card
-from player_self_service.stats_service import build_personal_stats_payload
+from player_self_service.stats_runtime import get_runtime
+from player_self_service.stats_service import (
+    assert_personal_stats_access,
+    build_personal_stats_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +40,6 @@ Renderer = Callable[..., RenderedStatsCard]
 
 _VIEW_TIMEOUT_SECONDS = 180.0
 _RENDER_TIMEOUT_SECONDS = 3.5
-_RENDER_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="me-stats-render")
 _AVATAR_TIMEOUT_SECONDS = 3.0
 _AVATAR_MAX_BYTES = 2 * 1024 * 1024
 _GOVERNOR_PAGE_SIZE = 24
@@ -85,18 +87,55 @@ async def _run_renderer(
     display_name: str,
     avatar_bytes: bytes | None,
 ) -> RenderedStatsCard:
-    loop = asyncio.get_running_loop()
-    render_future = loop.run_in_executor(
-        _RENDER_EXECUTOR,
-        partial(
-            renderer,
-            payload,
-            mode=mode,
-            display_name=display_name,
-            avatar_bytes=avatar_bytes,
+    runtime = get_runtime()
+    run = runtime.submit(
+        "render",
+        lambda run: renderer(
+            payload, mode=mode, display_name=display_name, avatar_bytes=avatar_bytes
         ),
+        executor=runtime.renderer_executor(),
     )
-    return await asyncio.wait_for(render_future, timeout=_RENDER_TIMEOUT_SECONDS)
+    return await runtime.observe(run, runtime.deadline(_RENDER_TIMEOUT_SECONDS))
+
+
+def _observed_action(function):
+    @wraps(function)
+    async def wrapped(self, interaction, *args, **kwargs):
+        if not await self.interaction_check(interaction):
+            return None
+        await _defer(interaction)
+        try:
+            with get_runtime().journey(expiry=getattr(self, "_timeout_expiry", None)):
+                return await function(self, interaction, *args, **kwargs)
+        except (PersonalStatsUnavailable, TimeoutError):
+            await _private_message(
+                interaction, "Personal Stats is busy or unavailable. Please try later."
+            )
+
+    return wrapped
+
+
+def _observed_entry(function):
+    @wraps(function)
+    async def wrapped(interaction, *, expires_at=None, **kwargs):
+        if int(getattr(getattr(interaction, "user", None), "id", -1)) != int(kwargs["author_id"]):
+            await _private_message(interaction, "This private Stats report is not for you.")
+            return None
+        await _defer(interaction, ephemeral=kwargs.get("entry_route") == "command")
+        try:
+            with get_runtime().journey(expiry=expires_at):
+                return await function(interaction, **kwargs)
+        except PersonalStatsAccessChanged:
+            await _private_message(
+                interaction, "Your linked-governor access changed. Run /me stats to refresh."
+            )
+        except (PersonalStatsUnavailable, TimeoutError):
+            await _private_message(
+                interaction,
+                "Personal Stats is busy or unavailable. Work may still be finishing; please try later.",
+            )
+
+    return wrapped
 
 
 def _close_files(files: list[discord.File] | None) -> None:
@@ -619,6 +658,10 @@ class PersonalStatsView(discord.ui.View):
             if not self._is_current(generation):
                 _emit({"event": "me_stats_transition", "stale_suppressed": True})
                 return False, 0.0
+            await assert_personal_stats_access(payload)
+            get_runtime().check()
+            if not self._is_current(generation) or int(interaction.user.id) != self.author_id:
+                return False, 0.0
             old_payload, old_mode, old_period = self.payload, self.mode, self.period
             self.payload, self.mode, self.period = payload, mode, payload.period
             self._build_controls()
@@ -646,10 +689,12 @@ class PersonalStatsView(discord.ui.View):
                         view=self,
                         attachments=[],
                     )
-            except Exception:
+            except BaseException:
+                get_runtime().delivery("unknown")
                 self.payload, self.mode, self.period = old_payload, old_mode, old_period
                 self._build_controls()
                 raise
+            get_runtime().delivery("confirmed")
             delivery_ms = round((time.perf_counter() - delivery_started) * 1000, 1)
             if not self._is_current(generation):
                 _emit({"event": "me_stats_transition", "stale_suppressed": True})
@@ -715,6 +760,7 @@ class PersonalStatsView(discord.ui.View):
         finally:
             _close_files(files)
 
+    @_observed_action
     async def change_mode(self, interaction: discord.Interaction, mode: StatsMode) -> None:
         generation = self._begin_transition()
         await _defer(interaction)
@@ -735,6 +781,7 @@ class PersonalStatsView(discord.ui.View):
                     "That Stats mode could not be opened. Your last report is unchanged.",
                 )
 
+    @_observed_action
     async def change_period(self, interaction: discord.Interaction, period: StatsPeriod) -> None:
         generation = self._begin_transition()
         await _defer(interaction)
@@ -774,6 +821,7 @@ class PersonalStatsView(discord.ui.View):
                     interaction, "That period could not be loaded. Your last report is unchanged."
                 )
 
+    @_observed_action
     async def change_scope(self, interaction: discord.Interaction, token: str) -> None:
         if token not in self._token_map:
             await _private_message(
@@ -816,23 +864,28 @@ class PersonalStatsView(discord.ui.View):
                     "That Stats scope could not be loaded. Your last report is unchanged.",
                 )
 
+    @_observed_action
     async def change_scope_page(self, interaction: discord.Interaction, delta: int) -> None:
         generation = self._begin_transition()
         pages = max(1, ceil(len(self.payload.governor_options) / _GOVERNOR_PAGE_SIZE))
         next_page = min(max(0, self.scope_page + delta), pages - 1)
         try:
             async with self._delivery_lock:
+                await assert_personal_stats_access(self.payload)
+                get_runtime().check()
                 if not self._is_current(generation):
                     return
                 old_page = self.scope_page
                 self.scope_page = next_page
                 self._build_controls()
                 try:
-                    await interaction.response.edit_message(view=self)
-                except Exception:
+                    await interaction.edit_original_response(view=self)
+                except BaseException:
+                    get_runtime().delivery("unknown")
                     self.scope_page = old_page
                     self._build_controls()
                     raise
+                get_runtime().delivery("confirmed")
         except Exception:
             logger.debug("personal_stats_scope_page_failed", exc_info=True)
             if self._is_current(generation):
@@ -980,17 +1033,6 @@ async def _initial_delivery(
                     description=_attachment_description(payload, StatsMode.OVERVIEW),
                 )
             ]
-            render_ms = round((time.perf_counter() - render_started) * 1000, 1)
-            delivery_started = time.perf_counter()
-            if can_edit is not None and not can_edit():
-                return None
-            edited = await target.edit_original_response(
-                content=None,
-                embed=None,
-                view=view,
-                attachments=[],
-                files=files,
-            )
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -998,17 +1040,33 @@ async def _initial_delivery(
                 render_ms = round((time.perf_counter() - render_started) * 1000, 1)
             _close_files(files)
             files = []
-            fallback_reason = "render_or_attachment_failed"
+            fallback_reason = "render_failed"
             logger.exception("personal_stats_initial_render_failed")
-            delivery_started = time.perf_counter()
-            if can_edit is not None and not can_edit():
-                return None
+        render_ms = round((time.perf_counter() - render_started) * 1000, 1)
+        embed = (
+            build_personal_stats_fallback_embed(payload, mode=StatsMode.OVERVIEW)
+            if not files
+            else None
+        )
+        await assert_personal_stats_access(payload)
+        get_runtime().check()
+        if can_edit is not None and not can_edit():
+            return None
+        if int(getattr(getattr(target, "user", None), "id", -1)) != author_id:
+            return None
+        delivery_started = time.perf_counter()
+        try:
             edited = await target.edit_original_response(
                 content=None,
-                embed=build_personal_stats_fallback_embed(payload, mode=StatsMode.OVERVIEW),
+                embed=embed,
                 view=view,
                 attachments=[],
+                files=files,
             )
+        except BaseException:
+            get_runtime().delivery("unknown")
+            raise
+        get_runtime().delivery("confirmed")
         view.set_message_ref(edited)
         view.set_timeout_target(target)
         _emit(
@@ -1034,6 +1092,7 @@ async def _initial_delivery(
         _close_files(files)
 
 
+@_observed_entry
 async def show_personal_stats_for_interaction(
     interaction: discord.Interaction,
     *,
@@ -1116,7 +1175,7 @@ async def show_personal_stats_for_interaction(
         )
         if can_edit is None or can_edit():
             await interaction.edit_original_response(
-                content="Period performance is temporarily unavailable. Please try again shortly.",
+                content="Period performance is temporarily unavailable. Work may still be finishing; please try later.",
                 embed=None,
                 view=None,
                 attachments=[],
@@ -1138,7 +1197,7 @@ async def show_personal_stats_for_interaction(
         )
         if can_edit is None or can_edit():
             await interaction.edit_original_response(
-                content="Period performance is temporarily unavailable. Please try again shortly.",
+                content="Period performance is temporarily unavailable. Work may still be finishing; please try later.",
                 embed=None,
                 view=None,
                 attachments=[],

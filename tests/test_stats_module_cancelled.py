@@ -37,9 +37,9 @@ COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
 
 
 @pytest.mark.asyncio
-async def test_run_sql_procedure_cancelled_propagates(caplog):
+async def test_run_sql_procedure_cancelled_propagates(caplog, monkeypatch):
     """
-    Simulate asyncio.CancelledError in run_sql_procedure by patching stats_module.asyncio.to_thread
+    Simulate asyncio.CancelledError in run_sql_procedure by patching its offload boundary
     to immediately raise CancelledError when awaited.
 
     Asserts:
@@ -50,12 +50,12 @@ async def test_run_sql_procedure_cancelled_propagates(caplog):
     caplog.set_level(logging.INFO, logger="telemetry")
 
     # Backup original to_thread and replace with a fake that raises CancelledError
-    original_to_thread = sm.asyncio.to_thread
+    original_to_thread = sm._offload_callable_py
 
     async def fake_to_thread(fn, *args, **kwargs):
         raise asyncio.CancelledError()
 
-    sm.asyncio.to_thread = fake_to_thread
+    monkeypatch.setattr(sm, "_offload_callable_py", fake_to_thread)
 
     try:
         with pytest.raises(asyncio.CancelledError):
@@ -77,4 +77,4 @@ async def test_run_sql_procedure_cancelled_propagates(caplog):
             assert payload.get("event") != "sql_proc"
     finally:
         # restore original helper
-        sm.asyncio.to_thread = original_to_thread
+        sm._offload_callable_py = original_to_thread

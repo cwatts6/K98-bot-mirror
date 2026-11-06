@@ -88,13 +88,24 @@ def test_unreviewed_or_partial_protocol_bundle_is_refused(transition, damage):
 def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
-    from tests.updater_source_assertions import before_p013_hash, before_p014_hash, before_p015_hash
+    from tests.updater_source_assertions import (
+        before_p013_hash,
+        before_p014_hash,
+        before_p015_hash,
+        before_p016_hash,
+    )
 
     for transition in update.reviewed_transitions():
-        if transition["id"] == "p015_calendar_ownership_v1":
+        if transition["id"] == "p016_personal_stats_ownership_v1":
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"], member["path"]
+            continue
+        if transition["id"] == "p015_calendar_ownership_v1":
+            for member in transition["members"]:
+                assert before_p016_hash(root, member["path"]) == member["after_sha256"], member[
+                    "path"
+                ]
             continue
         if transition["id"] == "p014_upload_outcomes_optional_io_v1":
             for member in transition["members"]:

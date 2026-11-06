@@ -277,8 +277,7 @@ def admin_register_or_replace(
         existing_name = claimed.get("DiscordName") or f"<@{claimed['DiscordUserID']}>"
         existing_slot = claimed.get("AccountType", "?")
         return False, (
-            f"GovernorID `{gid}` is already registered to "
-            f"**{existing_name}** ({existing_slot})."
+            f"GovernorID `{gid}` is already registered to **{existing_name}** ({existing_slot})."
         )
 
     # Check whether the target slot is already active for this user
@@ -352,13 +351,18 @@ def admin_register_or_replace(
 # ---------------------------------------------------------------------------
 
 
-def get_user_accounts(discord_user_id: int) -> dict[str, dict[str, str]]:
+def get_user_accounts(
+    discord_user_id: int, *, sql_outcome=None, query_timeout: int = 9
+) -> dict[str, dict[str, str]]:
     """
     Return all active account slots for a Discord user.
 
     Raises on SQL failure — callers must handle explicitly.
     """
-    rows = registry_dal.get_by_discord_id(int(discord_user_id))
+    options = (
+        {} if sql_outcome is None else dict(sql_outcome=sql_outcome, query_timeout=query_timeout)
+    )
+    rows = registry_dal.get_by_discord_id(int(discord_user_id), **options)
     return {
         r["AccountType"]: {
             "GovernorID": str(r["GovernorID"]),

@@ -47,6 +47,56 @@ class _Connection:
     def close(self):
         self.closed = True
 
+    def rollback(self):
+        return None
+
+
+@pytest.mark.parametrize(
+    "phase", ["cursor", "execute", "fetch", "nextset", "rollback", "cursor_close", "close"]
+)
+def test_independent_read_and_cleanup_faults_preserve_original(monkeypatch, phase):
+    from event_calendar.sql_lifecycle import SqlOutcome
+
+    cursor = _Cursor(_sets())
+    connection = _Connection(cursor)
+    outcome = SqlOutcome()
+    failure = RuntimeError("synthetic original failure")
+
+    def fail(*args, **kwargs):
+        raise failure
+
+    owner, method = {
+        "cursor": (connection, "cursor"),
+        "execute": (cursor, "execute"),
+        "fetch": (cursor, "fetchall"),
+        "nextset": (cursor, "nextset"),
+        "rollback": (connection, "rollback"),
+        "cursor_close": (cursor, "close"),
+        "close": (connection, "close"),
+    }[phase]
+    monkeypatch.setattr(owner, method, fail)
+    monkeypatch.setattr(dal, "get_conn_with_retries", lambda: connection)
+    if phase in {"rollback", "cursor_close"}:
+        result = dal.fetch_personal_stats_daily((111,), sql_outcome=outcome)
+        assert result.rows
+    elif phase == "close":
+        with pytest.raises(RuntimeError, match="cleanup is unconfirmed"):
+            dal.fetch_personal_stats_daily((111,), sql_outcome=outcome)
+        assert outcome.retained_connection is connection
+    else:
+        # Simultaneous cleanup failure must not replace the read failure.
+        monkeypatch.setattr(
+            connection, "close", lambda: (_ for _ in ()).throw(OSError("close failed"))
+        )
+        with pytest.raises(RuntimeError) as caught:
+            dal.fetch_personal_stats_daily((111,), sql_outcome=outcome)
+        assert caught.value is failure
+        assert outcome.error["error_type"] == "RuntimeError"
+        assert outcome.cleanup_error["error_type"] == "OSError"
+    assert outcome.cleanup == (
+        "settled" if phase in {"rollback", "cursor_close"} else "unconfirmed"
+    )
+
 
 def _sets(governor_id: int = 111):
     header_columns = (
@@ -110,7 +160,7 @@ def test_set_based_contract_deduplicates_ids_binds_fixed_shape_and_closes(monkey
     )
     assert dataset.rows[0].power_delta == -50
     assert dataset.rows[0].forts_total == -2
-    assert cursor.timeout == 9
+    assert connection.timeout == 9
     assert cursor.executed is not None
     sql, params = cursor.executed
     assert "dbo.IntList" in sql
@@ -137,7 +187,9 @@ def test_contract_skips_non_row_bearing_result_sets(monkeypatch) -> None:
     assert connection.closed is True
 
 
-@pytest.mark.parametrize("governor_ids", ((), tuple(range(1, 28)), (0,), (-1,)))
+@pytest.mark.parametrize(
+    "governor_ids", ((), tuple(range(1, 28)), (0,), (-1,), (2147483648,), (True,), ("111",))
+)
 def test_contract_rejects_out_of_bounds_governor_sets(governor_ids) -> None:
     with pytest.raises(ValueError):
         dal.fetch_personal_stats_daily(governor_ids)
@@ -153,6 +205,33 @@ def test_contract_rejects_foreign_rows_and_still_closes(monkeypatch) -> None:
 
     assert cursor.closed is True
     assert connection.closed is True
+
+
+@pytest.mark.parametrize("copies", [2, 181])
+def test_duplicate_or_excess_rows_are_rejected_with_confirmed_close(monkeypatch, copies):
+    header, daily = _sets()
+    cursor = _Cursor((header, (daily[0], daily[1] * copies)))
+    connection = _Connection(cursor)
+    monkeypatch.setattr(dal, "get_conn_with_retries", lambda: connection)
+    with pytest.raises(ValueError, match="duplicate or excess"):
+        dal.fetch_personal_stats_daily((111,))
+    assert connection.closed
+
+
+def test_factory_failure_remains_unconfirmed_and_preserves_original(monkeypatch):
+    from event_calendar.sql_lifecycle import SqlOutcome
+
+    outcome = SqlOutcome()
+    failure = OSError("synthetic acquisition failure")
+
+    def fail():
+        raise failure
+
+    monkeypatch.setattr(dal, "get_conn_with_retries", fail)
+    with pytest.raises(OSError) as caught:
+        dal.fetch_personal_stats_daily((111,), sql_outcome=outcome)
+    assert caught.value is failure
+    assert outcome.cleanup == "unconfirmed"
 
 
 def test_header_normalizes_aware_source_refresh_to_utc() -> None:

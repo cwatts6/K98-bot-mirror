@@ -302,13 +302,13 @@ prove current Production behaviour; Production evidence remains an explicit depe
 ### Deferred Optimisation
 - Area: SQL repo `dbo.usp_GetPersonalStatsDaily`, `dbo.KingdomScanData4`, Alliance Activity/Fort sources, and `stats/dal/personal_stats_dal.py`
 - Type: performance
-- Description: Phase 6 deployed one bounded set-based `dbo.usp_GetPersonalStatsDaily` contract for up to 26 deduplicated governors and 180 Stats-anchor days, with source-refresh provenance and bot-side timeouts, bounded concurrency, caching, and inflight deduplication. Functional smoke passed, but the earlier index/cardinality assumptions predate subsequent KingdomScanData4 migrations and no current actual-plan, logical-read, duration, memory-grant, or concurrent 26-account baseline proves that a new covering index is warranted.
-- Suggested Fix: Reconfirm the current procedure and index definitions, then execute single-, multi-, and 26-account sets at 90/180 days with actual plans plus `SET STATISTICS IO, TIME ON`, cold/warm cache, and expected concurrency. Isolate the header freshness aggregate from daily payload cost. Add only the narrowest procedure refinement or supporting index demonstrated by the current hotspot, and retain independent correctness, performance, migration, and rollback evidence.
+- Description: The operator-approved 6 November P01.6 follow-up qualified a local daily-pipeline rewrite plus `IX_KS4_Governor_DayEnd`, preserving the 26-governor/180-day contract. Synthetic 26-governor reads fell from 99,796 to 27,327; same-index matched p95 improved about 17%. The index added about 15.2 MiB for 134,715 rows and about 18% insert latency / 10% log bytes in rolled-back trials. Eight-worker tests proved progress but not higher throughput. Local correctness, migration/rollback, native Bot integration and separate SQL Changes review passed; representative production performance is not certified.
+- Suggested Fix: Carry the reviewed SQL companion through separately authorized PR/promotion, explicitly target its deployment and retain rollback. During an approved representative acceptance window, check real account/data distributions, plans/grants, source-import write overhead, index size and concurrent progress; retain the existing bounds and private authorization contract. Do not add speculative indexes or treat local LPIM mitigation as evidence that production needs the same host policy. See the P01.6 implementation/qualification task pack for exact evidence and limits.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 6 functional contract deployed; current post-August SQL schema/statistics; representative linked Governor IDs; SQL owner-approved measurement window; separate SQL Changes review for any index/procedure follow-up.
-- Status: evidence required — rebaseline
-- Last verified: 2026-08-29
+- Dependencies: SQL branch `codex/p016-personal-stats-read-plan`; Bot P01.6 companion; operator-approved publication/deployment and representative acceptance window; current production statistics and exact target inventory.
+- Status: locally implemented and qualified — publication and representative production acceptance pending
+- Last verified: 2026-11-06
 
 ### Deferred Optimisation
 - Area: `leadership_player_review` DAL/service/cache/render path and SQL leadership procedures

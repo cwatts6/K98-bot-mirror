@@ -1019,6 +1019,7 @@ async def schedule_event_embed_expiry():
 
 # --- Graceful teardown ------------------
 _shutdown_once = asyncio.Event()
+_teardown_task = None
 _QUEUE_SHUTDOWN_DRAIN_SECONDS = 3.0
 _QUEUE_SHUTDOWN_SAVE_SECONDS = 5.0
 
@@ -1073,19 +1074,40 @@ async def _flush_live_queue_state(timeout_seconds: float = _QUEUE_SHUTDOWN_SAVE_
 
 
 async def _graceful_teardown():
-    if _shutdown_once.is_set():
-        return
-    _shutdown_once.set()
+    global _teardown_task
+    from core.owned_work import drain_awaitable
+
+    if _teardown_task is None:
+        _shutdown_once.set()
+        _close_teardown_admission()
+        _teardown_task = asyncio.create_task(_perform_graceful_teardown())
+    return await drain_awaitable(_teardown_task)
+
+
+def _close_teardown_admission():
+    from player_self_service.stats_runtime import current_runtime
+    from services import upload_lifecycle
+
+    get_calendar_service().close_admission()
+    upload_lifecycle.close_admission()
+    stats = current_runtime()
+    if stats is not None:
+        stats.close_admission()
+
+
+async def _perform_graceful_teardown():
+    from player_self_service.stats_runtime import current_runtime
     from services import upload_lifecycle
 
     calendar = get_calendar_service()
-    calendar.close_admission()
-    upload_lifecycle.close_admission()
+    stats = current_runtime()
     calendar_drain = await calendar.drain()
     if not calendar_drain["ok"]:
         logger.error("[SHUTDOWN] Calendar cleanup remains unconfirmed: %s", calendar_drain)
         raise RuntimeError("Calendar physical cleanup is unconfirmed")
     await upload_lifecycle.drain()
+    if stats is not None and not await stats.drain():
+        raise RuntimeError("Personal Stats physical cleanup is unconfirmed")
     await _stop_health_dashboard()
     from event_cache import refresh_service
     from profile_cache import _service as profile_service

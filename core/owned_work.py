@@ -5,6 +5,7 @@ The caller retains its admission/lock until the child actually settles.
 """
 
 import asyncio
+from contextvars import copy_context
 
 from core.operation_evidence import child_scope, emit, optional, worker_result
 from core.operation_timing import clock, elapsed
@@ -49,4 +50,8 @@ async def drain_thread(function, *args, **kwargs):
             optional(elapsed, "worker_execution", started, disposition)
 
     with child_scope():
-        return await drain_awaitable(asyncio.to_thread(run))
+        # A to_thread Task can itself be cancelled by loop-wide shutdown, even
+        # when its parent shields it. Executor Futures are not all_tasks members.
+        context = copy_context()
+        future = asyncio.get_running_loop().run_in_executor(None, context.run, run)
+        return await drain_awaitable(future)

@@ -268,7 +268,11 @@ def soft_delete(
 
 
 def get_by_discord_id(
-    discord_user_id: int, *, status_filter: str = "Active"
+    discord_user_id: int,
+    *,
+    status_filter: str = "Active",
+    sql_outcome=None,
+    query_timeout: int = 9,
 ) -> list[dict[str, Any]]:
     """
     Return all registrations for a Discord user via sp_Registry_GetByDiscordID.
@@ -277,6 +281,23 @@ def get_by_discord_id(
     Returning an empty list silently would make SQL unavailability
     indistinguishable from "user has no registrations".
     """
+    if sql_outcome is not None:
+        from event_calendar.sql_lifecycle import SqlSession
+
+        session = SqlSession(_get_conn, read_only=True)
+        session.outcome = sql_outcome
+        sql_outcome.cleanup = "unconfirmed"
+        with session:
+            session.connection.timeout = query_timeout
+            cur = session.cursor()
+            cur.execute(
+                "EXEC [dbo].[sp_Registry_GetByDiscordID] @DiscordUserID = ?, @StatusFilter = ?",
+                (discord_user_id, status_filter),
+            )
+            rows = _rows_to_dicts(cur)
+        if sql_outcome.cleanup != "settled":
+            raise RuntimeError("Registry SQL cleanup is unconfirmed")
+        return rows
     conn = _get_conn()
     try:
         cur = conn.cursor()

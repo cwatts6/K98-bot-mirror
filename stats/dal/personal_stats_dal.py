@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from event_calendar.sql_lifecycle import SqlOutcome, SqlSession
 from file_utils import get_conn_with_retries
 from player_self_service.stats_models import (
     PersonalStatsDailyRow,
@@ -130,9 +131,14 @@ def fetch_personal_stats_daily(
     governor_ids: Iterable[int],
     *,
     history_days: int = 180,
+    sql_outcome: SqlOutcome | None = None,
+    on_data_ready=None,
 ) -> PersonalStatsDataSet:
     """Load one bounded daily dataset for at most 26 distinct Governor IDs."""
-    ids = tuple(dict.fromkeys(int(value) for value in governor_ids if int(value) > 0))
+    values = tuple(governor_ids)
+    if any(type(value) is not int or not 1 <= value <= 2147483647 for value in values):
+        raise ValueError("Personal stats requires positive SQL int governor IDs")
+    ids = tuple(dict.fromkeys(values))
     if not 1 <= len(ids) <= _MAX_GOVERNORS:
         raise ValueError("Personal stats requires between 1 and 26 governor IDs")
     if not 1 <= int(history_days) <= 180:
@@ -143,12 +149,15 @@ def fetch_personal_stats_daily(
         *(None for _ in range(_MAX_GOVERNORS - len(ids))),
         history_days,
     )
-    conn = get_conn_with_retries()
-    cursor = None
-    try:
-        cursor = conn.cursor()
-        if hasattr(cursor, "timeout"):
-            cursor.timeout = _QUERY_TIMEOUT_SECONDS
+    session = SqlSession(get_conn_with_retries, read_only=True)
+    if sql_outcome is not None:
+        session.outcome = sql_outcome
+    # A factory exception does not prove that a partially acquired connection
+    # was closed. Only entering/exiting the session can establish settlement.
+    session.outcome.cleanup = "unconfirmed"
+    with session:
+        session.connection.timeout = _QUERY_TIMEOUT_SECONDS
+        cursor = session.cursor()
         cursor.execute(PERSONAL_STATS_SQL, params)
         header_rows = _next_rows(
             cursor,
@@ -172,16 +181,19 @@ def fetch_personal_stats_daily(
             missing_message="Personal stats SQL did not return its daily result set",
         )
         rows = tuple(_map_daily_row(row, allowed_ids=allowed_ids) for row in daily_rows)
+        if len(rows) > len(ids) * history_days or len(
+            {(row.governor_id, row.as_of_date) for row in rows}
+        ) != len(rows):
+            raise ValueError("Personal stats SQL returned duplicate or excess rows")
         if header.window_start_date is not None and header.window_end_date is not None:
             if any(
                 not header.window_start_date <= row.as_of_date <= header.window_end_date
                 for row in rows
             ):
                 raise ValueError("Personal stats SQL returned an out-of-window source row")
-        return PersonalStatsDataSet(header=header, rows=rows)
-    finally:
-        try:
-            if cursor is not None:
-                cursor.close()
-        finally:
-            conn.close()
+        dataset = PersonalStatsDataSet(header=header, rows=rows)
+        if on_data_ready is not None:
+            on_data_ready()
+    if session.outcome.cleanup != "settled":
+        raise RuntimeError("Personal stats SQL cleanup is unconfirmed")
+    return dataset

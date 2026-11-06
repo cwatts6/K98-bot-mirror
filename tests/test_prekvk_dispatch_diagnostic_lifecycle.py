@@ -71,7 +71,7 @@ def test_teardown_drains_diagnostics_before_other_teardown():
     teardown = next(
         node
         for node in ast.walk(tree)
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_graceful_teardown"
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_perform_graceful_teardown"
     )
     source = ast.unparse(teardown)
     assert source.index("await prekvk_diagnostic_runner.shutdown()") < source.index(
@@ -86,7 +86,7 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
     teardown = next(
         node
         for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_graceful_teardown"
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_perform_graceful_teardown"
     )
     diagnostic = SimpleNamespace(
         runner=SimpleNamespace(
@@ -104,6 +104,8 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
     uploads = SimpleNamespace(close_admission=Mock(), drain=AsyncMock())
 
     def controlled_import(name, *args, **kwargs):
+        if name == "player_self_service.stats_runtime":
+            return SimpleNamespace(current_runtime=lambda: None)
         if name == "services" and "upload_lifecycle" in (args[2] if len(args) > 2 else ()):
             return SimpleNamespace(upload_lifecycle=uploads)
         if name == "stats_alerts.diagnostics":
@@ -144,10 +146,8 @@ async def test_diagnostic_failure_does_not_skip_remaining_teardown(failure):
     exec(
         compile(ast.Module(body=[teardown], type_ignores=[]), "bot_instance.py", "exec"), namespace
     )
-    await namespace["_graceful_teardown"]()
-    calendar.close_admission.assert_called_once()
+    await namespace["_perform_graceful_teardown"]()
     calendar.drain.assert_awaited_once()
-    uploads.close_admission.assert_called_once()
     uploads.drain.assert_awaited_once()
     namespace["_stop_health_dashboard"].assert_awaited_once()
     cache_owner.close_admission.assert_called_once()

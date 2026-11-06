@@ -22,6 +22,49 @@ from ui.views.health_view import HealthView, build_health_embed
 NOW = datetime(2026, 11, 4, 21, 0, tzinfo=UTC)
 
 
+@pytest.mark.parametrize(
+    "reason,sql_owned,render_owned,expected",
+    [
+        (None, 0, 0, "Capacity available"),
+        (None, 8, 0, "Busy"),
+        (None, 0, 2, "Busy"),
+        ("shutdown", 1, 0, "Shutting down"),
+        ("cleanup_uncertain", 1, 0, "Cleanup uncertain"),
+    ],
+)
+def test_personal_stats_health_uses_only_loaded_snapshot(
+    monkeypatch, reason, sql_owned, render_owned, expected
+):
+    snapshot = dict(
+        observed=True,
+        admission_closed=reason is not None,
+        reason=reason,
+        cleanup_uncertain=reason == "cleanup_uncertain",
+        sql_owned=sql_owned,
+        render_owned=render_owned,
+        observers=0,
+        captured_utc=NOW.isoformat(),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "player_self_service.stats_runtime",
+        SimpleNamespace(snapshot=lambda: snapshot, get_runtime=forbidden),
+    )
+    projected = status.snapshot(now_utc=NOW)
+    row = projected["components"]["personal_stats"]
+    assert row["outcome"] != "success"  # local capacity cannot certify database health
+    embed = build_health_embed(projected)
+    field = next(field for field in embed.fields if field.name == "Personal Stats")
+    assert expected in field.value and "SQL owned:" in field.value
+
+
+def test_personal_stats_health_does_not_initialize_missing_runtime(monkeypatch):
+    monkeypatch.delitem(sys.modules, "player_self_service.stats_runtime", raising=False)
+    projected = status.snapshot(now_utc=NOW)
+    assert projected["components"]["personal_stats"]["outcome"] == "unknown"
+    assert "player_self_service.stats_runtime" not in sys.modules
+
+
 def bot_functions(*names, **namespace):
     tree = ast.parse(Path("bot_instance.py").read_text(encoding="utf-8"))
     nodes = [node for node in tree.body if getattr(node, "name", None) in names]

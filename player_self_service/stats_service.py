@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from functools import wraps
 import logging
 import time
 from typing import Any
 
+from event_calendar.sql_lifecycle import error_facts
 from file_utils import emit_telemetry_event
 from player_self_service.stats_models import (
     PersonalStatsAccessChanged,
@@ -29,9 +30,11 @@ from player_self_service.stats_models import (
     StatsScopeType,
     StatsWindow,
 )
+from player_self_service.stats_runtime import get_runtime
 from services.governor_account_service import (
     AccountResolutionSummary,
     get_account_summary_for_user,
+    get_account_summary_for_user_sync,
 )
 from stats.dal import personal_stats_dal
 
@@ -43,38 +46,13 @@ DataLoader = Callable[..., PersonalStatsDataSet]
 _CACHE_TTL_SECONDS = 30.0
 _CACHE_MAX_ENTRIES = 32
 _DATA_TIMEOUT_SECONDS = 9.0
-_DATA_SEMAPHORE = asyncio.Semaphore(8)
-_CACHE_LOCK = asyncio.Lock()
 
 
 @dataclass(slots=True)
 class _CacheEntry:
     expires_at: float
     dataset: PersonalStatsDataSet
-
-
-_CACHE: OrderedDict[tuple[int, tuple[int, ...]], _CacheEntry] = OrderedDict()
-_INFLIGHT: dict[tuple[int, tuple[int, ...]], asyncio.Task[PersonalStatsDataSet]] = {}
-
-
-async def _remove_finished_inflight(
-    key: tuple[int, tuple[int, ...]],
-    task: asyncio.Task[PersonalStatsDataSet],
-) -> None:
-    async with _CACHE_LOCK:
-        if _INFLIGHT.get(key) is task:
-            _INFLIGHT.pop(key, None)
-
-
-def _schedule_inflight_cleanup(
-    key: tuple[int, tuple[int, ...]],
-    task: asyncio.Task[PersonalStatsDataSet],
-) -> None:
-    try:
-        task.exception()
-    except asyncio.CancelledError:
-        pass
-    asyncio.create_task(_remove_finished_inflight(key, task))
+    fingerprint: tuple
 
 
 def stats_window(period: StatsPeriod, anchor: date) -> StatsWindow:
@@ -131,11 +109,23 @@ async def _load_registry(
     account_loader: AccountLoader,
 ) -> AccountResolutionSummary:
     try:
-        summary = await account_loader(int(discord_user_id))
+        if account_loader is get_account_summary_for_user:
+            runtime = get_runtime()
+            run = runtime.submit(
+                "registry",
+                lambda run: get_account_summary_for_user_sync(
+                    int(discord_user_id),
+                    sql_outcome=run.outcome,
+                ),
+            )
+            summary = await runtime.observe(run, runtime.deadline(_DATA_TIMEOUT_SECONDS))
+        else:
+            # Explicit injected async adapter; production uses the strict worker above.
+            summary = await account_loader(int(discord_user_id))
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        logger.exception("personal_stats_registry_read_failed user_id=%s", discord_user_id)
+        logger.warning("personal_stats_registry_read_failed facts=%s", error_facts(exc))
         raise PersonalStatsUnavailable("The account registry is temporarily unavailable") from exc
     if not summary.ok:
         logger.warning("personal_stats_registry_unavailable user_id=%s", discord_user_id)
@@ -143,56 +133,83 @@ async def _load_registry(
     return summary
 
 
-async def _fetch_dataset(
-    governor_ids: tuple[int, ...],
-    data_loader: DataLoader,
-) -> PersonalStatsDataSet:
-    async with _DATA_SEMAPHORE:
-        return await asyncio.wait_for(
-            asyncio.to_thread(data_loader, governor_ids, history_days=180),
-            timeout=_DATA_TIMEOUT_SECONDS,
-        )
-
-
 async def _authorized_dataset(
     discord_user_id: int,
     governor_ids: tuple[int, ...],
     data_loader: DataLoader,
+    fingerprint: tuple,
 ) -> tuple[PersonalStatsDataSet, bool]:
+    runtime = get_runtime()
+    runtime.check()
     key = (int(discord_user_id), tuple(sorted(governor_ids)))
     now = time.monotonic()
-    async with _CACHE_LOCK:
-        entry = _CACHE.get(key)
-        if entry is not None and entry.expires_at > now:
-            _CACHE.move_to_end(key)
+    entry = runtime.cache.get(key)
+    if entry is not None:
+        if entry.fingerprint != fingerprint:
+            runtime.invalidate(discord_user_id)
+        elif entry.expires_at > now:
+            runtime.cache.move_to_end(key)
             return entry.dataset, True
-        if entry is not None:
-            _CACHE.pop(key, None)
-        task = _INFLIGHT.get(key)
-        if task is None:
-            task = asyncio.create_task(_fetch_dataset(governor_ids, data_loader))
-            _INFLIGHT[key] = task
-            task.add_done_callback(
-                lambda completed, cache_key=key: _schedule_inflight_cleanup(cache_key, completed)
-            )
+        else:
+            runtime.cache.pop(key, None)
 
-    try:
-        dataset = await asyncio.shield(task)
-    finally:
-        if task.done():
-            async with _CACHE_LOCK:
-                if _INFLIGHT.get(key) is task:
-                    _INFLIGHT.pop(key, None)
+    def load(run):
+        options = {}
+        if data_loader is personal_stats_dal.fetch_personal_stats_daily:
+            options = dict(sql_outcome=run.outcome, on_data_ready=run.data_ready)
+        return data_loader(governor_ids, history_days=180, **options)
 
-    async with _CACHE_LOCK:
-        _CACHE[key] = _CacheEntry(
-            expires_at=time.monotonic() + _CACHE_TTL_SECONDS,
-            dataset=dataset,
-        )
-        _CACHE.move_to_end(key)
-        while len(_CACHE) > _CACHE_MAX_ENTRIES:
-            _CACHE.popitem(last=False)
+    def publish(run):
+        expires_at = run.ready_at + _CACHE_TTL_SECONDS
+        if runtime.closed or not run.valid or run.epoch != runtime.epoch:
+            run.cache = "invalidated"
+            return
+        if expires_at <= time.monotonic():
+            run.cache = "expired"
+            return
+        runtime.cache[key] = _CacheEntry(expires_at, run.result, fingerprint)
+        runtime.cache.move_to_end(key)
+        while len(runtime.cache) > _CACHE_MAX_ENTRIES:
+            runtime.cache.popitem(last=False)
+        run.cache = "published"
+
+    run = runtime.submit("dataset", load, key=key, publish=publish)
+    if not run.valid:
+        raise PersonalStatsAccessChanged("Linked governor access changed")
+    dataset = await runtime.observe(run, runtime.deadline(_DATA_TIMEOUT_SECONDS))
     return dataset, False
+
+
+def _owned_payload(function):
+    @wraps(function)
+    async def wrapped(*args, **kwargs):
+        runtime = get_runtime()
+        with runtime.journey():
+            try:
+                async with asyncio.timeout_at(runtime.deadline(_DATA_TIMEOUT_SECONDS)):
+                    return await function(*args, **kwargs)
+            except TimeoutError as exc:
+                raise PersonalStatsUnavailable(
+                    "The report deadline expired; work may still be finishing"
+                ) from exc
+
+    return wrapped
+
+
+async def assert_personal_stats_access(payload, *, account_loader=get_account_summary_for_user):
+    """Fresh access at dispatch; never treats cached data as authorization."""
+    runtime = get_runtime()
+    with runtime.journey():
+        try:
+            async with asyncio.timeout_at(runtime.deadline(2.0)):
+                summary = await _load_registry(payload.discord_user_id, account_loader)
+        except TimeoutError as exc:
+            raise PersonalStatsUnavailable("Current account access could not be confirmed") from exc
+        if _fingerprint(summary) != payload.registry_fingerprint or not set(
+            payload.scope_governor_ids
+        ).issubset(summary.governor_ids):
+            runtime.invalidate(payload.discord_user_id)
+            raise PersonalStatsAccessChanged("Linked governor access changed")
 
 
 def _valid_interval(previous: date | None, current: date, window: StatsWindow) -> bool:
@@ -424,6 +441,7 @@ def _emit(event: dict[str, Any]) -> None:
         logger.debug("personal_stats_telemetry_failed", exc_info=True)
 
 
+@_owned_payload
 async def build_personal_stats_payload(
     discord_user_id: int,
     *,
@@ -442,6 +460,7 @@ async def build_personal_stats_payload(
         raise PersonalStatsNoAccounts("No linked governors are available")
     fingerprint = _fingerprint(summary)
     if expected_registry_fingerprint is not None and fingerprint != expected_registry_fingerprint:
+        get_runtime().invalidate(discord_user_id)
         raise PersonalStatsAccessChanged("Linked governor access changed")
 
     authorized_ids = tuple(option.governor_id for option in options)
@@ -463,16 +482,15 @@ async def build_personal_stats_payload(
 
     try:
         dataset, cache_hit = await _authorized_dataset(
-            int(discord_user_id), selected_ids, data_loader
+            int(discord_user_id), selected_ids, data_loader, fingerprint
         )
     except asyncio.CancelledError:
         raise
     except (TimeoutError, ValueError) as exc:
         logger.warning(
-            "personal_stats_data_unavailable user_id=%s governor_count=%s",
-            discord_user_id,
+            "personal_stats_data_unavailable governor_count=%s facts=%s",
             len(selected_ids),
-            exc_info=True,
+            error_facts(exc),
         )
         _emit(
             {
@@ -487,10 +505,10 @@ async def build_personal_stats_payload(
         )
         raise PersonalStatsUnavailable("Period performance is temporarily unavailable") from exc
     except Exception as exc:
-        logger.exception(
-            "personal_stats_data_failed user_id=%s governor_count=%s",
-            discord_user_id,
+        logger.warning(
+            "personal_stats_data_failed governor_count=%s facts=%s",
             len(selected_ids),
+            error_facts(exc),
         )
         _emit(
             {
@@ -507,9 +525,12 @@ async def build_personal_stats_payload(
 
     final_summary = await _load_registry(discord_user_id, account_loader)
     if _fingerprint(final_summary) != fingerprint:
+        get_runtime().invalidate(discord_user_id)
         raise PersonalStatsAccessChanged("Linked governor access changed during the request")
     final_ids = {int(account.governor_id) for account in final_summary.resolved_accounts}
-    if not set(selected_ids).issubset(final_ids):
+    selected_set = frozenset(selected_ids)
+    if not selected_set.issubset(final_ids):
+        get_runtime().invalidate(discord_user_id)
         raise PersonalStatsAccessChanged("Linked governor access changed during the request")
 
     anchor = dataset.header.stats_anchor_date
@@ -519,7 +540,7 @@ async def build_personal_stats_payload(
     if data_refreshed_at_utc is None:
         raise PersonalStatsUnavailable("The Stats source refresh timestamp is unavailable")
     window = stats_window(period, anchor)
-    rows = tuple(row for row in dataset.rows if row.governor_id in set(selected_ids))
+    rows = tuple(row for row in dataset.rows if row.governor_id in selected_set)
     coverage = _coverage(rows, window, selected_ids)
     metrics = _build_metrics(rows, window, selected_ids)
     state = _result_state(coverage, metrics, rows, window, selected_ids)
@@ -558,5 +579,4 @@ async def build_personal_stats_payload(
 
 async def clear_personal_stats_cache() -> None:
     """Test/operational helper for clearing the bounded in-memory cache."""
-    async with _CACHE_LOCK:
-        _CACHE.clear()
+    get_runtime().invalidate()

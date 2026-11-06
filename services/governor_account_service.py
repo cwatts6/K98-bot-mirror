@@ -216,7 +216,16 @@ async def get_account_summary_for_user(discord_user_id: int) -> AccountResolutio
     return summarize_accounts(dict(accounts or {}))
 
 
-def get_account_summary_for_user_sync(discord_user_id: int) -> AccountResolutionSummary:
+def get_account_summary_for_user_sync(
+    discord_user_id: int, *, sql_outcome=None, query_timeout: int = 9
+) -> AccountResolutionSummary:
+    if sql_outcome is not None:
+        # Strict callers preserve the original exception and independent cleanup
+        # receipt; the legacy summary adapter must not flatten either of them.
+        accounts = registry_service.get_user_accounts(
+            int(discord_user_id), sql_outcome=sql_outcome, query_timeout=query_timeout
+        )
+        return summarize_accounts(dict(accounts or {}))
     try:
         accounts = registry_service.get_user_accounts(int(discord_user_id))
     except Exception as exc:

@@ -1,3 +1,5 @@
+> **Archived at E100, 5 November 2026.** Delivered or superseded P01.5 record. Preserve the dated evidence below; earlier next-action/approval statements are historical. Current authority: [P01.5 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md) and [P01.6 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.6%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 # P01.5 local implementation and qualification
 
 **E97, 5 November 2026. Local candidate only.** The operator accepted the additional design thinking and authorized local implementation and qualification. The [design](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Whole%20Solution%20Design%20-%202026-11-05.md) was amended before implementation. This record supersedes E96's pending-approval status without changing its historical evidence.
@@ -59,7 +61,7 @@ Next release work, when authorized: final whole-PR review against an immutable c
 
 P01.4 remains delivered/deployed; its remaining natural acceptance stays in its own register. P01.2b stays closed without feature delivery. P01.6 and P02–P05 retain their existing ownership and sequencing. In particular, P02 keeps F20 file-sharing and F26 connection-fallback review, F09 contention remains separately qualified, and recovery must reconcile unfinished stages without replaying committed work. Use this packet's shared physical/effect evidence contracts and qualification fixtures where they fit later work; do not copy calendar-only policies blindly into other workflows.
 
-Preserve all inherited documentation and all nine archive moves through the [carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md).
+Preserve all inherited documentation and all nine archive moves through the [carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md).
 
 ## E97 final local checkpoint
 

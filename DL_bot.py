@@ -720,25 +720,12 @@ async def _quiesce_background_tasks():
     """
     try:
         from bot_instance import run_graceful_teardown
-
-        await run_graceful_teardown()
-        return
-    except Exception:
-        logger.exception("[SHUTDOWN] bot_instance graceful teardown failed.")
-
-    # Fallback only: keep the previous narrow cleanup if the bot teardown import/path fails.
-    try:
-        from reminder_task_registry import TaskRegistry
-
-        await TaskRegistry.cancel_all(timeout=5)
-    except Exception:
-        logger.debug("[SHUTDOWN] TaskRegistry fallback cancel skipped or failed.", exc_info=True)
-    try:
-        from bot_instance import quiesce_logging
-
-        quiesce_logging()
-    except Exception:
-        logger.debug("[SHUTDOWN] quiesce_logging skipped or failed.", exc_info=True)
+    except ImportError:
+        logger.exception("[SHUTDOWN] Required teardown is unavailable; drain is incomplete.")
+        raise
+    # An entered drain failure must reach the caller. Fallback task cancellation
+    # cannot establish physical settlement or authorize client/process release.
+    await run_graceful_teardown()
 
 
 async def _close_http_clients_if_any():
@@ -764,9 +751,11 @@ async def _graceful_shutdown(exit_code: int = 0, reason: str = "signal"):
     4) close HTTP clients
     5) flush + shutdown logging (last)
     """
+    drained = False
     try:
         await _write_shutdown_markers(exit_code=exit_code, reason=reason)
         await _quiesce_background_tasks()
+        drained = True
         try:
             await asyncio.wait_for(bot.close(), timeout=_SHUTDOWN_TIMEOUT_SECONDS)
         except TimeoutError:
@@ -775,13 +764,13 @@ async def _graceful_shutdown(exit_code: int = 0, reason: str = "signal"):
             logger.exception("[SHUTDOWN] bot.close() raised")
         await _close_http_clients_if_any()
     finally:
-        try:
-            flush_logs()
-        finally:
-            # Close the queue listener & file handles (Commit 1)
-            from logging_setup import shutdown_logging as _shutdown_logging
+        if drained:
+            try:
+                flush_logs()
+            finally:
+                from logging_setup import shutdown_logging as _shutdown_logging
 
-            _shutdown_logging()
+                _shutdown_logging()
 
 
 def _begin_shutdown_from_signal(signum_name: str = "UNKNOWN", exit_code: int = 0):
@@ -877,6 +866,11 @@ if __name__ == "__main__":
         from services import optional_upload_lifecycle
 
         asyncio.run(optional_upload_lifecycle.shutdown())
+        from player_self_service.stats_runtime import current_runtime
+
+        stats = current_runtime()
+        if stats is not None and stats.jobs:
+            raise RuntimeError("Personal Stats cleanup is unconfirmed; process release withheld")
         # Release only after physical optional I/O settlement on every exit path.
         try:
             # Only clear the PID file if it still points to *this* process

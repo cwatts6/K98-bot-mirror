@@ -193,8 +193,7 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
                 f"Ark won: {_format_number(honours.ark_won)}",
                 f"Ark win ratio: {_safe_text(honours.ark_win_ratio_label)}",
                 f"Times Named Autarch: {_format_number(history.times_named_autarch)}",
-                "Times Autarch Participated: "
-                f"{_format_number(history.times_autarch_participated)}",
+                f"Times Autarch Participated: {_format_number(history.times_autarch_participated)}",
             )
         ),
         inline=False,
@@ -728,6 +727,8 @@ class GovernorDashboardView(discord.ui.View):
                     display_name=self.display_name,
                     governor_id=context.selected_governor_id if context is not None else None,
                     entry_route="dashboard",
+                    can_edit=lambda: self._transition_is_current(interaction),
+                    expires_at=time.monotonic() + self._transition_timeout_remaining(),
                 ),
                 timeout=self._transition_timeout_remaining(),
             )

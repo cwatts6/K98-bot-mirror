@@ -1,3 +1,5 @@
+> **E100:** P01.5 is deployed and closed for its agreed scope; [closeout and acceptance limits](../task_packs/archive/Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md). P01.6 read-worker review is next. Earlier candidate-only statements below are dated history, not current deployment instructions.
+
 # Events And DM Reminders
 
 Purpose: describe the current reminder systems and where to look when changing reminder,

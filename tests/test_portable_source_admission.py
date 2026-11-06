@@ -40,7 +40,7 @@ def synthetic(monkeypatch):
 def test_exact_reviewed_family_and_prior_history():
     items = updater.reviewed_transitions()
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-    assert len(items) == 65
+    assert len(items) == 66
     assert (
         updater.sha256(canonical(items[:52]))
         == "cf3ae28f7d563acaad9106bbfd6cc60402d9d267522e9654963a8ab1adb1164b"

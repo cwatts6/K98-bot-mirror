@@ -1,3 +1,5 @@
+> **Archived at E100, 5 November 2026.** Delivered or superseded P01.5 record. Preserve the dated evidence below; earlier next-action/approval statements are historical. Current authority: [P01.5 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md) and [P01.6 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.6%20Handover%20and%20Scope%20-%202026-11-05.md).
+
 # P01.5 calendar ownership and outcomes: whole-solution design
 
 > **E97 local implementation amendment, 5 November 2026:** The operator accepted the additional design thinking and asked to begin local implementation and qualification. The following requirements refine E96 before coding. Local implementation/qualification proceeds; publication, merge, production promotion/deployment/restart, live provider/Discord calls and incident repair remain outside this work.
@@ -10,7 +12,7 @@
 
 **E96 historical review baseline, 5 November 2026; E97 authorizes local implementation and qualification.** This packet covers F23/F24/F25 together. It proposes Bot changes and local qualification, not publication, merge, deployment, restart, live provider calls or incident repair. No runtime, test-suite, configuration or SQL source was changed during this review.
 
-Read with the [handover](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md), [P01 design](Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md), [tracker](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md), [carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md) and [P01.4 natural acceptance](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md).
+Read with the [handover](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md), [P01 design](../Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md), [tracker](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md), [carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md) and [P01.4 natural acceptance](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md).
 
 ## Scope summary and recommendation
 

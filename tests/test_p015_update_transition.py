@@ -7,11 +7,12 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_p016_hash
 
 
 def test_all_64_historical_transitions_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 65
+    assert len(entries) == 66
     assert (
         hashlib.sha256(json.dumps(entries[:64], sort_keys=True).encode()).hexdigest()
         == "a5807e2a3f3e7e2eade256b4118630c78887b74bd3584d245ce0e286fda9c763"
@@ -28,7 +29,8 @@ def pair(monkeypatch):
     for member in transition["members"]:
         path = member["path"]
         after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert hashlib.sha256(after[path]).hexdigest() == member["after_sha256"], path
+        assert before_p016_hash(root, path) == member["after_sha256"], path
+        known[after[path]] = member["after_sha256"]
         if member["before_sha256"] == member["after_sha256"]:
             before[path] = after[path]
         elif member["before_sha256"] is None:

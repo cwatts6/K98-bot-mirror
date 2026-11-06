@@ -66,10 +66,13 @@ find a different blocker even when filesystem repair succeeded.
 
 ## Provider stream preflight
 
-An earlier preparation does not reserve a quiet interval. Health dashboard updates
-and manual bot-status checks can start Google Sheets probes, and their work can
-continue after the UI deadline. Use bounded SQL-only observations for the exact
-account/stream/preparation to diagnose this gate; do not repeatedly refresh health.
+An earlier preparation does not reserve a quiet interval. Before P01.3, health
+dashboard/manual status paths could start provider probes whose work outlived a UI
+deadline. That is historical behavior: the delivered passive status/Refresh paths
+reread retained evidence and do not initiate provider probes. Other legitimate
+provider work can still overlap preparation. Use only authorized bounded SQL-only
+observations of the exact account/stream/preparation when diagnosis is needed;
+unknown passive status does not authorize a new provider check.
 
 Observe closure/completion before recommending retry. An open session is not an
 open stream. Healthy monitoring or zero unresolved incidents does not certify
@@ -89,3 +92,32 @@ production receipts. Keep fixtures outside live source/runtime data. Test exampl
 with Git absent from PATH. In PowerShell 5.1, assign foreach output before piping
 it. Errors should identify stage/path, observed versus required owner/access/
 attributes and a bounded next action without exposing secrets.
+
+## Per-release custody readiness gate (P01.5 lesson, E100)
+
+Before describing a candidate as host-ready or handing over an install sequence,
+derive the affected source paths from the exact predecessor/target release delta.
+Inventory every existing ancestor/directory on the actual bot host, including
+documentation and archive paths. Record owner SID, DACL/inheritance, attributes,
+reparse status and the applicable file inventory/hash/link/stream checks, with
+host, identity/elevation, time and installed updater/source bindings. Missing host
+evidence means readiness is pending; a historical repair or clean Git tree is not
+substitute evidence. Keep this bounded read-only inventory separate from normal
+PrepareOnly, which can create packages and establish supported fresh-file custody.
+
+At P01.5, docs/calendar retained application ownership although its application
+ACE was read/execute. Ownership grants separate DACL authority; a parent's owner
+does not propagate to existing children. The updater correctly refused the
+directory, but the handoff had omitted this fresh ancestor check despite prior
+documented lessons. Do not infer which earlier operation caused it without evidence.
+
+The approved repair matched twelve predecessor files, created final-ACL protected
+copies, retained originals and resumable receipts, and verified bytes/permissions
+before the operator resumed normal deployment. No blanket takeown/icacls or in-place
+owner adoption is the remedy. Prior handles belong to old objects and must not
+gain authority over replacements. Preserve allowed metadata by object role.
+
+Record four distinct gates: source qualification; actual host custody readiness;
+installed release/startup; observed feature acceptance. Explicitly carry unresolved
+limits to their owner. These instructions add a handoff requirement, not a claim
+that an automated host-inventory feature has been implemented.

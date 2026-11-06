@@ -1,4 +1,4 @@
-> **Archived 5 November 2026.** Completed or superseded delivery record; dated holds and pending statements below are historical. Current outcome: [P01.4 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Closeout%20-%202026-11-05.md); remaining checks: [natural acceptance](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md); next work: [P01.5 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md).
+> **Archived 5 November 2026.** Completed or superseded delivery record; dated holds and pending statements below are historical. Current outcome: [P01.4 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.4%20Closeout%20-%202026-11-05.md); remaining checks: [natural acceptance](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md); next work: [P01.5 handover](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md).
 
 # P01.4 adoption decision
 

@@ -16,6 +16,7 @@ _LABELS = {
     "recovery": "Recovery monitor",
     "events": "Event delivery",
     "startup": "Startup activity",
+    "personal_stats": "Personal Stats",
 }
 _REASONS = {
     "not_observed": "No observation yet",
@@ -130,6 +131,16 @@ def build_health_embed(projection, *, local=None):
             )
         else:
             value = _line(row)
+        if key == "personal_stats":
+            value = {
+                "stats_cleanup_uncertain": "Cleanup uncertain; new Stats requests unavailable. Inspect the diagnostic report.",
+                "stats_shutdown": "Shutting down; new Stats requests unavailable.",
+                "stats_busy": "Busy; new Stats requests may be refused.",
+                "stats_available": "Capacity available; this is not a SQL health check.",
+            }.get(row.get("reason"), "Not yet observed; no check was started.")
+            if row.get("reason", "").startswith("stats_"):
+                value += f"\nSQL owned: {row['sql_owned']}/8 · Rendering: {row['render_owned']}/2 · Requests: {row['observers']}/32"
+                value += f"\nLocal snapshot: {row.get('observed_utc', 'unknown')}"
         if key == "recovery":
             channel_id = local.get("notify_channel_id")
             route = f" in <#{channel_id}>" if type(channel_id) is int and channel_id > 0 else ""

@@ -1,3 +1,5 @@
+> **E100:** P01.5 is deployed and closed for its agreed scope; [closeout and acceptance limits](../task_packs/archive/Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md). P01.6 read-worker review is next. Earlier candidate-only statements below are dated history, not current deployment instructions.
+
 # Shutdown Runbook
 
 ## P03a.2 saved-response settlement — implementation contract
@@ -341,3 +343,10 @@ A durable attempt precedes provider mutation. Interrupted/ambiguous attempts ret
 ## P01.5 calendar drain (local candidate)
 
 Graceful teardown closes calendar business and audit admission before its first await, alongside upload admission. Calendar drain retains the entered worker through cancellation, stops later business stages and joins any accepted optional audit. Unconfirmed database close prevents a successful drain and retains the local connection/error evidence. Do not infer settlement from elapsed time, an absent audit row or a completed observer; there is no timed release or repair command.
+
+
+## P01.6 personal Stats drain (local candidate)
+
+Personal Stats closes admission before teardown's first await. Its SQL/registry and renderer reservations survive UI timeout and cancellation until physical cleanup settles. Repeated graceful-teardown callers await the same task and observe the same failure; a failed drain is not converted into successful client/logging/process release. Installed Pycord global cancellation is covered by a native-thread subprocess test.
+
+If cleanup is unconfirmed, preserve the owner and diagnostic evidence. Do not force-release a reservation, automatically retry a statement or use cache/diagnostic state as restart continuation authority. The passive Personal Stats Health line distinguishes busy, shutdown and cleanup uncertainty; it does not probe SQL. The local implementation receipt records qualification and remaining release gates.

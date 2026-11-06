@@ -1,3 +1,5 @@
+> **Release custody gate (E100, 5 November 2026):** Before host-ready handoff, obtain a fresh bounded inventory of the exact release paths and all existing ancestors, including docs/archive directories. Check actual owner/ACL/inheritance/attributes and applicable file/link/stream/hash facts against installed policy. Historical repairs and clean Git status are not proof. Keep source qualification, host readiness, deployment and feature acceptance separate. See [Windows ownership and access contract](Windows%20ownership%20and%20access%20contract.md#per-release-custody-readiness-gate-p015-lesson-e100). P01.3 status is passive; do not start provider probes to make an unknown health field green.
+
 # K98 promotion and deployment — operator runbook
 
 For the local MGE finalisation release, use the [qualification packet](../task_packs/P1%20MGE%20Finalisation%20-%20Native%20SQL%20and%20Updater%20Qualification%20Packet%20-%202026-10-29.md).

@@ -39,10 +39,36 @@ def snapshot(now_utc=None, now_monotonic=None):
         ("recovery", "services.recovery_health", "health_snapshot"),
         ("events", "services.event_delivery_service", "health_snapshot"),
         ("startup", "core.startup_diagnostics", "health_snapshot"),
+        ("personal_stats", "player_self_service.stats_runtime", "snapshot"),
     ):
         try:
             value = _loaded(module, method)
-            if key in {"sql", "sheets"} and type(value) is tuple and len(value) == 3:
+            if key == "personal_stats" and type(value) is dict and value.get("observed"):
+                uncertain = value.get("cleanup_uncertain") is True
+                closed = value.get("admission_closed") is True
+                busy = (
+                    value.get("sql_owned", 0) >= 8
+                    or value.get("render_owned", 0) >= 2
+                    or value.get("observers", 0) >= 32
+                )
+                row = dict(
+                    outcome="failure" if uncertain else "unknown",
+                    reason=(
+                        "stats_cleanup_uncertain"
+                        if uncertain
+                        else (
+                            "stats_shutdown"
+                            if closed
+                            else "stats_busy" if busy else "stats_available"
+                        )
+                    ),
+                    observed_utc=value.get("captured_utc"),
+                    age_seconds=0,
+                    sql_owned=value.get("sql_owned", 0),
+                    render_owned=value.get("render_owned", 0),
+                    observers=value.get("observers", 0),
+                )
+            elif key in {"sql", "sheets"} and type(value) is tuple and len(value) == 3:
                 current, latest, failure = value
                 row = current.project(now, now_monotonic=mono)
                 row["last_completion"] = latest.project(now) if latest else None

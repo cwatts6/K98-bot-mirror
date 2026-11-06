@@ -3150,6 +3150,121 @@
           "after_sha256": "aac67e1fd893f188a0798ba741aea9860a5060404b6ee03cf607614334120a4f"
         }
       ]
+    },
+    {
+      "id": "p016_personal_stats_ownership_v1",
+      "members": [
+        {
+          "path": "DL_bot.py",
+          "before_sha256": "d4d64e5d9d70a09419092dea72e48dc7a1c5d027b69cadd76ef83cdb69e9e54f",
+          "after_sha256": "9e4ab26a9da3a6d84e23ff47b59527d07dae0624460c2cfdde65279d77d5915e"
+        },
+        {
+          "path": "bot_instance.py",
+          "before_sha256": "f86b9f1c48b4fe0dc2be41b01622a362e1b78f1a0c7b767244889bfcafaa0a4b",
+          "after_sha256": "fe36275879e2b51634836deeb7a896564b1ff87841998b0ff05d806b94d97c0e"
+        },
+        {
+          "path": "constants.py",
+          "before_sha256": "704f7f046778f54c634543c14979989fdbcd9f099444bbc0b6daf684fedb4e07",
+          "after_sha256": "704f7f046778f54c634543c14979989fdbcd9f099444bbc0b6daf684fedb4e07"
+        },
+        {
+          "path": "core/export_sql_connection.py",
+          "before_sha256": "41a9ed5437a4c0a8ca115696db4f64225bd3baf4f68d7d6add2156307b20373f",
+          "after_sha256": "41a9ed5437a4c0a8ca115696db4f64225bd3baf4f68d7d6add2156307b20373f"
+        },
+        {
+          "path": "core/operation_evidence.py",
+          "before_sha256": "d95e7f6f9031777b73c69611105e483e02580a22aea1705d2d6fd9f0bc52fe5b",
+          "after_sha256": "d95e7f6f9031777b73c69611105e483e02580a22aea1705d2d6fd9f0bc52fe5b"
+        },
+        {
+          "path": "core/operation_timing.py",
+          "before_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52",
+          "after_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52"
+        },
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "ee9371ead0616d762fcffca49e72102fc6ef9c549bc3d14e01d1fb901719e7c7",
+          "after_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f"
+        },
+        {
+          "path": "event_calendar/sql_lifecycle.py",
+          "before_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d",
+          "after_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "7dbb13089315fdf0d214053d68e31f1c098546d17668ca31534d2705894c886f",
+          "after_sha256": "7dbb13089315fdf0d214053d68e31f1c098546d17668ca31534d2705894c886f"
+        },
+        {
+          "path": "player_self_service/stats_models.py",
+          "before_sha256": "90a129e9d22724f24346a234bd32a815371ab10a6816e5576156a4c5f17db32c",
+          "after_sha256": "90a129e9d22724f24346a234bd32a815371ab10a6816e5576156a4c5f17db32c"
+        },
+        {
+          "path": "player_self_service/stats_renderer.py",
+          "before_sha256": "7f3f7cddad1c802c4a04e0c6e61e0884a159057dda8aec8c2e535dd0a6f0e6aa",
+          "after_sha256": "7f3f7cddad1c802c4a04e0c6e61e0884a159057dda8aec8c2e535dd0a6f0e6aa"
+        },
+        {
+          "path": "player_self_service/stats_runtime.py",
+          "before_sha256": null,
+          "after_sha256": "f13e08fc6a6270715bac915259172a2f4b6daafc12c38df95c8fff0fa6330538"
+        },
+        {
+          "path": "player_self_service/stats_service.py",
+          "before_sha256": "0562f13ec5b00dff6dbbf0f0b7767c8eabf623a6307385a62dce5639d83b9508",
+          "after_sha256": "0873ed9626b0d334ba8697425bb761e292c054bb24049f7cf5895357b498c49a"
+        },
+        {
+          "path": "registry/dal/registry_dal.py",
+          "before_sha256": "ecd70ab8f99b154919cd114f770a29aaf2b48193aff30c5f69f34b459d44ae76",
+          "after_sha256": "9927904c005f3e3fdc14acbbc5df79d70bb5c281664e33517594602cd88bce64"
+        },
+        {
+          "path": "registry/registry_service.py",
+          "before_sha256": "f6b48a2ffa8ff5b31295ddedb20c1f981d2569ffd341e034708ca9b91d149b14",
+          "after_sha256": "ac482090db514d6901fd1576903a967e783d6586c8d95d5f3361cb1f1f0649db"
+        },
+        {
+          "path": "services/governor_account_service.py",
+          "before_sha256": "7ebff27d6f7a48b5b2d11dab2a33ad6403567da31dd09ca2ba419cffa570bfa6",
+          "after_sha256": "00c653a5d70888ac8d844d32dae96504fa1b5114bd202e8ea805ffffbffbde8a"
+        },
+        {
+          "path": "services/operator_status_service.py",
+          "before_sha256": "86b19a5112064109f3171d724a9ea76163e0b7e62ed707cdb941ebf4df4466cf",
+          "after_sha256": "1d320b7fccf9e7148c46849f160ecb6b4a16c7e9ddbd454d8643048b9bd554a9"
+        },
+        {
+          "path": "services/recovery_evidence_bundle.py",
+          "before_sha256": "a1dcef9308b858f6871014563ff42be0e77445a23b34d4908af60bded4ae01eb",
+          "after_sha256": "64875470f366749608e22f31e4912b5db420da6ca9dc8a15e0ba386e261b2f26"
+        },
+        {
+          "path": "stats/dal/personal_stats_dal.py",
+          "before_sha256": "2b731e2258ad2aff099443614ed7ff7ee1b6412dc1dfb17bddb3bb474721905f",
+          "after_sha256": "1d91df4f2dffa7b485d0793f3b5a4b16c4f9b9c9609e8da25650abb99c775fb1"
+        },
+        {
+          "path": "ui/views/health_view.py",
+          "before_sha256": "c45bccbff79a2cdfda060d4fb16f702418c6cbd7cf6d957f1ac1f6640aa8ca21",
+          "after_sha256": "44e62284980ee4a0f292ee5b4fd09c95d036b1bf0c1d300d1a652aa1da9ea75b"
+        },
+        {
+          "path": "ui/views/player_self_service_governor_dashboard_views.py",
+          "before_sha256": "b467ba0b1bc1eea1a5e57772ddd773c227a4081c2c1a730308b551760e72e2ed",
+          "after_sha256": "1025ef3778ab60771fe38a1bebcf7f995ccc980318d5b8fad770bd72d34844fa"
+        },
+        {
+          "path": "ui/views/player_self_service_stats_views.py",
+          "before_sha256": "49d7a44fc4e204dbda4e6170a5fc28d8e9f1d0dd0d713a321b6daea47db1cb3c",
+          "after_sha256": "5f644fc9ceca76386d5c9d7ea860c07255fc4b22e68d692bc57c4b4787e63a2d"
+        }
+      ]
     }
   ]
 }

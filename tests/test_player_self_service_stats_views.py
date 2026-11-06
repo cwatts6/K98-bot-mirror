@@ -30,6 +30,18 @@ from ui.views.player_self_service_stats_views import (
 )
 
 
+@pytest.fixture(autouse=True)
+def fresh_access_adapter(monkeypatch):
+    # These UI fixtures inject payloads; they must also inject the new independent
+    # final authority boundary. Adversarial access tests override this adapter.
+    async def allowed(payload):
+        return None
+
+    monkeypatch.setattr(
+        "ui.views.player_self_service_stats_views.assert_personal_stats_access", allowed
+    )
+
+
 def _payload(option_count: int = 1) -> PersonalStatsPayload:
     empty = StatsMetricSummary(None, 0, 3)
     metrics = PersonalStatsMetrics(*((empty,) * 16))
@@ -283,8 +295,8 @@ async def test_author_check_and_forged_or_expired_token_are_private_and_do_not_l
     forged = _Interaction()
     await view.change_scope(forged, "forged-token")
     assert calls == []
-    assert forged.response.messages[-1][1]["ephemeral"] is True
-    assert "expired or invalid" in forged.response.messages[-1][0][0]
+    assert forged.followups[-1][1]["ephemeral"] is True
+    assert "expired or invalid" in forged.followups[-1][0][0]
 
 
 @pytest.mark.asyncio
@@ -327,7 +339,10 @@ async def test_initial_failure_does_not_expose_exception_or_sql_details() -> Non
 
     assert result is None
     content = interaction.original_edits[-1]["content"]
-    assert content == "Period performance is temporarily unavailable. Please try again shortly."
+    assert (
+        content
+        == "Period performance is temporarily unavailable. Work may still be finishing; please try later."
+    )
     assert "RuntimeError" not in content
     assert "SELECT" not in content
 
@@ -501,3 +516,131 @@ async def test_cancelled_render_transitions_remain_bounded_to_two_workers() -> N
         await asyncio.gather(*tasks, return_exceptions=True)
         release.set()
         await asyncio.sleep(0.05)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["image", "fallback", "mode", "picker"])
+async def test_final_access_rejection_never_falls_back_or_edits(monkeypatch, route):
+    from player_self_service.stats_models import PersonalStatsAccessChanged
+    from ui.views import player_self_service_stats_views as views
+
+    async def rejected(payload):
+        raise PersonalStatsAccessChanged("revoked after preparation")
+
+    async def payload_loader(*args, **kwargs):
+        return _payload(26)
+
+    def renderer(*args, **kwargs):
+        if route == "fallback":
+            raise ValueError("image failed")
+        return RenderedStatsCard("fixture.png", b"png")
+
+    monkeypatch.setattr(views, "assert_personal_stats_access", rejected)
+    interaction = _Interaction()
+    if route in {"image", "fallback"}:
+        await views.show_personal_stats_for_interaction(
+            interaction,
+            author_id=42,
+            display_name="Fixture",
+            payload_loader=payload_loader,
+            renderer=renderer,
+            entry_route="command",
+        )
+    else:
+        view = PersonalStatsView(
+            author_id=42,
+            display_name="Fixture",
+            payload=_payload(26),
+            avatar_bytes=None,
+            renderer=renderer,
+        )
+        if route == "mode":
+            await view.change_mode(interaction, StatsMode.COMBAT)
+        else:
+            await view.change_scope_page(interaction, 1)
+        assert view.scope_page == 0
+    assert interaction.original_edits == []
+    assert interaction.response.edits == []
+    assert interaction.followups[-1][1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_image_delivery_is_not_followed_by_fallback():
+    calls = []
+    interaction = _Interaction()
+
+    async def edit(**kwargs):
+        calls.append(kwargs)
+        raise OSError("reply lost after acceptance")
+
+    async def loader(*args, **kwargs):
+        return _payload()
+
+    interaction.edit_original_response = edit
+    with pytest.raises(OSError):
+        await show_personal_stats_for_interaction(
+            interaction,
+            author_id=42,
+            display_name="Fixture",
+            payload_loader=loader,
+            renderer=lambda *a, **k: RenderedStatsCard("fixture.png", b"png"),
+        )
+    assert len(calls) == 1
+    assert calls[0]["files"][0].fp.closed
+
+
+@pytest.mark.asyncio
+async def test_admission_precedes_avatar_and_payload_work(monkeypatch):
+    from player_self_service.stats_runtime import get_runtime
+    from ui.views import player_self_service_stats_views as views
+
+    async def forbidden(*args, **kwargs):
+        pytest.fail("preparation started despite saturated observer admission")
+
+    monkeypatch.setattr(views, "_read_avatar_bytes", forbidden)
+    runtime = get_runtime()
+    # Use separate tasks because nested calls in one journey intentionally reuse its lease.
+    ready = asyncio.Event()
+
+    async def hold():
+        with runtime.journey():
+            await ready.wait()
+
+    holders = [asyncio.create_task(hold()) for _ in range(32)]
+    await asyncio.sleep(0)
+    try:
+        interaction = _Interaction()
+        await show_personal_stats_for_interaction(
+            interaction,
+            author_id=42,
+            display_name="Fixture",
+            payload_loader=forbidden,
+        )
+        assert "busy" in interaction.followups[-1][0][0]
+    finally:
+        ready.set()
+        await asyncio.gather(*holders)
+    assert runtime.observers == 0
+
+
+@pytest.mark.asyncio
+async def test_cancelled_picker_edit_restores_page_and_records_unknown():
+    from player_self_service.stats_runtime import get_runtime
+
+    entered, release = asyncio.Event(), asyncio.Event()
+    interaction = _Interaction()
+
+    async def edit(**kwargs):
+        entered.set()
+        await release.wait()
+
+    interaction.edit_original_response = edit
+    view = PersonalStatsView(
+        author_id=42, display_name="Fixture", payload=_payload(26), avatar_bytes=None
+    )
+    task = asyncio.create_task(view.change_scope_page(interaction, 1))
+    await entered.wait()
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    assert view.scope_page == 0
+    assert get_runtime().terminal[-1]["outcome"] == "unknown"

@@ -225,7 +225,7 @@ def test_graceful_teardown_drains_and_flushes_queue_before_task_monitor_stop():
     src = Path("bot_instance.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
 
-    teardown = _async_function(tree, "_graceful_teardown")
+    teardown = _async_function(tree, "_perform_graceful_teardown")
     task_monitor_stop_line = _task_monitor_stop_line(teardown)
 
     assert _first_call_line(teardown, "_drain_shutdown_queues") < task_monitor_stop_line

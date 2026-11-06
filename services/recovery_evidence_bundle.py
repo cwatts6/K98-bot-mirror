@@ -434,6 +434,7 @@ def collect_components(*, lease=None):
         ("sink", "services.operation_diagnostics", "report"),
         ("admission", "services.cache_admission_diagnostics", "report"),
         ("stats_cache", "services.player_stats_cache_service", "report"),
+        ("personal_stats", "player_self_service.stats_runtime", "snapshot"),
         ("profile_cache", "profile_cache", "get_cache_stats"),
         ("name_cache", "target_utils", "name_outcome_report"),
         ("event_startup", "core.scheduler_lifecycle", "event_startup_report"),
