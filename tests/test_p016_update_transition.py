@@ -1,0 +1,76 @@
+"""Exact personal-stats successor, preserving all prior release transitions."""
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+
+from scripts import prepare_k98_update as updater
+
+
+def test_all_65_historical_transitions_unchanged():
+    entries = updater.reviewed_transitions()
+    assert len(entries) == 66
+    assert hashlib.sha256(json.dumps(entries[:65], sort_keys=True).encode()).hexdigest() == (
+        "a8140a5fcf1324768672ef66770b9c1f44a6652db28caa8ad955d32b92a669ff"
+    )
+
+
+@pytest.fixture
+def pair(monkeypatch):
+    root = Path(__file__).resolve().parents[1]
+    transition = next(
+        t for t in updater.reviewed_transitions() if t["id"] == "p016_personal_stats_ownership_v1"
+    )
+    before, after, known = {}, {}, {}
+    for member in transition["members"]:
+        path = member["path"]
+        after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
+        assert hashlib.sha256(after[path]).hexdigest() == member["after_sha256"], path
+        if member["before_sha256"] == member["after_sha256"]:
+            before[path] = after[path]
+        elif member["before_sha256"] is None:
+            before[path] = None
+        else:
+            before[path] = ("inert predecessor:" + path).encode()
+            known[before[path]] = member["before_sha256"]
+    original = updater.sha256
+    monkeypatch.setattr(updater, "sha256", lambda raw: known.get(raw, original(raw)))
+    return before, after
+
+
+def test_complete_candidate_admitted(pair):
+    before, after = pair
+    read = lambda revision, path: (before if revision == "before" else after).get(path)
+    changed = {p for p in after if before[p] != after[p]}
+    assert set(after) == updater.P016_PERSONAL_STATS_PATHS
+    updater.check_transition_inventory(changed, read, "before", "after")
+    updater.check_source_only(changed, read_blob=read, before="before", target="after")
+
+
+@pytest.mark.parametrize("path", sorted(updater.P016_PERSONAL_STATS_PATHS))
+@pytest.mark.parametrize("damage", ["predecessor", "postimage", "missing"])
+def test_every_member_is_exact(pair, path, damage):
+    before, after = pair
+    changed = {p for p in after if before[p] != after[p]}
+    if damage == "predecessor":
+        before[path] = b"unreviewed predecessor"
+    elif damage == "postimage":
+        after[path] += b"# unreviewed postimage"
+    else:
+        del after[path]
+    read = lambda revision, name: (before if revision == "before" else after).get(name)
+    with pytest.raises(ValueError):
+        updater.check_transition_inventory(changed, read, "before", "after")
+
+
+def test_old_reader_refuses_new_candidate(pair, monkeypatch):
+    before, after = pair
+    installed = [
+        t for t in updater.reviewed_transitions() if t["id"] != "p016_personal_stats_ownership_v1"
+    ]
+    monkeypatch.setattr(updater, "reviewed_transitions", lambda: installed)
+    read = lambda revision, path: (before if revision == "before" else after).get(path)
+    with pytest.raises(ValueError):
+        updater.check_transition_inventory(set(after), read, "before", "after")
