@@ -213,7 +213,8 @@ Check ($statusRecord.import_export.status -ceq 'degraded') 'Status receipt omitt
 Check ($statusRecord.release_id -ceq 'fixture-release') 'Status receipt not release-bound'
 Check (Check-Readiness) 'Repeated verification did not retain matching status'
 [IO.File]::AppendAllText($logPath,"`nExport coordinator unavailable")
-Reject {Check-Readiness} '*Readiness classification changed*'
+Reject {Check-Readiness} '*protected runtime admission failed*'
+Check ($statusRecord.import_export.reason -ceq 'fresh_import_export_health_evidence_unavailable') 'Failed admission overwrote retained readiness evidence'
 # Load only the seed reader; never execute the updater's top-level workflow.
 $seedAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'Update-K98.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Seed reader parse failure'}
