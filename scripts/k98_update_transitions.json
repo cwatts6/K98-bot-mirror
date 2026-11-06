@@ -3162,7 +3162,7 @@
         {
           "path": "bot_instance.py",
           "before_sha256": "f86b9f1c48b4fe0dc2be41b01622a362e1b78f1a0c7b767244889bfcafaa0a4b",
-          "after_sha256": "fe36275879e2b51634836deeb7a896564b1ff87841998b0ff05d806b94d97c0e"
+          "after_sha256": "d17bfbe07124eef3f9d0eb877c0143630815d7edd5ccbadb8a43cf49b463cb18"
         },
         {
           "path": "constants.py",
@@ -3237,7 +3237,7 @@
         {
           "path": "services/operator_status_service.py",
           "before_sha256": "86b19a5112064109f3171d724a9ea76163e0b7e62ed707cdb941ebf4df4466cf",
-          "after_sha256": "1d320b7fccf9e7148c46849f160ecb6b4a16c7e9ddbd454d8643048b9bd554a9"
+          "after_sha256": "19a2accb017858e75d88ed23017a807b723e63ca2cf9ede6bd184660939d3cfa"
         },
         {
           "path": "services/recovery_evidence_bundle.py",

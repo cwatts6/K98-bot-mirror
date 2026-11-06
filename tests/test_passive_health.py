@@ -65,6 +65,17 @@ def test_personal_stats_health_does_not_initialize_missing_runtime(monkeypatch):
     assert "player_self_service.stats_runtime" not in sys.modules
 
 
+def test_personal_stats_loaded_but_uninitialized_is_not_observed(monkeypatch):
+    monkeypatch.setitem(
+        sys.modules,
+        "player_self_service.stats_runtime",
+        SimpleNamespace(snapshot=lambda: dict(observed=False), get_runtime=forbidden),
+    )
+    row = status.snapshot(now_utc=NOW)["components"]["personal_stats"]
+    assert row["reason"] == "not_observed" and row["outcome"] == "unknown"
+    assert row["observed_utc"] is None
+
+
 def bot_functions(*names, **namespace):
     tree = ast.parse(Path("bot_instance.py").read_text(encoding="utf-8"))
     nodes = [node for node in tree.body if getattr(node, "name", None) in names]

@@ -4,10 +4,33 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
+from types import SimpleNamespace
 
 import pytest
 
 from player_self_service.stats_runtime import StatsRuntime
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("initialized", [False, True])
+async def test_teardown_closes_first_use_stats_admission_before_drains(monkeypatch, initialized):
+    from player_self_service import stats_runtime
+    from services import upload_lifecycle
+
+    monkeypatch.setattr(stats_runtime, "_runtime", StatsRuntime() if initialized else None)
+    monkeypatch.setattr(upload_lifecycle, "close_admission", lambda: None)
+    tree = ast.parse(Path("bot_instance.py").read_text(encoding="utf-8"))
+    node = next(n for n in tree.body if getattr(n, "name", None) == "_close_teardown_admission")
+    namespace = dict(get_calendar_service=lambda: SimpleNamespace(close_admission=lambda: None))
+    exec(compile(ast.Module(body=[node], type_ignores=[]), "bot_instance.py", "exec"), namespace)
+    namespace["_close_teardown_admission"]()
+    # Another component's drain may yield while the first Stats request arrives.
+    await asyncio.sleep(0)
+    runtime = stats_runtime.get_runtime()
+    with pytest.raises(stats_runtime.PersonalStatsUnavailable):
+        runtime.submit("dataset", lambda run: pytest.fail("Shutdown admitted native work"))
+    assert runtime.closed and not runtime.jobs and runtime.render_executor is None
+    assert await runtime.drain()
 
 
 @pytest.mark.asyncio

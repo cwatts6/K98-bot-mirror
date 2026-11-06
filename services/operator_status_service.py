@@ -68,6 +68,8 @@ def snapshot(now_utc=None, now_monotonic=None):
                     render_owned=value.get("render_owned", 0),
                     observers=value.get("observers", 0),
                 )
+            elif key == "personal_stats" and type(value) is dict and value.get("observed") is False:
+                row = Observation(key, "local evidence", reason="not_observed").project(now)
             elif key in {"sql", "sheets"} and type(value) is tuple and len(value) == 3:
                 current, latest, failure = value
                 row = current.project(now, now_monotonic=mono)

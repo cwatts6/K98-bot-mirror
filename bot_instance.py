@@ -1085,14 +1085,13 @@ async def _graceful_teardown():
 
 
 def _close_teardown_admission():
-    from player_self_service.stats_runtime import current_runtime
+    from player_self_service.stats_runtime import get_runtime
     from services import upload_lifecycle
 
     get_calendar_service().close_admission()
     upload_lifecycle.close_admission()
-    stats = current_runtime()
-    if stats is not None:
-        stats.close_admission()
+    # Close first-use admission before any drain can yield to a new interaction.
+    get_runtime().close_admission()
 
 
 async def _perform_graceful_teardown():
