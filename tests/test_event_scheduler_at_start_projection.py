@@ -18,6 +18,8 @@ async def test_live_scheduler_consumes_shared_authorized_at_start_candidate(monk
         "end_time": now + timedelta(hours=2),
     }
     captured: list[dict] = []
+    registered = asyncio.Event()
+    reminder_tasks: list[asyncio.Task] = []
 
     class FakeUser:
         id = 42
@@ -33,6 +35,8 @@ async def test_live_scheduler_consumes_shared_authorized_at_start_candidate(monk
     def capture_task(user_id, task, *, meta):
         captured.append({"user_id": user_id, "meta": meta})
         task.cancel()
+        reminder_tasks.append(task)
+        registered.set()
 
     async def ready(_bot):
         return True
@@ -43,7 +47,7 @@ async def test_live_scheduler_consumes_shared_authorized_at_start_candidate(monk
     monkeypatch.setattr(scheduler, "rehydrate_dm_scheduled_tasks", no_op_async)
     monkeypatch.setattr(scheduler, "cleanup_dm_scheduled_tracker_async", no_op_async)
     monkeypatch.setattr(scheduler, "cleanup_dm_sent_tracker_async", no_op_async)
-    monkeypatch.setattr(scheduler, "save_dm_scheduled_tracker", lambda *_: None)
+    monkeypatch.setattr(scheduler, "save_dm_scheduled_tracker_async", no_op_async)
     monkeypatch.setattr(scheduler, "REMINDER_WINDOWS", ())
     monkeypatch.setattr(scheduler, "get_all_upcoming_events", lambda: [event])
     monkeypatch.setattr(
@@ -61,11 +65,14 @@ async def test_live_scheduler_consumes_shared_authorized_at_start_candidate(monk
     monkeypatch.setattr(scheduler, "dm_sent_tracker", {})
     monkeypatch.setattr(scheduler, "dm_scheduled_tracker", {})
 
-    with pytest.raises(TimeoutError):
-        await asyncio.wait_for(
-            scheduler.schedule_event_reminders(FakeBot(), notify_channel_id=1),
-            timeout=0.05,
-        )
+    scheduler_task = asyncio.create_task(
+        scheduler.schedule_event_reminders(FakeBot(), notify_channel_id=1)
+    )
+    try:
+        await asyncio.wait_for(registered.wait(), timeout=5.0)
+    finally:
+        scheduler_task.cancel()
+        await asyncio.gather(scheduler_task, *reminder_tasks, return_exceptions=True)
 
     assert captured == [
         {
