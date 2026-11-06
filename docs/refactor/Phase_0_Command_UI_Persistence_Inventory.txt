@@ -1,0 +1,5 @@
+Phase 0 command/UI/persistence inventory source of truth is maintained at:
+- docs/refactor/phase0_inventory.md
+
+This compatibility text file exists to support tooling/reviewer references that
+expect the historical `.txt` filename.
