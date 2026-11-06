@@ -93,13 +93,20 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
         before_p014_hash,
         before_p015_hash,
         before_p016_hash,
+        before_p016_render_hash,
     )
 
     for transition in update.reviewed_transitions():
-        if transition["id"] == "p016_personal_stats_ownership_v1":
+        if transition["id"] == "p016_personal_stats_render_submission_v1":
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"], member["path"]
+            continue
+        if transition["id"] == "p016_personal_stats_ownership_v1":
+            for member in transition["members"]:
+                assert (
+                    before_p016_render_hash(root, member["path"]) == member["after_sha256"]
+                ), member["path"]
             continue
         if transition["id"] == "p015_calendar_ownership_v1":
             for member in transition["members"]:

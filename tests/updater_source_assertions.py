@@ -28,7 +28,7 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
-def before_p016_hash(root, path):
+def before_p016_render_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
     if path not in prepare_k98_update.P016_PERSONAL_STATS_PATHS:
         return actual
@@ -39,7 +39,13 @@ def before_p016_hash(root, path):
     )
     render_member = next(m for m in render_successor["members"] if m["path"] == path)
     assert actual == render_member["after_sha256"], path
-    actual = render_member["before_sha256"]
+    return render_member["before_sha256"]
+
+
+def before_p016_hash(root, path):
+    actual = before_p016_render_hash(root, path)
+    if path not in prepare_k98_update.P016_PERSONAL_STATS_PATHS:
+        return actual
     successor = next(
         t
         for t in prepare_k98_update.reviewed_transitions()

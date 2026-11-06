@@ -98,6 +98,46 @@ print("native settled before installed Pycord cleanup returned")
     assert "native settled" in result.stdout
 
 
+def test_pycord_global_cancellation_drains_owned_render_future():
+    script = """
+import asyncio, threading
+from discord.client import _cancel_tasks
+from player_self_service.stats_runtime import StatsRuntime
+loop = asyncio.new_event_loop()
+entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+def render(run):
+    entered.set()
+    assert release.wait(4)
+    finished.set()
+    return 'image'
+async def setup():
+    runtime = StatsRuntime()
+    run = runtime.submit('render', render, executor=runtime.renderer_executor())
+    while not entered.is_set(): await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    return runtime, run
+runtime, run = loop.run_until_complete(setup())
+timer = threading.Timer(.1, release.set)
+timer.start()
+try:
+    _cancel_tasks(loop)
+    assert finished.is_set()
+    assert run.task.cancelled() and not run.native_future.cancelled()
+    assert run.settled and not runtime.jobs
+    assert loop.run_until_complete(runtime.drain())
+finally:
+    release.set()
+    timer.join()
+    loop.run_until_complete(runtime.drain())
+    loop.run_until_complete(loop.shutdown_default_executor())
+    loop.close()
+"""
+    result = subprocess.run(
+        [sys.executable, "-B", "-c", script], capture_output=True, text=True, timeout=12
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 @pytest.mark.asyncio
 async def test_drain_cancellation_does_not_release_blocked_read_or_renderer():
     runtime = StatsRuntime()

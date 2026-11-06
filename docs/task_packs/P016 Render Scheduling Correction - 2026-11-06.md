@@ -38,12 +38,24 @@ handoff, not inferred from these focused runs.
 Changes security reviews `34620890-7181-4302-b1b9-d9190c95257e` (runtime correction)
 and `9b3bef99-62ae-4ac4-988e-04da42cd08c1` (exact updater transition) completed with
 no findings. The subsequent delta from mirror `80483d3` changes only documentation,
-eleven historical test inventory counts, the test-only source-hash assertion bridge,
-and its negative tests. Runtime/updater bytes are unchanged; the bridge has no
+twelve historical test inventory counts, the test-only source-hash assertion bridge,
+its reader-capability assertion and negative tests, and a real SDK shutdown regression
+test. Runtime/updater bytes are unchanged; the bridge has no
 production imports and still rejects unreviewed source bytes before mapping historical
 hashes. A further security scan is skipped for this test/documentation-only delta.
 Historical prefix digest assertions remain unchanged. Retain final mirror/private
 preimage and postimage equivalence with the two immutable Changes review targets.
+
+PR review additionally checked whether cancellation could cancel the retained executor
+future. The sole render caller uses the dedicated ThreadPoolExecutor; observer, owner
+and drain awaiters shield that future, and the executor is shut down only after its
+jobs settle, without `cancel_futures`. Executor futures are not members of `all_tasks`.
+A subprocess regression exercises actual installed Pycord `_cancel_tasks` against a
+blocked Stats render: cleanup waits for physical completion, the owner task is cancelled,
+the native future is not cancelled, and the job settles before drain returns. The
+127-test final review group passed with operational logs unchanged. Manually cancelling
+an internal native future is not a supported call path; releasing its capacity on that
+signal alone would not prove that an already running thread had stopped.
 
 ## Production findings and remaining limits
 
