@@ -2186,6 +2186,14 @@ def prepare_update(
     previous_description = read_blob(config["before"], RELEASE_DESCRIPTION)
     sql_files = {}
     mge_contracts = None
+    application_repair = config["before"] == verifier["P016_APPLICATION_REPAIR"]["predecessor"]
+    if application_repair:
+        if recovery or description_raw != previous_description:
+            raise ValueError("P016 application repair cannot combine another SQL release")
+        mge_contracts = verifier["p016_application_transition"](
+            config["before"], previous["bot-template.json"]
+        )
+        config["application_contract_repair"] = deepcopy(verifier["P016_APPLICATION_REPAIR"])
     if recovery:
         if description_raw != previous_description:
             raise ValueError("Coordinated recovery cannot combine another SQL descriptor.")

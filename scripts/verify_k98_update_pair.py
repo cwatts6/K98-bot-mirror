@@ -6,6 +6,7 @@ read-only SQL observations are checked by the complete existing startup comparat
 """
 
 import argparse
+from copy import deepcopy
 from datetime import UTC
 import hashlib
 import io
@@ -46,6 +47,43 @@ def read(path, expected=None, limit=1048576):
 
 CONTRACT_ARCHIVE = "contract_verifier.zip"
 CONTRACT_ARCHIVE_LIMIT = 2 * 1024 * 1024
+# Installed updater authority for the already-applied, reviewed P016 SQL change.
+# Derived from the retained approved catalogue plus the exact migration, and
+# independently qualified on local SQL Server. Production reads are comparisons,
+# never a source of expected metadata. No SQL migration is replayed here.
+P016_APPLICATION_REPAIR = {
+    "version": 1,
+    "id": "p016_application_contract_v1",
+    "predecessor": "8f1023e2d89e2d4da06ddde39da5b4b6df32ff03",
+    "sql_commit": "dad628c7a353cc6391868d097a6ae5fb7a8d9e84",
+    "migration_id": "20261106_001_personal_stats_daily_read_plan",
+    "migration_sha256": "bb0e3161d8c3df96452e2631dfcbb8bbb9e0637877631624716129e76d7129a8",
+}
+P016_APPLICATION_BEFORE = "e124283154b15e57427626f929aff27c508fd4da20ac95f05f2b24c95da410c3"
+P016_APPLICATION_AFTER_METADATA = "b5b33d42b15db44ab2bee1ebefa3dfd54557d9b8a8b1cb3340be30253a540f73"
+P016_APPLICATION_REVIEW = "9dcb6602-a4a4-5bf5-9073-d00a6db99f76"
+
+
+def p016_application_transition(before, bot):
+    """Amend one exact predecessor contract, preserving all other expectations."""
+    from services.export_execution_protocol import encode
+
+    if before != P016_APPLICATION_REPAIR["predecessor"]:
+        raise ValueError("P016 application repair requires the exact deployed predecessor")
+    application = bot["application_sql_contract"]
+    if hashlib.sha256(encode(application)).hexdigest() != P016_APPLICATION_BEFORE:
+        raise ValueError("P016 predecessor application contract differs from reviewed evidence")
+    after = deepcopy(application)
+    after.update(metadata_hash=P016_APPLICATION_AFTER_METADATA, review_id=P016_APPLICATION_REVIEW)
+    return {
+        "contracts": {
+            key: {"before": deepcopy(bot[key]), "after": deepcopy(bot[key])}
+            for key in ("sql_contract", "legacy_sql_contract")
+        }
+        | {"application_sql_contract": {"before": deepcopy(application), "after": after}}
+    }
+
+
 # Fixed reviewed inventory: services/kvk and their metadata resources only.
 # core and root configuration retain the authenticated application's .env root.
 CONTRACT_ARCHIVE_MEMBERS = (
@@ -216,8 +254,10 @@ def main():
     config = json.loads(read(args.bindings, args.sha256))
     policy = verify_live_source(config, predecessor=args.preflight)
     activate_release_archive(config, Path(__file__).parent)
+    if "application_contract_repair" in config and not args.sql_contracts:
+        raise ValueError("P016 application repair requires complete SQL contract verification")
     if args.sql_contracts:
-        verify_sql_contracts(config, policy)
+        verify_sql_contracts(config, policy, preflight=args.preflight)
     if args.preflight:
         print(
             json.dumps(
@@ -312,8 +352,8 @@ def main():
             handle.Close()
 
 
-def verify_sql_contracts(config, policy):
-    """Reuse complete startup comparators without constructing the runtime/IPC."""
+def bot_from_policy(policy):
+    """Read the protected template through its exact plan and content bindings."""
     from core.export_startup_windows import administrative_path
 
     plan = json.loads(
@@ -323,9 +363,49 @@ def verify_sql_contracts(config, policy):
         )
     )
     ref = plan["templates"]["bot"]
-    bot = json.loads(
+    return json.loads(
         read(administrative_path(ref["path"], private=True), ref["sha256"], 4 * 1024 * 1024)
     )
+
+
+def repair_verification_bot(config, predecessor, candidate):
+    """Verify exact before/after bindings before comparing already-applied SQL."""
+    from services.export_execution_protocol import encode
+
+    if encode(config["application_contract_repair"]) != encode(P016_APPLICATION_REPAIR):
+        raise ValueError("Unreviewed application contract repair")
+    if "sql" in config or "recovery_seed" in config:
+        raise ValueError("Application contract repair cannot replay or combine SQL work")
+    transition = p016_application_transition(config["before"], predecessor)
+    for key, pair in transition["contracts"].items():
+        if encode(candidate[key]) != encode(pair["after"]):
+            raise ValueError("P016 candidate contract differs from exact reviewed amendment")
+    return candidate
+
+
+def verify_sql_contracts(config, policy, *, preflight=False):
+    """Reuse complete startup comparators without constructing the runtime/IPC."""
+    from core.export_startup_windows import administrative_path
+
+    bot = bot_from_policy(policy)
+    if "application_contract_repair" in config:
+        if preflight:
+            # The source is still the authenticated predecessor; the sealed
+            # candidate must contain precisely the separately reviewed amendment.
+            members = [m for m in config["seed_members"] if m["name"] == "bot-template.json"]
+            if len(members) != 1:
+                raise ValueError("One sealed candidate Bot template required")
+            candidate_path = administrative_path(
+                Path(__file__).parent / "bot-template.json", private=True
+            )
+            candidate = json.loads(read(candidate_path, members[0]["sha256"], 4 * 1024 * 1024))
+            bot = repair_verification_bot(config, bot, candidate)
+        else:
+            old = config["old_policy"]
+            predecessor_policy = json.loads(
+                read(administrative_path(old["Path"], private=True), old["SHA256"])
+            )
+            bot = repair_verification_bot(config, bot_from_policy(predecessor_policy), bot)
     verify_bot_sql_contracts(bot)
 
 
@@ -370,7 +450,7 @@ def verify_bot_sql_contracts(bot):
             cursor.close()
     finally:
         connection.close()
-    print(json.dumps(dict(stage="UNCHANGED_STARTUP_SQL_CONTRACTS_VERIFIED", business_work=False)))
+    print(json.dumps(dict(stage="STARTUP_SQL_CONTRACTS_VERIFIED", business_work=False)))
     # Return the complete actual catalog evidence, not expected contract fields.
     # Callers can retain and reverify this observation; no expectation is adopted
     # from it, and a failed comparator prevents any successful return.
