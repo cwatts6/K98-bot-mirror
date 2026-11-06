@@ -506,7 +506,7 @@ def native(database, receipt, artifact):
                         (*ids[:size], *(None for _ in range(26 - size)), 180),
                     )
                     while True:
-                        messages.extend(str(message[1]) for message in cursor.messages)
+                        messages.extend(str(message[1]) for message in (cursor.messages or ()))
                         if cursor.description:
                             rows = cursor.fetchall()
                             if (
@@ -527,7 +527,7 @@ def native(database, receipt, artifact):
                             else:
                                 rowsets.append([list(row) for row in rows])
                         if not cursor.nextset():
-                            messages.extend(str(message[1]) for message in cursor.messages)
+                            messages.extend(str(message[1]) for message in (cursor.messages or ()))
                             break
                     logical_reads = sum(
                         int(value)
