@@ -198,10 +198,14 @@ def _retry_predicate(exc: BaseException) -> bool:
     retry=tenacity.retry_if_exception(_retry_predicate),
     reraise=True,
 )
-def _get_import_connection_with_retry():
-    from core.export_sql_connection import producer_connection
+def _connect_import_with_retry(factory):
+    return factory()
 
-    return producer_connection(_conn_import)
+
+def _get_import_connection_with_retry():
+    from core.export_sql_connection import producer_connection_factory
+
+    return _connect_import_with_retry(producer_connection_factory(_conn_import))
 
 
 def _enable_fast_executemany(cursor) -> bool:

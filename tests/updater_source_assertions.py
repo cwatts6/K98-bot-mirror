@@ -28,6 +28,21 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_d2a_hash(root, path):
+    """Authenticate D2a before exposing the unchanged prior release assertion."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path not in prepare_k98_update.P02_D2A_CONNECTION_PATHS:
+        return actual
+    successor = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "p02_d2a_connection_selection_v1"
+    )
+    member = next(m for m in successor["members"] if m["path"] == path)
+    assert actual == member["after_sha256"], path
+    return member["before_sha256"]
+
+
 def before_phase1_hash(root, path):
     """Authenticate Phase 1, then expose the immutable P02.1 reference image.
 
@@ -35,7 +50,7 @@ def before_phase1_hash(root, path):
     the same original predecessor, not an admission of partial new helpers.
     Historical test bridges never change installed updater policy.
     """
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_d2a_hash(root, path)
     if path not in prepare_k98_update.P02_PHASE1_SQL_EXPORT_PATHS:
         return actual
     entries = prepare_k98_update.reviewed_transitions()
