@@ -3,6 +3,7 @@
 import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
+from services.authority_observation import observation_guard
 from services.export_evidence_catalog_dal import EvidenceCatalogDAL
 from services.export_evidence_storage import EvidenceCopies
 from services.export_execution_protocol import uuid_text
@@ -245,7 +246,10 @@ class EvidenceRecovery:
         if set(message) != fields:
             raise SourceConflict("Exact evidence recovery selector required.")
         self.broker.boundary.recheck()
-        with self.broker.authority._lock:
+        with observation_guard(
+            self.broker.authority._lock,
+            read_only=operation in {"inspect", "pending", "pending_page"},
+        ):
             if operation in {"pending", "pending_page"}:
                 after = message["after"]
                 if after is not None:

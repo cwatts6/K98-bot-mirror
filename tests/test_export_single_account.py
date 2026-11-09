@@ -344,7 +344,7 @@ def test_shared_server_binds_both_processes_and_never_replays(monkeypatch, failu
     import core.export_process_identity as identity
     import scripts.run_export_authority as launcher
 
-    lifetime, own, peer, handle = (SimpleNamespace(Close=Mock()) for _ in range(4))
+    lifetime, own, peer, handle, reserved = (SimpleNamespace(Close=Mock()) for _ in range(5))
     pipe = SimpleNamespace(connect=Mock(), receive=Mock(return_value={"version": 1}), send=Mock())
     snapshot = process_bindings()["bot"]
     if failure == "recycled_after_read":
@@ -356,7 +356,9 @@ def test_shared_server_binds_both_processes_and_never_replays(monkeypatch, failu
     monkeypatch.setattr(identity, "authenticate_process_peer", authenticate)
     opener = Mock(side_effect=[lifetime, own, own])
     monkeypatch.setattr(identity, "open_pinned_process", opener)
-    monkeypatch.setattr(identity, "pinned_process_alive", Mock(return_value=True))
+    monkeypatch.setattr(
+        identity, "pinned_process_alive", Mock(side_effect=[True, KeyboardInterrupt()])
+    )
     pipe_factory = Mock(return_value=pipe)
     monkeypatch.setattr(host, "MessagePipe", pipe_factory)
     broker = SimpleNamespace(dispatch=Mock(return_value="ok"))
@@ -374,7 +376,7 @@ def test_shared_server_binds_both_processes_and_never_replays(monkeypatch, failu
                 process_bindings=process_bindings(),
             ),
             authority=Mock(),
-            make_pipe=Mock(side_effect=[handle, KeyboardInterrupt()]),
+            make_pipe=Mock(side_effect=[handle, reserved]),
             authenticate=Mock(side_effect=AssertionError("legacy token path")),
             broker=broker,
         )
@@ -382,8 +384,9 @@ def test_shared_server_binds_both_processes_and_never_replays(monkeypatch, failu
     assert peer.Close.call_count == (0 if failure == "peer" else 1)
     assert pipe.receive.call_count == (0 if failure == "peer" else 1)
     handle.Close.assert_called_once()
-    assert own.Close.call_count == 2
-    assert opener.call_count == 3
+    reserved.Close.assert_called_once()
+    assert own.Close.call_count == 1
+    assert opener.call_count == 2
     lifetime.Close.assert_called_once()
     pipe_factory.assert_called_once_with(handle, timeout_ms=30000, process=lifetime)
 

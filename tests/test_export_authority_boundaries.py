@@ -155,12 +155,13 @@ def test_child_and_enrollment_load_exact_trusted_launcher_before_package_import(
     "failure", ["decode", "disconnect", "authenticate", "dispatch", "reply", "timeout"]
 )
 def test_bad_peer_closes_and_next_valid_peer_completes_without_replay(monkeypatch, failure):
-    handles = [SimpleNamespace(Close=Mock()), SimpleNamespace(Close=Mock())]
+    handles = [SimpleNamespace(Close=Mock()) for _ in range(3)]
     pipes = [
         SimpleNamespace(connect=Mock(), receive=Mock(return_value={"version": 1}), send=Mock())
         for _ in handles
     ]
     broker = SimpleNamespace(dispatch=Mock(return_value={"ready": True}))
+    pipes[2].receive.side_effect = KeyboardInterrupt()
     authenticate = Mock()
     if failure in {"decode", "disconnect", "timeout"}:
         pipes[0].receive.side_effect = ValueError("invalid or missing frame")
@@ -287,6 +288,33 @@ def test_shutdown_during_pending_io_drains_cancellation_then_propagates():
     with pytest.raises(KeyboardInterrupt):
         pipe.receive()
     assert events[-3:] == ["cancel", "drain", "close-event"]
+
+
+@pytest.mark.parametrize("code", [109, 232, 5, 87])
+def test_failed_native_io_start_does_not_wait_for_an_unissued_operation(code):
+    pipe, events = bounded_pipe()
+    first = WinError(code)
+    pipe.api.WriteFile = Mock(side_effect=first)
+    with pytest.raises(WinError) as caught:
+        pipe.send({})
+    assert caught.value is first
+    assert events == ["close-event"]
+
+
+def test_unknown_io_drain_retains_buffer_event_and_first_failure(monkeypatch):
+    monkeypatch.setattr(host.MessagePipe, "_retained_io", {})
+    pipe, events = bounded_pipe(wait=258)
+    pipe.api.GetOverlappedResult = Mock(side_effect=WinError(6))
+    with pytest.raises(host.HostBoundaryError, match="deadline"):
+        pipe.receive()
+    assert events == ["read", "cancel"]
+    assert host.MessagePipe.unconfirmed_io_count() == 1
+    assert host.MessagePipe._retained_io[id(pipe)] is pipe
+    operation, start = pipe._unconfirmed_io[0]
+    assert operation.hEvent is not None and callable(start)
+    with pytest.raises(host.HostBoundaryError, match="cleanup"):
+        pipe.receive()
+    assert events == ["read", "cancel"]
 
 
 @pytest.mark.parametrize("operation", ["connect", "read"])

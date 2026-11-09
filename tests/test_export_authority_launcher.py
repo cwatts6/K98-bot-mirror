@@ -327,6 +327,28 @@ def test_authority_shutdown_reports_retained_session_and_preserves_service_error
     setup.connector.assert_not_called()
 
 
+@pytest.mark.parametrize("uncertain", ["observation", "sql", "pipe"])
+def test_shutdown_keeps_authority_session_open_for_unconfirmed_custody(
+    authority_launch, monkeypatch, uncertain
+):
+    from core import sql_connection_custody
+    from core.export_execution_host import MessagePipe
+
+    broker = authority_launch.factories["AuthorityBroker"].return_value
+    broker.observation_progress.drain.return_value = uncertain != "observation"
+    if uncertain == "sql":
+        sql_connection_custody.retain_connection(
+            object(), effect="unknown", first_failure=OSError(), cleanup_error=OSError()
+        )
+    if uncertain == "pipe":
+        monkeypatch.setattr(MessagePipe, "_retained_io", {1: object()})
+    assert authority_launch.launchers["authority"]() == 1
+    assert [call.kwargs["Action"] for call in authority_launch.dal.transition.call_args_list] == [
+        "open"
+    ]
+    authority_launch.authority.drain.assert_called_once()
+
+
 @pytest.mark.parametrize(
     "launcher,stage",
     [

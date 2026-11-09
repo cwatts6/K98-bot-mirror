@@ -19,7 +19,7 @@ def transition():
 
 def test_prior_76_transitions_are_immutable():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 78
+    assert len(entries) == 79
     assert hashlib.sha256(json.dumps(entries[:76], sort_keys=True).encode()).hexdigest() == (
         "bedacf8c4bb61e186e5af770fe5b5e799f694ec9e8eb6c08ca7d58c5d795969d"
     )

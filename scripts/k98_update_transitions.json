@@ -3960,6 +3960,76 @@
           "after_sha256": "ef701b247b1a39870babcc50e92c6702fa97c4907ae05f9c06c64058594bddc8"
         }
       ]
+    },
+    {
+      "id": "p02_d2j_observation_dispatch_v1",
+      "members": [
+        {
+          "path": "core/export_execution_host.py",
+          "before_sha256": "4b847c044cf49f54cbb2565d0a27c4b67429f76293eb944b3cd8a4d0c85495a3",
+          "after_sha256": "4ff9c6f054f2be93aba8f0c8ed27c624461cb8fcef40eaff58ecd1a26afc3dc2"
+        },
+        {
+          "path": "core/export_process_identity.py",
+          "before_sha256": "b75525105aed7666ad340040bd8f4324592a084bdca93b943ccbb9182c6f207f",
+          "after_sha256": "b75525105aed7666ad340040bd8f4324592a084bdca93b943ccbb9182c6f207f"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91",
+          "after_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91"
+        },
+        {
+          "path": "core/sql_observation.py",
+          "before_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130",
+          "after_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130"
+        },
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "16fa93fff2d1dcd8a92cf5c46bd0b1ec6127a586779d05a3281b40b9e56a256c",
+          "after_sha256": "6f86d6b2bbb81822ec5b4d3dc7a602e8919078a02f85111ef9cd3161de9eeeba"
+        },
+        {
+          "path": "services/authority_observation.py",
+          "before_sha256": "bd53cffeeeb80f9ff74df1b3498eb6d1e37de65d8cd6e3971df4df4bc6fa1da1",
+          "after_sha256": "0708106cb2114d42cea79761f5e41c7453a835a26f89ca5d63e72ea562b9e6de"
+        },
+        {
+          "path": "services/export_evidence_recovery.py",
+          "before_sha256": "7413dfcd66a950253606722fdb6d8db95dffa6fefde9da4a724f828d6b140db0",
+          "after_sha256": "1f8b1fe58a8d2353adbf5b5f0064fbcb8204a79bcf2ec5d32c640523c8a337f9"
+        },
+        {
+          "path": "services/export_execution_authority.py",
+          "before_sha256": "5b13c486f92b664035272a8d16b958983c487304fc5902547b6fef057ae58083",
+          "after_sha256": "5b13c486f92b664035272a8d16b958983c487304fc5902547b6fef057ae58083"
+        },
+        {
+          "path": "services/export_execution_progress.py",
+          "before_sha256": "8f5af3047c522dfe419c75379b3ba3bc1d58148d295f8a96c07f1b8d85913349",
+          "after_sha256": "8f5af3047c522dfe419c75379b3ba3bc1d58148d295f8a96c07f1b8d85913349"
+        },
+        {
+          "path": "services/export_proof_progress.py",
+          "before_sha256": "92f59ef5182f7310714c5fb85340d3e5b8638f66bb8921393ec70e87c1620fad",
+          "after_sha256": "92f59ef5182f7310714c5fb85340d3e5b8638f66bb8921393ec70e87c1620fad"
+        },
+        {
+          "path": "services/export_replacement_authority.py",
+          "before_sha256": "93602756f9578354ea63a8e44b6d058e6bb7bf1286b4a6a46e807eb4810562cd",
+          "after_sha256": "c0916885b20b2e45ad581923305f15d417ec14e1535e58022e680cce7d89428c"
+        },
+        {
+          "path": "services/export_target_recovery_authority.py",
+          "before_sha256": "750d3e7dcf00e2f6c0b469dccdcd25b5dbed923d4012c09ea14dd2fe25a5b930",
+          "after_sha256": "42573f1362600b9271fbe3a67a739bcb9f7ae94e939eca9c6cefd258aa6a7967"
+        },
+        {
+          "path": "services/failed_export_recovery_authority.py",
+          "before_sha256": "2f79aeb93b1591b5ba0269510b42649a2720b191d8f494ddaa40fe769f47ba79",
+          "after_sha256": "654b39ce92e628796ee64214be05cd05ce55bbcbb70370d2f9314629721eed8e"
+        }
+      ]
     }
   ]
 }
