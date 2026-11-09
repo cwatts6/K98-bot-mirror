@@ -371,7 +371,7 @@ def test_discovery_checks_retained_weight_members_without_loading_generations(mo
         with pytest.raises(SourceConflict, match="no retained configuration"):
             dal.check_intent_weights(intent)
         weight_guard.assert_not_called()
-    source_guard.assert_called_once_with(cursor, 16, "snapshot_report_v1")
+    source_guard.assert_called_once_with(cursor, 16, "snapshot_report_v1", passive=True)
     assert cursor.calls[0][1] == (intent["IntentID"], 16)
     assert not any("UPDATE" in query or "ManifestJson" in query for query, _ in cursor.calls)
 

@@ -32,6 +32,9 @@ class Cursor:
         result, self.data = self.data, []
         return result
 
+    def close(self):
+        pass  # Scripted query fixture; native tests verify physical closure.
+
 
 class ChoiceStore:
     def __init__(self):
@@ -72,6 +75,9 @@ class ChoiceStore:
 
         class Connection:
             autocommit = False
+
+            def set_attr(self, key, value):
+                pass  # This in-memory fixture does not establish isolation.
 
             def cursor(self):
                 return Cursor(store.route)

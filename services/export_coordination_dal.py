@@ -404,8 +404,8 @@ class ExportCoordinationDAL:
         from kvk.dal.season_source_dal import require_source
         from kvk.dal.source_weight_dal import require_current_export_weights
 
-        with transaction(self.connect) as cursor:
-            require_source(cursor, intent["KVK_NO"], "snapshot_report_v1")
+        with recovery_snapshot(self.connect) as cursor:
+            require_source(cursor, intent["KVK_NO"], "snapshot_report_v1", passive=True)
             cursor.execute(
                 "SELECT ConfigVersionID FROM KVK.SourceExportIntentPublication WHERE IntentID=? AND KVK_NO=?",
                 intent["IntentID"],

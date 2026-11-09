@@ -615,3 +615,65 @@ reproduced all 210 Pyright diagnostics with identical messages; no new diagnosti
 - Impact: low
 - Risk: medium
 - Dependencies: Recovery, pool ownership and native tuple/cleanup regression coverage.
+
+## D2h consistent season metadata
+
+Scope reviewed before coding: resolve_season_read, SeasonSourceDAL.read and the
+export discovery weight gate use owned snapshots. A small read_season helper
+shares the existing mapped row contract; require_source keeps its locked default
+and permits passive reads only when explicitly requested inside the new owned
+gate. Writer lock_scope/lock_season and lifecycle CAS stay unchanged. The resolver
+retains every complete-selection/update/publication/hash/config relationship check,
+previous-complete behavior and failure-to-unavailable behavior. Its discarded
+component-pointer lock query can be removed; it conveys no publication authority.
+Heavy immutable facts remain outside metadata transactions.
+
+SQL definitions inspected: SeasonSource, SourceRouting, SourceCompleteSelection,
+SourceUpdate, SourcePublication, SourceConfigVersion/Request, intent-publication,
+SourceWeightConfig and the imported configuration tables/read helper. Imported
+configuration verification performs only parameterized reads and validates the
+retained payload hash and legacy/source weight relationship. No SQL schema or
+permission change. Scope includes unit/native consistency, corruption, refusal,
+close and writer-default tests, existing public report/lifecycle/weight tests,
+exact release admission and Bot Changes review with Deep off.
+
+D2g merged as mirror PR 505 at `24b09ddada48d5ed2b1a7c575aa63998c56ba26d`
+after exact-head review completed without findings. D2h's four predecessor
+regressions failed, one passed; 55 focused public-routing/lifecycle checks then
+passed. Five additional season-input cases preserve the old positive-integer
+boundary. The nine-member release/precedessor checks passed 122 cases.
+
+Native D2h: ten passed. Both arrival orders preserve the choice/routing/complete
+selection tuple; an observer-first weight change cannot mix current configuration
+with its earlier season read. A fresh observation correctly refuses stale weights.
+Partial/cross-choice/config/hash mismatches, permission denial and snapshot-off
+remain unavailable without legacy/locking fallback, and all readers physically
+close. An initial synthetic fixture omitted required PeriodKind; supplying the
+source-defined field corrected setup before the meaningful run. These tests use
+only new disposable databases, source checks and SELECT-only reader permissions.
+
+Release `p02_d2h_season_observation_v1` preserves 76 prior entries, canonical hash
+`bedacf8c4bb61e186e5af770fe5b5e799f694ec9e8eb6c08ca7d58c5d795969d`.
+Count 77; byte bound 199680. Security Changes scan
+`d8451ddd-ea8f-4baa-8a28-4045f5d9f84b` completed with no findings, all five
+executable inventory items reviewed, Deep off. Digest:
+`0993bffee9ddec1ba16e67e4777c7061390db1abcff28c52290294cde63c0305`.
+Architecture, deferred/routing, lint, imports and command registration passed.
+Combined full suite remains due at D2 closure; no production readiness claimed.
+
+### D2h inherited metadata typing debt
+
+### Deferred Optimisation
+- Area: `kvk/dal/season_source_dal.py`, `kvk/dal/source_routing_dal.py`, `services/export_coordination_dal.py`
+- Type: consistency
+- Description: All 63 current row/result type diagnostics reproduce with identical messages on the exact previous source at its original paths.
+- Suggested Fix: Add precise metadata/result types separately without changing source choice, sealed tuple validation or writer ownership predicates.
+- Impact: low
+- Risk: medium
+- Dependencies: Public routing, lifecycle, weight and native consistency regressions.
+
+D2h broad regression: 3467 passed, 79 opt-in skips, one dependency warning and
+two old mocked discovery assertions that omitted the new explicit passive flag.
+Their expectations now require that flag; all 141 affected rechecks passed.
+Broad and final operational-log isolation passed. The post-scan change is one
+test assertion plus evidence documentation; runtime and updater bytes are unchanged.

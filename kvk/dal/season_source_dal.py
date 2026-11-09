@@ -29,10 +29,23 @@ def lock_season(cursor, kvk_no, *, read=True):
     return one(cursor)
 
 
-def require_source(cursor, kvk_no, source_key, *, expected_version=None, onboarding=False):
+def read_season(cursor, kvk_no):
+    """Passive metadata read; callers own a consistent snapshot transaction."""
+    from kvk.dal.new_source_import_dal import one
+    from kvk.schemas.new_source_schema import INT_MAX
+
+    if type(kvk_no) is not int or not 1 <= kvk_no <= INT_MAX:
+        raise ValueError("Invalid source season.")
+    cursor.execute("SELECT * FROM KVK.SeasonSource WHERE KVK_NO=?", kvk_no)
+    return one(cursor)
+
+
+def require_source(
+    cursor, kvk_no, source_key, *, expected_version=None, onboarding=False, passive=False
+):
     from kvk.dal.new_source_import_dal import SourceConflict
 
-    choice = lock_season(cursor, kvk_no)
+    choice = read_season(cursor, kvk_no) if passive else lock_season(cursor, kvk_no)
     if choice is None:
         raise SourceConflict("Season source setup is required before admission.")
     if source_key not in SOURCES or choice["SourceKey"] != source_key:
@@ -80,11 +93,10 @@ class SeasonSourceDAL:
             return one(cursor)
 
     def read(self, kvk_no):
-        from kvk.dal.new_source_import_dal import lock_scope, transaction
+        from core.recovery_sql_snapshot import recovery_snapshot
 
-        with transaction(self.connect) as cursor:
-            lock_scope(cursor, kvk_no)
-            return lock_season(cursor, kvk_no)
+        with recovery_snapshot(self.connect) as cursor:
+            return read_season(cursor, kvk_no)
 
     def transition(self, kvk_no, state, *, expected_version, actor, reason, authorized):
         from kvk.dal.new_source_import_dal import SourceConflict, lock_scope, one, transaction
