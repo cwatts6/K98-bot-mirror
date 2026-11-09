@@ -1,0 +1,37 @@
+[
+  {
+    "path": "gsheet_module.py",
+    "before": "8773fbbc2beaab983e45837a2203cc6865677bc057c1bc0c1b7861c247b9d5a7",
+    "after": "e3d9cfaaccf8ec8458fefbf0f24e1de24fff0a95e961b4d792a7b1403d83ee6e"
+  },
+  {
+    "path": "services/legacy_export_snapshot_service.py",
+    "before": "1e5aa841372a91fa02241a23106df91abbf76e37dec7f1a7d1242311380daf6f",
+    "after": "32e0183cf71a7c10ea1846f3ea1436732bb7ee014588a0ac10eec3359ab20400"
+  },
+  {
+    "path": "services/queue_admission_recovery.py",
+    "before": "b6dcca91b82915a3424ed930ada28a95c9c6cd2db7443a4fe5112fb8288376fc",
+    "after": "080b4333b7d3b6a0bac5988fff76eac92001359a8b818fbe156df7a5cad1786f"
+  },
+  {
+    "path": "services/queue_admission_recovery_dal.py",
+    "before": "ae2ac96d28b1f5a8e7604e53a90587ae469bd3bfcefb4be73f34a0cfa8fcb188",
+    "after": "cdbfd2b198e1bb05c3284257ff33669228f90df4e90052b296efabeff06a806b"
+  },
+  {
+    "path": "services/recovery_service.py",
+    "before": "bd48ed720487ca18a12a709b5ac6802d43813bf19178fbc092b61b88c6b1639e",
+    "after": "1c2f269c0d77053d358c6f67580706c50617fc0f376a77d3a156ae57a90000c5"
+  },
+  {
+    "path": "services/recovery_release_policy.py",
+    "before": "54c35dba648b054b2ff89aa22265e7524a7859c4f43b7f39db66352e3ae55938",
+    "after": "e8398a786874a47fd6821d98a7a9b29c27e2cc35645892a307ad1aba16e51d9f"
+  },
+  {
+    "path": "weekly_activity_importer.py",
+    "before": "ec13d6de93da0c2442f121a7c05c60eaba8b1654c2e90139405cc6da0d0fae03",
+    "after": "9c6484d5bd96d5a77af04f939dba986787084920281341b86ab8d40d2a3b323e"
+  }
+]
