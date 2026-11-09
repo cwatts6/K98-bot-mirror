@@ -1,0 +1,32 @@
+name: Release identity regressions
+
+# No path filter: these deployment regressions must run on every PR.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-identity-regressions:
+    runs-on: windows-latest
+    env:
+      PYTHON_DOTENV_DISABLED: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Verify native ordering and protected recovery
+        run: >-
+          python scripts/analyse_pytest_log_noise.py --pytest-args -q
+          tests/test_release_identity_regressions.py
+          tests/test_export_schema_fingerprint.py
+          tests/test_p02_phase1_permission_repair.py
+          tests/test_p016_application_contract_repair.py

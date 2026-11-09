@@ -40,3 +40,9 @@ def test_select_tests_includes_full_tests_for_test_changes() -> None:
     commands = select_tests(["tests/test_select_tests.py"])
 
     assert "python -m pytest -q tests" in commands
+
+
+def test_release_identity_regressions_are_always_selected() -> None:
+    for paths in ([], ["docs/readme.md"], ["scripts/prepare_k98_update.py"]):
+        commands = select_tests(paths)
+        assert any("tests/test_release_identity_regressions.py" in c for c in commands)

@@ -260,6 +260,20 @@ def test_rebuilt_schema_and_result_order_have_identical_fingerprint_without_muta
     assert application_metadata_fingerprint(*original) == application_metadata_fingerprint(*other)
 
 
+def test_real_visible_column_reordering_is_not_metadata_row_shuffling():
+    original = fixture()
+    altered = deepcopy(original)
+    # Reverse actual visible positions consistently in both catalogues. Merely
+    # shuffling returned rows is harmless; changing SELECT * shape is not.
+    for row in altered[0]["columns"]:
+        row["Ordinal"] = 4 - row["Ordinal"]
+    for row in altered[1]["columns"]:
+        row["column_id"] = 4 - row["column_id"]
+        row["visible_position"] = 3 - row["visible_position"]
+    changed = application_metadata_fingerprint(*altered)
+    assert changed != application_metadata_fingerprint(*original)
+
+
 @pytest.mark.parametrize(
     "section,field,value",
     [
