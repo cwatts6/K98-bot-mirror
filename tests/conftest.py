@@ -32,6 +32,16 @@ if REPO_ROOT not in sys.path:
 
 from tests.sql_snapshot_fixture import snapshot_database as snapshot_database
 
+
+@pytest.fixture(autouse=True)
+def isolated_sql_cleanup_custody(monkeypatch):
+    # Fault-injection cases retain their fake/owned test handles for the whole
+    # test, but must not close admission in an unrelated test's process context.
+    from core import sql_connection_custody
+
+    monkeypatch.setattr(sql_connection_custody, "_holds", {})
+
+
 # ----------------------------
 # Optional: lightweight fake heavy deps (opt-in)
 # ----------------------------

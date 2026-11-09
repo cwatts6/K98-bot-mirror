@@ -101,6 +101,7 @@ def transaction(connect, *, retry_metadata=False):
     acknowledged = set()
     body_error = None
     requester = None
+    owns_connection = True
 
     def timed(phase, call, *args):
         started = time.monotonic()
@@ -117,7 +118,9 @@ def transaction(connect, *, retry_metadata=False):
         # The body receives the original cursor. Only source_transaction's
         # connection lifecycle calls are observed; their semantics are unchanged.
         def __init__(self, connection):
+            nonlocal owns_connection
             self.connection = connection
+            owns_connection = getattr(connection, "owns_connection", True) is not False
 
         def __getattr__(self, name):
             value = getattr(self.connection, name)
@@ -143,9 +146,9 @@ def transaction(connect, *, retry_metadata=False):
                 # deliberately not labelled lock-held or exact statement time.
                 timings["transaction_body"] = max(0, int((time.monotonic() - started) * 1000))
     except CoordinationLockRefused as error:
-        # Any rollback/close exception replaces the refusal in source_transaction
-        # and cannot reach here. A failed commit is UncertainCommit, not this type.
-        error.transaction_released = True
+        # Cleanup uncertainty is wrapped separately by source_transaction. A
+        # borrowed adapter's no-op close never proves physical release.
+        error.transaction_released = owns_connection and {"rollback", "close"} <= acknowledged
         error.phase_timings_ms = timings
         raise
     except Exception as error:
@@ -154,6 +157,7 @@ def transaction(connect, *, retry_metadata=False):
             facts.update(sql_session_id=requester, session_role="requester")
         if (
             retry_metadata
+            and owns_connection
             and error is body_error
             and {"rollback", "close"} <= acknowledged
             and "commit" not in timings

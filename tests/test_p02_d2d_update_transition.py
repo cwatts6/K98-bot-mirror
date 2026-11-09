@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
-from tests.updater_source_assertions import before_d2d_hash, before_d2e_hash
+from tests.updater_source_assertions import before_d2d_hash, before_d2i_hash, before_d2e_hash
 
 
 def transition():
@@ -21,7 +21,7 @@ def transition():
 
 def test_prior_72_transitions_are_immutable():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 77
+    assert len(entries) == 78
     assert hashlib.sha256(json.dumps(entries[:72], sort_keys=True).encode()).hexdigest() == (
         "3296510369166c08bd666edd43926960be68964eff39fb474d425e07cc413766"
     )

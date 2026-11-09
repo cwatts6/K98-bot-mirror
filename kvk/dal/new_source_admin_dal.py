@@ -40,6 +40,7 @@ class _BorrowedConnection:
     """Let S3B join our transaction; the outer context owns commit and rollback."""
 
     autocommit = False
+    owns_connection = False
 
     def __init__(self, cursor):
         self._cursor = cursor

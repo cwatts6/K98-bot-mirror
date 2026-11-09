@@ -677,3 +677,77 @@ two old mocked discovery assertions that omitted the new explicit passive flag.
 Their expectations now require that flag; all 141 affected rechecks passed.
 Broad and final operational-log isolation passed. The post-scan change is one
 test assertion plus evidence documentation; runtime and updater bytes are unchanged.
+
+## D2i SQL cleanup and retained physical custody — scoped before coding
+
+The source transaction helper currently lets rollback/close errors replace the
+first failure; capture session release can skip later guards and cursor cleanup;
+capture adopt/conclude and producer verification can likewise mask their first
+failure. Existing recovery snapshots acknowledge failures but do not retain an
+unclosed connection. These are one lifecycle boundary, including the contention
+retry wrapper and all capture descendants (stats, all-KVK, player/config reports).
+
+Reuse the existing SqlOutcome/error-facts shape in a core custody owner. Retain
+unacknowledged physical connections strongly and expose only safe process-local
+counts/outcomes. Once close fails, refuse new source/capture/observation admission
+instead of dropping the handle or replaying work. Already-running owners retain
+their original completion duty. No automatic retry/force-close/release/repair is
+added; process-local custody is not a durable SQL resolution or health proof.
+
+Source transactions must attempt rollback on pre-commit failure, always attempt
+close, preserve the first cause and separate unknown commit from cleanup. Busy or
+retry eligibility requires acknowledged rollback and close; borrowed transactions
+cannot assert physical release. Closing an owning connection closes its cursors;
+do not close the cursor borrowed from an outer admin transaction. Capture sessions
+retain the original global/session guard order; attempt every release even after
+lost grant acknowledgement, then cursor and connection cleanup. Short capture
+transactions preserve commit uncertainty and all existing durable CAS predicates.
+
+Check factory/setup, body, rollback, release, cursor-close, connection-close,
+commit acknowledgement and cancellation independently, plus actual timeout and
+guard release in uniquely owned disposable SQL. Review existing callers and
+capture descendants; run broad lifecycle/recovery regressions and full suite at
+combined D2. No SQL schema, grants, business procedure or provider execution.
+Bot Changes review required, Deep off; the unchanged SQL repo requires no diff scan.
+
+D2h merged as mirror PR 506 at `b307fcc72ff554d0dd67b568236ddd7ecb59cb3d`
+after exact-head review completed without findings. D2i now retains the first
+body/setup/commit failure through every attempted cleanup. Borrowed admin adapters
+cannot claim physical release, and retry/ordinary-busy classification requires
+acknowledged owned cleanup. Capture checks every intended guard after a lost grant
+reply and retains uncertainty even after driver close when explicit release was
+not acknowledged (pooling can retain a session). No automatic cleanup retry or
+admission-reset API is introduced.
+
+D2i focused/release gate: 132 passed. Native: five new driver/lifecycle checks
+passed, plus 36 existing capture checks across stats, all-KVK and player-report
+families. The cancellation check observes the exact owned query in a server wait
+before cancelling and requires HY008; a timeout cannot satisfy it. Lost grant,
+release and close acknowledgements use uniquely owned local guards and verify
+explicit release from a second connection. No retained database/input or business
+procedure is used. Eight old contention assertions were corrected to expect the
+new cleanup-uncertain wrapper and its original cause; 103 focused checks passed.
+
+Release `p02_d2i_sql_lifecycle_v1` has eleven exact members, seven changed (one new
+custody module), and preserves all 77 prior entries, canonical hash
+`d0d4240d8f57c2c5ea3983b930418797166df5854344043702e6fd1e12501857`.
+Registry count 78; byte bound 207872. Architecture, deferred/routing checks, import
+smoke and command registration passed. Security Changes scan
+`a031af81-4183-4748-aa34-d364a3bf707b` completed with no findings and all nine
+executable inventory items reviewed; Deep off. Exact patch digest:
+`829ef4f6eb4ccf557d3e997a7317bedb693d4d2aaa03a75cda10dbbe66d2173c`.
+Broad lifecycle regression: 4336 passed, 467 opt-in skips, one dependency warning;
+operational-log isolation passed. Exact-path type comparison reproduces all 24
+diagnostics with identical messages. Full suite remains due at the combined D2
+checkpoint; native fixture evidence is not production qualification.
+
+### D2i inherited source-row typing debt
+
+### Deferred Optimisation
+- Area: `kvk/dal/new_source_import_dal.py`, `kvk/dal/new_source_admin_dal.py`, `services/export_contention.py`, `services/import_capture_recovery_dal.py`
+- Type: consistency
+- Description: All 24 current row/result typing diagnostics reproduce on the exact prior source at its original paths; lifecycle ownership introduces no new diagnostic.
+- Suggested Fix: Add precise source row and timing/result types separately while preserving receipt and retry predicates.
+- Impact: low
+- Risk: medium
+- Dependencies: Source import/admin, capture and contention regression coverage with authoritative SQL shapes.

@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from core.sql_connection_custody import SqlCleanupUnknown
 from kvk.dal.new_source_import_dal import UncertainCommit
 from services import export_contention as module
 from services.export_coordination_dal import _mutex
@@ -52,7 +53,7 @@ def test_retry_proof_requires_rollback_and_connection_release(failure):
     if failure:
         getattr(connection, failure).side_effect = OSError(failure)
     error = refusal()
-    with pytest.raises(OSError if failure else module.CoordinationLockRefused):
+    with pytest.raises(SqlCleanupUnknown if failure else module.CoordinationLockRefused):
         with module.transaction(lambda: connection):
             raise error
     assert error.transaction_released is (failure is None)
@@ -300,8 +301,9 @@ def test_terminal_claim_without_rollback_close_proof_keeps_ticket(tmp_path, fail
             raise error
 
     dal.claim.side_effect = claim
-    with pytest.raises(OSError):
+    with pytest.raises(SqlCleanupUnknown) as caught:
         runtime.begin_writer("all_kvk")
+    assert caught.value.__cause__ is error
     assert not error.transaction_released
     dal.withdraw_unstarted.assert_not_called()
     dal.claim.assert_called_once()
