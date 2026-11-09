@@ -28,9 +28,24 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_d2b_hash(root, path):
+    """Authenticate D2b before exposing the unchanged D2a release assertion."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path not in prepare_k98_update.P02_D2B_PROFILE_CUSTODY_PATHS:
+        return actual
+    successor = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "p02_d2b_profile_sql_custody_v1"
+    )
+    member = next(m for m in successor["members"] if m["path"] == path)
+    assert actual == member["after_sha256"], path
+    return member["before_sha256"]
+
+
 def before_d2a_hash(root, path):
     """Authenticate D2a before exposing the unchanged prior release assertion."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_d2b_hash(root, path)
     if path not in prepare_k98_update.P02_D2A_CONNECTION_PATHS:
         return actual
     successor = next(

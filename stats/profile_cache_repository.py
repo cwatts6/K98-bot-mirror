@@ -1,8 +1,9 @@
 """Profile SQL read/mapping contract. No cache or filesystem publication."""
 
-from contextlib import nullcontext
 from datetime import datetime
 import logging
+
+from event_calendar.sql_lifecycle import SqlSession
 
 logger = logging.getLogger(__name__)
 
@@ -63,14 +64,16 @@ def _safe_utc(dt):
     return dt
 
 
-def read_profiles(connect=None):
+def read_profiles(connect=None, *, sql_outcome):
+    """Read under explicit custody; the caller retains uncertain SQL outcomes."""
     out, omitted = {}, []
-    conn = (connect or _connect)()
-    managed = hasattr(conn, "__enter__") and hasattr(conn, "__exit__")
-    cur = None
+    session = SqlSession(connect or _connect, read_only=True)
+    session.outcome = sql_outcome
+    # A factory exception cannot acknowledge cleanup of a partial allocation.
+    sql_outcome.cleanup = "unconfirmed"
     try:
-        with conn if managed else nullcontext(conn) as active:
-            cur = active.cursor()
+        with session:
+            cur = session.cursor()
             # v_PlayerProfile is the one-stop view we joined earlier
             cur.execute("SELECT * FROM dbo.v_PlayerProfile WITH (NOLOCK)")
             rows = cur.fetchall()
@@ -160,13 +163,13 @@ def read_profiles(connect=None):
                 )
 
     finally:
-        if cur is not None:
-            try:
-                cur.close()
-            except Exception:
-                pass
-        if not managed:
-            conn.close()
+        if sql_outcome.cleanup != "settled":
+            # Keep custody even if an abrupt worker exit interrupts cleanup.
+            sql_outcome.retained_connection = session.connection
+    if sql_outcome.cleanup != "settled":
+        raise RuntimeError("profile_sql_cleanup_unconfirmed")
+    if sql_outcome.rollback != "confirmed":
+        raise RuntimeError("profile_sql_rollback_unconfirmed")
     for value in out.values():
         if isinstance(value.get("KVK"), list):
             value["KVK"].sort(key=lambda x: x.get("KVK") or 0, reverse=True)

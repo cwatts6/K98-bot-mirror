@@ -3630,6 +3630,41 @@
           "after_sha256": "f71e08ae30a76af29a99a5e72b6f34186c30ef724ef6f985379863ab098b7f50"
         }
       ]
+    },
+    {
+      "id": "p02_d2b_profile_sql_custody_v1",
+      "members": [
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f",
+          "after_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f"
+        },
+        {
+          "path": "event_calendar/sql_lifecycle.py",
+          "before_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d",
+          "after_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d"
+        },
+        {
+          "path": "profile_cache.py",
+          "before_sha256": "3d3f3e2ea6c065c7eef7a6605a41a1ad5a39babe15a26a44c615490c949f0246",
+          "after_sha256": "7de72ab44a69262b0792644eb8f1e5bc28fc16ec0c5b194e7dc7a62d1120814c"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "dd6afc432cba152a5553572464b4419b7aa4aad9acbcb847ff085c068c82e145",
+          "after_sha256": "dd6afc432cba152a5553572464b4419b7aa4aad9acbcb847ff085c068c82e145"
+        },
+        {
+          "path": "services/profile_cache_service.py",
+          "before_sha256": "8fcf27184d0f6dfe61bd8338fc9442437c7fb2df86881bbd4f7f4c01d619fb66",
+          "after_sha256": "1d07c60c8dd3b1816eef2d20832896914abf8576b8cbade7dd21620c0b7324d5"
+        },
+        {
+          "path": "stats/profile_cache_repository.py",
+          "before_sha256": "f71e08ae30a76af29a99a5e72b6f34186c30ef724ef6f985379863ab098b7f50",
+          "after_sha256": "6c4d7b315f83b87d68c8cc5a41447db578a91adf64508b43ce3c28a3b9e6dbba"
+        }
+      ]
     }
   ]
 }
