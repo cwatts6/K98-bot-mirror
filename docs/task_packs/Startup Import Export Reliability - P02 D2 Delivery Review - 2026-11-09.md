@@ -837,3 +837,57 @@ was separately reviewed in final Changes scan
 `d0f1ad35-c6b1-4f27-bc83-38040a9ca59a`, complete with zero findings, snapshot
 `03f22f49cae70a1742cdb56cf8021cee0f4031d68f85f4f2ba26025362fdaef7`.
 No production release, restart, provider execution or retained recovery occurred.
+
+## D2k refusal-triggered holder evidence — scoped before coding
+
+Add a bounded read-only diagnostic to the two exactly attributed admission
+refusals. The global legacy snapshot resource has a fully visible name; observe
+only granted holders in the current database and public-principal namespace,
+retaining requester identity separately from holder session birth and physical
+connection identity. Evidence is explicitly observed after refusal, not proof of
+the historical blocking owner or physical closure. Missing permission, vanished
+holders, ambiguous connections and truncated coordination names remain unavailable.
+No broad server grant, provider call, retry, force release or background poll is
+introduced. Existing error codes and original failure remain authoritative.
+
+Use one diagnostic cursor with a one-second statement timeout on the original
+failed connection, restore its prior timeout, and close the cursor. Cleanup
+uncertainty retains the connection and cannot erase the original refusal. The
+source-of-truth SQL definitions remain unchanged; Microsoft DMV contracts and an
+owned disposable native fixture establish the queried system columns and exact
+resource representation. Test positive holder identity, foreign resources,
+disappearing/ambiguous holders, denied access, bounded timeout and failed cleanup.
+Bot Changes review required, Deep off; combined D2 caller census remains due.
+
+D2j merged as mirror PR 508 at `2d533f799bf0d3f1bbf7b14395ed6a9021590845`
+after exact-head review completed without findings. D2k implements the scoped
+diagnostic with one one-second cursor and at most three rows; no SQL repository
+change or permission grant is required. Its exact resource representation was
+checked against [SQL lock DMV documentation](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-tran-locks-transact-sql?view=sql-server-ver17),
+[connection identities](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-connections-transact-sql),
+and [server permission checks](https://learn.microsoft.com/en-us/sql/t-sql/functions/has-perms-by-name-transact-sql?view=sql-server-ver17).
+Coordination's longer hashed resource is explicitly unavailable; it is not matched
+from a truncated prefix. No login/host/query text is returned.
+
+Four new native cases pass: session and transaction holders, disappearance with a
+similarly named foreign resource, a caller without server-view permission, and a
+real driver timeout preserving 51421 and restoring the original query limit.
+They use only new disposable databases; permission testing uses a local user
+without login and grants nothing. The first fixture attempt exposed parameterized
+batch transaction-count handling and the native check caught an invalid server
+permission-class argument; both were corrected before qualification. Resource
+preflight retained >8 GiB RAM/disk, zero version store and tempdb log use 27.7%; no
+retained database was modified. An initial overbroad all-database log check was
+replaced with the plan's tempdb/new-fixture check before creating any fixture.
+
+Validation: 73 focused/native checks, 221 caller regressions (21 opt-in skips),
+and 175 final release/reader checks pass; operational logs unchanged. Architecture,
+deferred, routing, selection, lint, imports and registration pass. Type comparison
+retains 52 inherited diagnostics and removes one; the new helper has none.
+Changes scan `0f358018-cd7c-4898-a5ba-9ebd3b4af5e3` completed with zero findings,
+snapshot `da400ee7b9dc970e3ac89facbfb7fea777e12de83ab113016b9f5aafc0891e08`.
+The eight-member/four-change `p02_d2k_holder_diagnostics_v1` family adds one helper,
+preserves all 79 predecessors (canonical digest
+`dbde06387dd0a3e437dd778bdbf168f5a04546b6188c0e2216276279758c29ef`), and bounds
+the registry to 80 entries/224256 bytes. Full-suite and final caller/resource
+census remain at the combined D2 checkpoint; no production action occurred.

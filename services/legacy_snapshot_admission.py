@@ -14,6 +14,7 @@ class SnapshotAdmissionRefused(RuntimeError):
         self.transaction_state = transaction_state
         self.transaction_count = transaction_count
         self.elapsed_ms = elapsed_ms
+        self.holder_observation = dict(status="unavailable", reason="not_observed")
 
 
 def acquire_snapshot_guard(cursor):
@@ -37,11 +38,18 @@ def acquire_snapshot_guard(cursor):
         )
         if args and args[0] == "42000" and "(51421)" in text and match:
             result, session, state, count = map(int, match.groups())
-            raise SnapshotAdmissionRefused(
+            refusal = SnapshotAdmissionRefused(
                 result=result,
                 session=session,
                 transaction_state=state,
                 transaction_count=count,
                 elapsed_ms=max(0, int((time.monotonic() - started) * 1000)),
-            ) from original
+            )
+            if result == -1:
+                from services.sql_lock_holder_diagnostics import SNAPSHOT_RESOURCE, observe_holder
+
+                refusal.holder_observation = observe_holder(
+                    cursor, resource=SNAPSHOT_RESOURCE, requester=session, original=original
+                )
+            raise refusal from original
         raise

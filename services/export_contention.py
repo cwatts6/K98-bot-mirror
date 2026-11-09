@@ -35,6 +35,7 @@ class CoordinationLockRefused(RuntimeError):
         self.resource_hash = resource_hash
         self.transaction_released = False
         self.phase_timings_ms = None
+        self.holder_observation = dict(status="unavailable", reason="not_observed")
 
 
 class MetadataContention(RuntimeError):
@@ -63,6 +64,8 @@ def sql_error_facts(error):
             transaction_count=error.transaction_count,
             admission_elapsed_ms=error.elapsed_ms,
             holder_identity="unknown",
+            session_role="requester",
+            holder_observation=error.holder_observation,
             physical_closure="not_established_by_refusal",
         )
     if isinstance(error, MetadataContention):
@@ -88,6 +91,8 @@ def sql_error_facts(error):
             transaction_count=error.transaction_count,
             resource_sha256=error.resource_hash,
             transaction_released=error.transaction_released,
+            session_role="requester",
+            holder_observation=error.holder_observation,
         )
     if isinstance(error, CoordinationLockRefused) and error.phase_timings_ms is not None:
         result["phase_timings_ms"] = dict(error.phase_timings_ms)

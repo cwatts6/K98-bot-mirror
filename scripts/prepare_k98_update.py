@@ -616,6 +616,20 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P02_D2K_HOLDER_DIAGNOSTICS_PATHS = frozenset(
+    {
+        "core/export_sql_connection.py",
+        "core/sql_connection_custody.py",
+        "kvk/dal/new_source_import_dal.py",
+        "services/legacy_snapshot_admission.py",
+        "services/export_contention.py",
+        "services/export_coordination_dal.py",
+        "services/sql_lock_holder_diagnostics.py",
+        "services/legacy_export_snapshot_dal.py",
+    }
+)
+
+
 P02_D2J_OBSERVATION_DISPATCH_PATHS = frozenset(
     {
         "core/export_process_identity.py",
@@ -1068,13 +1082,13 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    # Fixed D2j successor plus Windows newlines; still a bounded installed file.
-    if len(raw) > 216064:
+    # Fixed D2k successor plus Windows newlines; still a bounded installed file.
+    if len(raw) > 224256:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 79:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 80:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -1184,6 +1198,10 @@ def reviewed_transitions():
             )
             fixed_p02_phase1 = (
                 item["id"] == "p02_phase1_sql_exports_v1" and path in P02_PHASE1_SQL_EXPORT_PATHS
+            )
+            fixed_p02_d2k = (
+                item["id"] == "p02_d2k_holder_diagnostics_v1"
+                and path in P02_D2K_HOLDER_DIAGNOSTICS_PATHS
             )
             fixed_p02_d2j = (
                 item["id"] == "p02_d2j_observation_dispatch_v1"
@@ -1349,6 +1367,7 @@ def reviewed_transitions():
                     or fixed_p016
                     or fixed_p021
                     or fixed_p02_phase1
+                    or fixed_p02_d2k
                     or fixed_p02_d2j
                     or fixed_p02_d2i
                     or fixed_p02_d2h
@@ -1524,6 +1543,11 @@ def reviewed_transitions():
             and paths != P02_D2J_OBSERVATION_DISPATCH_PATHS
         ):
             raise ValueError("Complete fixed P02 D2j observation dispatch transition required.")
+        if (
+            item["id"] == "p02_d2k_holder_diagnostics_v1"
+            and paths != P02_D2K_HOLDER_DIAGNOSTICS_PATHS
+        ):
+            raise ValueError("Complete fixed P02 D2k holder diagnostics transition required.")
         if item["id"] == "p02_d2i_sql_lifecycle_v1" and paths != P02_D2I_SQL_LIFECYCLE_PATHS:
             raise ValueError("Complete fixed P02 D2i SQL lifecycle transition required.")
         if (
