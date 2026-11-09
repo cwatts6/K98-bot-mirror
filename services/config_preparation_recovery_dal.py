@@ -3,6 +3,7 @@
 Uses existing S10C/S11 objects; no schema migration, automatic worker or retry.
 """
 
+from core.recovery_sql_snapshot import recovery_snapshot
 from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
 from kvk.dal.source_output_pool_dal import _wire
 from services.export_coordination_dal import _cas, _mutex, bounded_json, identity as identifier
@@ -13,14 +14,14 @@ class ConfigPreparationRecoveryDAL:
         self.connect = connect
 
     def identity(self):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS server, DB_NAME() AS [database]"
             )
             return one(cursor)
 
     def pending_recovery(self, *, account, storage_owner, after=None):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (20) PreparationID FROM dbo.ExportPreparation WHERE AccountKey=? "
                 "AND StorageOwner=? AND ConsumerKind='config' AND State IN ('preflight','uncertain') "
@@ -34,7 +35,7 @@ class ConfigPreparationRecoveryDAL:
 
     def target_data(self, preparation_id, *, account, storage_owner):
         """Select a target from the registered database; callers cannot supply ownership."""
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT * FROM dbo.ExportPreparation WHERE PreparationID=? AND AccountKey=? "
                 "AND StorageOwner=? AND ConsumerKind='config'",
@@ -64,11 +65,14 @@ class ConfigPreparationRecoveryDAL:
                 )
             )
 
-    def _snapshot(self, cursor, target):
-        # Same account -> sorted resources -> owner lock order as normal admission.
-        _mutex(cursor, "account:" + target.account)
-        for key, _ in target.resources:
-            _mutex(cursor, key)
+    def _snapshot(self, cursor, target, *, passive=False):
+        # Settlement retains account -> sorted resources -> owner lock order.
+        # Only the dedicated observation context may omit mutation locks.
+        if not passive:
+            _mutex(cursor, "account:" + target.account)
+            for key, _ in target.resources:
+                _mutex(cursor, key)
+        locks = "" if passive else "WITH (UPDLOCK,HOLDLOCK)"
         cursor.execute(
             "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS server, DB_NAME() AS [database]"
         )
@@ -79,20 +83,20 @@ class ConfigPreparationRecoveryDAL:
         ):
             raise SourceConflict("Recovery SQL target differs.")
         cursor.execute(
-            "SELECT * FROM dbo.ExportPreparation WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=?",
+            f"SELECT * FROM dbo.ExportPreparation {locks} WHERE PreparationID=?",
             target.preparation_id,
         )
         preparation = one(cursor)
         cursor.execute(
-            "SELECT ResourceKey FROM dbo.ExportPreparationResource WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=? ORDER BY ResourceKey",
+            f"SELECT ResourceKey FROM dbo.ExportPreparationResource {locks} WHERE PreparationID=? ORDER BY ResourceKey",
             target.preparation_id,
         )
         membership = [r["ResourceKey"] for r in rows(cursor)]
         # Include unexpected owned resources too; a partial key list cannot unlock.
         cursor.execute(
-            "SELECT r.* FROM dbo.ExportResource r WITH (UPDLOCK,HOLDLOCK) WHERE "
+            f"SELECT r.* FROM dbo.ExportResource r {locks} WHERE "
             "r.ActivePreparationID=? OR EXISTS (SELECT 1 FROM dbo.ExportPreparationResource m "
-            "WITH (UPDLOCK,HOLDLOCK) WHERE m.PreparationID=? AND m.ResourceKey=r.ResourceKey) ORDER BY r.ResourceKey",
+            f"{locks} WHERE m.PreparationID=? AND m.ResourceKey=r.ResourceKey) ORDER BY r.ResourceKey",
             target.preparation_id,
             target.preparation_id,
         )
@@ -102,7 +106,7 @@ class ConfigPreparationRecoveryDAL:
         # every stream owned by this preparation and every active account claim;
         # only unrelated terminal history is excluded from the conflict set.
         cursor.execute(
-            "SELECT s.* FROM dbo.ExportExecutionStream s WITH (UPDLOCK,HOLDLOCK) WHERE "
+            f"SELECT s.* FROM dbo.ExportExecutionStream s {locks} WHERE "
             "s.PreparationID=? OR s.ActiveAccountKey=? OR (s.State NOT IN ('closed','read_contained','target_contained') AND EXISTS ("
             "SELECT 1 FROM OPENJSON(s.ScopeJson,'$.resources') WITH (ResourceKey varchar(256) '$.key') x "
             "JOIN dbo.ExportPreparationResource m ON m.ResourceKey=x.ResourceKey COLLATE Latin1_General_100_BIN2 "
@@ -113,13 +117,13 @@ class ConfigPreparationRecoveryDAL:
         )
         streams = rows(cursor)
         cursor.execute(
-            "SELECT COUNT_BIG(*) AS n FROM dbo.ExportProviderRequest r WITH (UPDLOCK,HOLDLOCK) "
+            f"SELECT COUNT_BIG(*) AS n FROM dbo.ExportProviderRequest r {locks} "
             "JOIN dbo.ExportExecutionStream s ON s.StreamID=r.StreamID WHERE s.PreparationID=?",
             target.preparation_id,
         )
         requests = one(cursor)["n"]
         cursor.execute(
-            "SELECT COUNT_BIG(*) AS n FROM dbo.ExportProviderRequestEvent e WITH (UPDLOCK,HOLDLOCK) "
+            f"SELECT COUNT_BIG(*) AS n FROM dbo.ExportProviderRequestEvent e {locks} "
             "JOIN dbo.ExportProviderRequest r ON r.RequestID=e.RequestID "
             "JOIN dbo.ExportExecutionStream s ON s.StreamID=r.StreamID WHERE s.PreparationID=?",
             target.preparation_id,
@@ -149,8 +153,8 @@ class ConfigPreparationRecoveryDAL:
         return result
 
     def snapshot(self, target):
-        with transaction(self.connect) as cursor:
-            return self._snapshot(cursor, target)
+        with recovery_snapshot(self.connect) as cursor:
+            return self._snapshot(cursor, target, passive=True)
 
     def settle(self, target, expected, audit, *, containment=None):
         if not audit.get("actor") or not audit.get("reason"):

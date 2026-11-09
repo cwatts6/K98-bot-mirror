@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_d2e_hash
 
 
 def receipt_transition():
@@ -20,10 +21,7 @@ def test_receipt_transition_pins_both_reviewed_runtime_files():
     root = Path(__file__).resolve().parents[1]
     assert {m["path"] for m in transition["members"]} == updater.RECOVERY_RECEIPT_ROUNDTRIP_PATHS
     for member in transition["members"]:
-        assert (
-            updater.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        assert before_d2e_hash(root, member["path"]) == member["after_sha256"]
         assert member["before_sha256"] != member["after_sha256"]
 
 

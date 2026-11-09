@@ -47,8 +47,14 @@ def local_sql(sql):
 
 
 @pytest.fixture
-def sql_fixture():
+def sql_fixture(monkeypatch):
     import pyodbc
+
+    from services import config_preparation_recovery_dal as recovery_module
+
+    # This borrowed-session fixture proves query/CAS behavior only. Dedicated
+    # snapshot isolation and physical cleanup have their own native tests.
+    monkeypatch.setattr(recovery_module, "recovery_snapshot", recovery_module.transaction)
 
     namespace = uuid4().hex
     native = pyodbc.connect(

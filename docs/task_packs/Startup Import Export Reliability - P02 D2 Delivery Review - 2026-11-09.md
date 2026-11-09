@@ -405,3 +405,81 @@ release-boundary suite pass; other full-suite cases already passed.
 The final related recheck passed **2,043 tests**, including all three corrected
 cases, with operational-log isolation passing. No runtime/tooling change was
 needed after the full run or sealed security review.
+## D2e configuration recovery observations
+
+D2d mirror PR 502 merged as `55919d93a1b6901941f122cbdbe15598659e2430`
+after exact-head Codex review completed with no findings. Copilot reported a
+plan/model restriction, not a completed independent review; no inline issues
+were submitted. Production qualification remains a later gate.
+
+The operator authorized continuing all remaining D2 slices without another
+per-slice approval. Keep focused mirror PRs, their reviews and validation; provide
+a full D2 summary when the remaining matrix is closed. Deployment is separate.
+
+D2e separates `ConfigPreparationRecoveryDAL.identity`, `pending_recovery`,
+`target_data` and `snapshot` into the unchanged dedicated `recovery_snapshot`
+contract: three-second statements, zero row-lock wait, explicit snapshot
+isolation, rollback/physical-close acknowledgement, no commit or retry fallback.
+The default `_snapshot` still takes account/resource mutexes and UPDLOCK/HOLDLOCK;
+`settle` retains that default, complete fresh-state equality, owner/fence/version
+CAS and atomic containment. The complete result still includes unexpected owned
+resources, immutable membership, related/active foreign streams and request/event
+counts. Queries and shapes were checked against the six authoritative SQL tables;
+there is no SQL schema, permission, source-selection or credential change.
+
+`config_recovery_authority._inspect` can recover owned/abandoned closures. It is
+not made passive or concurrent: each new DAL observation closes before that
+existing mutation or the next observation begins. The service, authority and
+snapshot helper remain unchanged. No command/view changes or new helper are
+needed. Existing SQL-authoritative persistence and restart predicates remain.
+
+Regression evidence: five new tests failed against the predecessor, four passed.
+After implementation, 80 focused recovery/helper checks and nine native checks
+passed. The native tests use a new uniquely owned local disposable database,
+source columns/checks and SELECT-only preview principal, with external FKs omitted.
+They prove both arrival orders, complete old/new tuples across a writer commit,
+foreign-stream/unexpected-resource/provider-ledger conflict retention, stale-state
+settlement refusal, fresh settlement fence/membership preservation, account-scope
+refusal and physical closure after permission denial. Teardown does not force
+eviction. The older single-session temporary-table fixture remains query/CAS
+proof only and explicitly uses its borrowed transaction wrapper.
+
+Release transition `p02_d2e_config_observation_v1` authenticates six exact members
+(one runtime DAL changes). Prior 73 entries remain immutable; canonical hash
+`a7f129167373c974554b14066a456e55bebe546458803abaa98a066b7665f378`.
+Registry count is 74 and bounded bytes 187392. Historical tests authenticate the
+successor before projecting earlier identities; no historical entry is rewritten.
+
+Security routing: exact Bot Changes review against merged D2d, Deep off, required
+for DAL and updater behavior. SQL review is separately skipped because its tree
+is unchanged. Broad transition/configuration/cleanup regression and deterministic
+gates are required before PR. Run the full suite at the combined D2 checkpoint;
+for this isolated DAL slice, unchanged shared helper/service/command behavior is
+covered by focused and broad related regressions plus native SQL. This avoids
+repeating the full suite solely for registry-count constants, while retaining
+D2d's full-suite result and its corrected-assertion rerun as prior evidence.
+### D2e inherited row-mapping typing debt
+
+### Deferred Optimisation
+- Area: `services/config_preparation_recovery_dal.py`
+- Type: consistency
+- Description: Ten existing row-mapping type diagnostics reproduce with the same messages on the exact D2d base; the observation change does not introduce them.
+- Suggested Fix: Introduce precise row/result shapes in a separately scoped typing cleanup while preserving wire output and receipt equality.
+- Impact: low
+- Risk: medium
+- Dependencies: Existing recovery/containment contract and native regression evidence.
+
+D2e Changes scan `73266969-dd1f-4f52-9f1f-1d9274e398cc` completed with zero
+findings and all three executable inventory items reviewed. Digest:
+`f532da2bfb01272ff8bc6762776ad00108ca6f2e69e191e9c09ed8db90e26bb8`.
+Post-scan changes are evidence documentation and test-only lint/assertion cleanup;
+application/tooling bytes remain unchanged. Architecture, deferred, routing,
+Ruff, import smoke and command registration passed. An additional 111 release
+identity/schema regressions passed. Full-suite-at-D2-close decision remains above.
+D2e broad related run: 2153 passed, 55 opt-in SQL skips, one existing dependency
+warning and one historical recovery-transition assertion failure. The assertion
+now uses the authenticated D2e predecessor bridge; prior registry entries stay
+unchanged. This is a test-only post-scan correction, inspected separately; no
+runtime or updater behavior changed. The final affected checks and log-isolation
+result are recorded in the private validation receipt and PR. Ten inherited
+Pyright diagnostics match the exact base. Native final rerun: nine passed.
