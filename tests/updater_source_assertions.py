@@ -28,9 +28,24 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_d2k_hash(root, path):
+    """Authenticate D2k before exposing the unchanged prior release assertion."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path not in prepare_k98_update.P02_D2K_HOLDER_DIAGNOSTICS_PATHS:
+        return actual
+    successor = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "p02_d2k_holder_diagnostics_v1"
+    )
+    member = next(m for m in successor["members"] if m["path"] == path)
+    assert actual == member["after_sha256"], path
+    return member["before_sha256"]
+
+
 def before_d2j_hash(root, path):
     """Authenticate D2j before exposing the unchanged prior release assertion."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_d2k_hash(root, path)
     if path not in prepare_k98_update.P02_D2J_OBSERVATION_DISPATCH_PATHS:
         return actual
     successor = next(

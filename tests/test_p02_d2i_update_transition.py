@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
-from tests.updater_source_assertions import before_d2i_hash
+from tests.updater_source_assertions import before_d2i_hash, before_d2j_hash
 
 
 def transition():
@@ -17,7 +17,7 @@ def transition():
 
 def test_prior_77_transitions_are_immutable():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 79
+    assert len(entries) == 80
     assert hashlib.sha256(json.dumps(entries[:77], sort_keys=True).encode()).hexdigest() == (
         "d0d4240d8f57c2c5ea3983b930418797166df5854344043702e6fd1e12501857"
     )
@@ -30,7 +30,10 @@ def pair(monkeypatch):
     for member in transition()["members"]:
         path = member["path"]
         after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert updater.sha256(after[path]) == member["after_sha256"], path
+        assert before_d2j_hash(root, path) == member["after_sha256"], path
+        if updater.sha256(after[path]) != member["after_sha256"]:
+            after[path] = ("inert D2i reference:" + path).encode()
+            known[after[path]] = member["after_sha256"]
         assert before_d2i_hash(root, path) == member["before_sha256"]
         if member["before_sha256"] is None:
             before[path] = None

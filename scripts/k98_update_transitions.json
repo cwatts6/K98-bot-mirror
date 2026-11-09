@@ -4030,6 +4030,51 @@
           "after_sha256": "654b39ce92e628796ee64214be05cd05ce55bbcbb70370d2f9314629721eed8e"
         }
       ]
+    },
+    {
+      "id": "p02_d2k_holder_diagnostics_v1",
+      "members": [
+        {
+          "path": "core/export_sql_connection.py",
+          "before_sha256": "d78906b799ffdb3503e2413802498c7452408d15d2f6377e253bc3d62973da5d",
+          "after_sha256": "d78906b799ffdb3503e2413802498c7452408d15d2f6377e253bc3d62973da5d"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91",
+          "after_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91"
+        },
+        {
+          "path": "kvk/dal/new_source_import_dal.py",
+          "before_sha256": "367f58a4fa4f5b9b0841692855a200eebbef52acb21d287daed3d5f4795720b3",
+          "after_sha256": "367f58a4fa4f5b9b0841692855a200eebbef52acb21d287daed3d5f4795720b3"
+        },
+        {
+          "path": "services/export_contention.py",
+          "before_sha256": "4f6838c0671f58bc80143896566f87914f1915c2ad7e93067fda39a905f872b0",
+          "after_sha256": "ba225008dde44992cb513af9448586ea98b5b70f263de8fbd6c0d6987baba854"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "9580a889f33f170b7e89b5aff3d83850ed1292ddcf24f88921202a715626d3df",
+          "after_sha256": "b82fdb69460575be24e77c6ad508684fa3778f39fd07df4380c5eba63f254a4c"
+        },
+        {
+          "path": "services/legacy_export_snapshot_dal.py",
+          "before_sha256": "c3d8507ff11d9c9e18406525bf8ff4cc2d6c19c5072587ddbd8615f7a4040273",
+          "after_sha256": "c3d8507ff11d9c9e18406525bf8ff4cc2d6c19c5072587ddbd8615f7a4040273"
+        },
+        {
+          "path": "services/legacy_snapshot_admission.py",
+          "before_sha256": "2984b9b6b5d0418af8bb98932961b41bdb8826ed4e06b1e6e05545f64c29990b",
+          "after_sha256": "14e331b16f7bc18f3d583de0900caa9998fffc6e75cfd1471da3358984956b56"
+        },
+        {
+          "path": "services/sql_lock_holder_diagnostics.py",
+          "before_sha256": null,
+          "after_sha256": "8addfd7a80941429a4cf23476585b605b3b52063c6e355fd2b59906baefdb6df"
+        }
+      ]
     }
   ]
 }

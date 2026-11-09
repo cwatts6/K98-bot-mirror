@@ -293,15 +293,31 @@ def _mutex(cursor, key, *, wait_ms=0, owner="Transaction"):
             r"K98_COORDINATION_LOCK result=(-1|-2|-3|-999) session=(\d{1,5}) xact=(-1|0|1) count=(\d{1,10})(?!\d)",
             text,
         )
-        if match and 51400 in facts["native_errors"] and facts["sqlstate"] == "42000":
+        native_errors = facts["native_errors"]
+        if (
+            match
+            and isinstance(native_errors, list)
+            and 51400 in native_errors
+            and facts["sqlstate"] == "42000"
+        ):
             result, session, state, count = map(int, match.groups())
-            raise CoordinationLockRefused(
+            refusal = CoordinationLockRefused(
                 result=result,
                 session=session,
                 transaction_state=state,
                 transaction_count=count,
                 resource_hash=resource_hash,
-            ) from original
+            )
+            if result == -1:
+                from services.sql_lock_holder_diagnostics import observe_holder
+
+                refusal.holder_observation = observe_holder(
+                    cursor,
+                    resource=coordination_lock_name(key),
+                    requester=session,
+                    original=original,
+                )
+            raise refusal from original
         logger.warning(
             "export_mutex_error %s",
             json.dumps(dict(resource_sha256=resource_hash, **facts), sort_keys=True),
