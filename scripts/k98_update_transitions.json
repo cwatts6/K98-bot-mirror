@@ -4072,7 +4072,7 @@
         {
           "path": "services/sql_lock_holder_diagnostics.py",
           "before_sha256": null,
-          "after_sha256": "dc5f32818b44726e6af83fc94b42d99b9cf0f828a8bc8754ed6370427e98c30d"
+          "after_sha256": "8addfd7a80941429a4cf23476585b605b3b52063c6e355fd2b59906baefdb6df"
         }
       ]
     }

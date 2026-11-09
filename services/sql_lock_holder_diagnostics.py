@@ -48,6 +48,8 @@ def observe_holder(cursor, *, resource, requester, original):
         return evidence
     connection = diagnostic = None
     previous = None
+    interruption = None
+    cleanup_error = None
     try:
         connection = cursor.connection
         previous = connection.timeout
@@ -102,6 +104,8 @@ def observe_holder(cursor, *, resource, requester, original):
     except BaseException as error:
         evidence = dict(status="unavailable", reason="observation_failed")
         original.add_note("Holder observation failed: " + type(error).__name__)
+        if not isinstance(error, Exception):
+            interruption = error
     finally:
         for phase, action in (
             ("timeout_restore", lambda: setattr(connection, "timeout", previous)),
@@ -114,12 +118,18 @@ def observe_holder(cursor, *, resource, requester, original):
             except BaseException as error:
                 evidence = dict(status="unavailable", reason="cleanup_unconfirmed")
                 original.add_note("Holder " + phase + " failed: " + type(error).__name__)
-                retain_connection(
-                    # Retain the cursor too: an unacknowledged close must not
-                    # let its Python object be collected before its connection.
-                    SimpleNamespace(connection=connection, cursor=diagnostic),
-                    effect="not_started",
-                    first_failure=original,
-                    cleanup_error=error,
-                )
+                cleanup_error = cleanup_error or error
+                if not isinstance(error, Exception) and interruption is None:
+                    interruption = error
+        if cleanup_error is not None:
+            # One bundle per connection, retaining its cursor even when several
+            # cleanup steps fail. Counts describe owners rather than failures.
+            retain_connection(
+                SimpleNamespace(connection=connection, cursor=diagnostic),
+                effect="not_started",
+                first_failure=original,
+                cleanup_error=cleanup_error,
+            )
+    if interruption is not None:
+        raise interruption from original
     return evidence

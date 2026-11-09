@@ -71,7 +71,7 @@ def test_partial_or_inconsistent_identity_is_unavailable(index, value):
     assert "secret" not in str(result)
 
 
-@pytest.mark.parametrize("error", [RuntimeError("secret"), KeyboardInterrupt()])
+@pytest.mark.parametrize("error", [RuntimeError("secret")])
 def test_diagnostic_failure_preserves_original_and_closes(error):
     result, connection, diagnostic, original = observe(error=error)
     assert result == dict(status="unavailable", reason="observation_failed")
@@ -79,6 +79,30 @@ def test_diagnostic_failure_preserves_original_and_closes(error):
     diagnostic.close.assert_called_once()
     assert type(error).__name__ in original.__notes__[0]
     assert "secret" not in str(result)
+
+
+@pytest.mark.parametrize("phase", ["query", "close"])
+def test_process_interrupt_propagates_after_cleanup_with_original_refusal(phase):
+    diagnostic = Mock()
+    diagnostic.execute.return_value = diagnostic
+    diagnostic.fetchmany.return_value = []
+    interrupt = KeyboardInterrupt()
+    if phase == "query":
+        diagnostic.execute.side_effect = interrupt
+    else:
+        diagnostic.close.side_effect = interrupt
+    connection = SimpleNamespace(timeout=15, cursor=Mock(return_value=diagnostic))
+    original = RuntimeError("original refusal")
+    with pytest.raises(KeyboardInterrupt) as caught:
+        module.observe_holder(
+            SimpleNamespace(connection=connection),
+            resource=module.SNAPSHOT_RESOURCE,
+            requester=73,
+            original=original,
+        )
+    assert caught.value is interrupt and caught.value.__cause__ is original
+    diagnostic.close.assert_called_once()
+    assert connection.timeout == 15
 
 
 def test_unknown_cleanup_retains_custody_and_never_reports_holder():
@@ -102,6 +126,7 @@ def test_timeout_restoration_failure_retains_cursor_and_first_refusal():
             object.__setattr__(self, name, value)
 
     diagnostic = Mock()
+    diagnostic.close.side_effect = OSError("second cleanup failure")
     connection = Connection()
     connection.cursor = Mock(return_value=diagnostic)
     original = RuntimeError("first")
