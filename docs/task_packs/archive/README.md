@@ -1,4 +1,18 @@
-> **6 November 2026:** P01.6 completed records are archived; see [closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md), [archive register](Startup%20Import%20Export%20Reliability%20-%20Archive%20Register%20-%202026-11-04.md) and [active P02 handover](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Open natural acceptance and programme contracts remain active.
+> **Current P02 checkpoint, 9 November 2026:** Phase 1 SQL/names/numeric/export and selected observer changes are deployed and verified; permanent release regressions are merged. [Approved remaining scope, handoff and lessons](../Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md) now govern D2-D5. Continue remaining P02; production deployment stays separate. P03 settles actual retained-work blockers, with any essential P04 correction, before the first standard import/export test; do not wait merely for the end of P05 or require zero incidents. Earlier dated pending/deployment/approval text below is historical where superseded.
+
+## P02 Phase 1 and superseded preparation, archived 9 November 2026
+
+- [P02 Phase 1 - Permanent Release Regressions - 2026-11-09.md](P02%20Phase%201%20-%20Permanent%20Release%20Regressions%20-%202026-11-09.md)
+- [P02 Phase 1 - Permission Order Recovery - 2026-11-09.md](P02%20Phase%201%20-%20Permission%20Order%20Recovery%20-%202026-11-09.md)
+- [Startup Import Export Reliability - Documentation Carry-forward - 2026-11-06.md](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-06.md)
+- [Startup Import Export Reliability - P02 Chat Starter - 2026-11-06.md](Startup%20Import%20Export%20Reliability%20-%20P02%20Chat%20Starter%20-%202026-11-06.md)
+- [Startup Import Export Reliability - P02 Handover and Scope - 2026-11-06.md](Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md)
+- [Startup Import Export Reliability - P02 Phase 1 Implementation - 2026-11-07.md](Startup%20Import%20Export%20Reliability%20-%20P02%20Phase%201%20Implementation%20-%202026-11-07.md)
+- [Startup Import Export Reliability - P02 Phase 1 Release Plan - 2026-11-09.md](Startup%20Import%20Export%20Reliability%20-%20P02%20Phase%201%20Release%20Plan%20-%202026-11-09.md)
+- [Startup Import Export Reliability - P02.1 Local Candidate - 2026-11-06.md](Startup%20Import%20Export%20Reliability%20-%20P02.1%20Local%20Candidate%20-%202026-11-06.md)
+- [Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 14 SUMMARY_PROC Responsibility and Performance Audit.md](Codex%20Task%20Pack%20-%20Import%20Pipeline%20Deferred%20Optimisation%20Task%20C%20Slice%2014%20SUMMARY_PROC%20Responsibility%20and%20Performance%20Audit.md)
+
+> **6 November 2026:** P01.6 completed records are archived; see [closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md), [archive register](Startup%20Import%20Export%20Reliability%20-%20Archive%20Register%20-%202026-11-04.md) and [active P02 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Open natural acceptance and programme contracts remain active.
 
 # Archived Task Packs
 

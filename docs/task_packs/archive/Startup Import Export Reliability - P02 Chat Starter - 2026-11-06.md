@@ -1,3 +1,5 @@
+> **Archived 9 November 2026:** Superseded or completed Phase 1 instructions. Preserve the dated evidence below; do not replay its commands. [Current P02 scope and dependencies](../Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md) govern remaining work. Deployment is verified; standard production import/export acceptance remains open.
+
 # P02 clean-chat starter
 
 Continue the K98 startup/import/export reliability programme at P02, review/design first. P01.6 was explicitly closed on 6 November with residual intermittent Stats latency, snapshot CPU cost, older fallback/acknowledgement behavior and SQL performance limits recorded for follow-up after P01-P05. Do not repeat accepted deployments or widen that deferral silently.
@@ -5,8 +7,8 @@ Continue the K98 startup/import/export reliability programme at P02, review/desi
 Use `C:/Users/cwatt/.codex/worktrees/p016-production/discord_file_downloader` as the initial source/documentation workspace; the project root may be older. Read AGENTS and the seven required core references, then:
 
 1. [P02 handover and scope](Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md).
-2. [Programme principles](Startup%20Import%20Export%20Reliability%20-%20Programme%20Principles%20-%202026-11-06.md).
-3. [P01.6 closeout](archive/Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md).
+2. [Programme principles](../Startup%20Import%20Export%20Reliability%20-%20Programme%20Principles%20-%202026-11-06.md).
+3. [P01.6 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md).
 4. [Documentation carry-forward](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-06.md), then active scope/tracker/census/tracing/coverage/final sweep and applicable runbooks.
 5. Private `.codex_artifacts/p016-closeout-p02-20261106/P02-PRIVATE-HANDOFF.md` for exact evidence routes. Do not commit raw reports or incident identities.
 

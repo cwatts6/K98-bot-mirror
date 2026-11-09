@@ -1,6 +1,8 @@
+> **Current P02 checkpoint, 9 November 2026:** Phase 1 SQL/names/numeric/export and selected observer changes are deployed and verified; permanent release regressions are merged. [Approved remaining scope, handoff and lessons](Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md) now govern D2-D5. Continue remaining P02; production deployment stays separate. P03 settles actual retained-work blockers, with any essential P04 correction, before the first standard import/export test; do not wait merely for the end of P05 or require zero incidents. Earlier dated pending/deployment/approval text below is historical where superseded.
+
 > **9 November 2026 qualification update:** Phase 1 coordinated SQL, shared latest names, exact numeric/export handling and selected recovery-observer concurrency passed independent full-size isolated verification. The current exports have 49,468 rows across 14 outputs; existing tied-rank and date-window differences are explicitly source-verified in the Phase 1 implementation record. Remaining D2-D4 work, whole-programme D5, release readiness and production/provider acceptance remain open.
 
-> **Phase 1 approved, 7 November 2026:** SQL, names, numeric types and exact export implementation and isolated tests are authorized. See [Phase 1 implementation](Startup%20Import%20Export%20Reliability%20-%20P02%20Phase%201%20Implementation%20-%202026-11-07.md). Remaining contention/maintenance work and production deployment remain separate. Earlier plan-approval holds below are historical for Phase 1 only.
+> **Phase 1 approved, 7 November 2026:** SQL, names, numeric types and exact export implementation and isolated tests are authorized. See [Phase 1 implementation](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20Phase%201%20Implementation%20-%202026-11-07.md). Remaining contention/maintenance work and production deployment remain separate. Earlier plan-approval holds below are historical for Phase 1 only.
 
 # P02 integrated analysis and delivery plan
 
@@ -25,7 +27,7 @@ already committed stages. This is one solution delivered in reviewable slices,
 with a combined acceptance gate; completing the summary rewrite alone cannot close P02.
 
 This document is the current integrated delivery index under the existing
-[P02 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md).
+[P02 handover](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md).
 The [programme principles](Startup%20Import%20Export%20Reliability%20-%20Programme%20Principles%20-%202026-11-06.md),
 [scope](Startup%20Import%20Export%20Reliability%20-%20Scope%20-%202026-11-02.md),
 [tracker](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md)
@@ -153,8 +155,8 @@ it to the supported endpoint contract or retain a scoped compatibility output an
 requalify its cost. Do not hide this behind a permanently stale table. The legacy
 TEST routine's destructive behavior requires a named operational disposition.
 
-SQL detail: `C:/K98-bot-SQL-Server/docs/p021-summary-implementation.md`,
-`docs/p021-summary-numeric-type-review.md`, `docs/p021-deterministic-names.md` and
+SQL detail: `C:/K98-bot-SQL-Server/docs/archive/p021-summary-implementation.md`,
+`docs/archive/p021-summary-numeric-type-review.md`, `docs/archive/p021-deterministic-names.md` and
 `docs/p02-integrated-sql-delivery-plan.md` in the SQL repository.
 
 ## All six maintenance stages

@@ -1,3 +1,28 @@
+> **Current P02 checkpoint, 9 November 2026:** Phase 1 SQL/names/numeric/export and selected observer changes are deployed and verified; permanent release regressions are merged. [Approved remaining scope, handoff and lessons](Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md) now govern D2-D5. Continue remaining P02; production deployment stays separate. P03 settles actual retained-work blockers, with any essential P04 correction, before the first standard import/export test; do not wait merely for the end of P05 or require zero incidents. Earlier dated pending/deployment/approval text below is historical where superseded.
+
+## Phase 1 lessons carried forward, 9 November 2026
+
+- Reproduce the actual failure in permanent tests: qualified host case variants,
+  native permission-entry order, harmless catalogue row shuffling and genuine
+  column-order/privilege drift need different positive and negative controls.
+  Never repair an expected fingerprint by adopting an unreviewed live hash.
+- Native SQL commitment, installer completion, startup verification and provider
+  acceptance are separate outcomes. Resume exact remaining release stages;
+  never reapply committed SQL or start a second process after an unknown start.
+- Use Windows PowerShell 5.1 for production-script qualification. Preserve full
+  child errors, explicit arrays and evidence shapes across process boundaries.
+  Compress bounded evidence instead of casually increasing collection limits.
+- Test-monitor failures can follow successful business work. Read retained
+  completion/output evidence before replay. Track exact connection identities,
+  not reused session numbers. Metadata-reader success does not qualify history
+  readers across index DDL; retain the SQL 3961 case for P02 maintenance work.
+- Latest shared names apply across all reports; historical statistics remain
+  historical. Check date windows against the actual report clock and do not
+  mistake unspecified tied ranks for changed scores or name regressions.
+- Keep scope/recovery dependencies explicit: first standard import/export after
+  actual P03 blockers and essential P04 corrections, not automatically after
+  every incident closes or only at the end of P05. No replay to make status green.
+
 # Reliability programme: engineering and acceptance principles
 
 Operator reaffirmed 6 November 2026 at P01.6 closeout. Apply alongside AGENTS.md and the seven core engineering references, not as a replacement. Current order is P02, remaining P03, P04, P05, then the separately deferred follow-ups and applicable wider programme work. P01.2b was closed by decision without feature delivery; do not resurrect its rejected monitoring design.

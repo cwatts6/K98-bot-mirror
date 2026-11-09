@@ -1,3 +1,5 @@
+> **Archived 9 November 2026:** Superseded or completed Phase 1 instructions. Preserve the dated evidence below; do not replay its commands. [Current P02 scope and dependencies](../Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md) govern remaining work. Deployment is verified; standard production import/export acceptance remains open.
+
 # Phase 1 permission-order recovery
 
 The Phase 1 SQL migration, source and startup seed installed successfully. The

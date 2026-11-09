@@ -1,3 +1,5 @@
+> **Current P02 checkpoint, 9 November 2026:** Phase 1 SQL/names/numeric/export and selected observer changes are deployed and verified; permanent release regressions are merged. [Approved remaining scope, handoff and lessons](../task_packs/Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md) now govern D2-D5. Continue remaining P02; production deployment stays separate. P03 settles actual retained-work blockers, with any essential P04 correction, before the first standard import/export test; do not wait merely for the end of P05 or require zero incidents. Earlier dated pending/deployment/approval text below is historical where superseded.
+
 > **P02 connected-work reconciliation, 7 November 2026:** The [integrated delivery plan](../task_packs/Startup%20Import%20Export%20Reliability%20-%20P02%20Integrated%20Analysis%20and%20Delivery%20Plan%20-%202026-11-07.md) maps the brought-forward summary/numeric work, CFG-51421, lock-acknowledgement testing, release pins and other original P02 obligations. Existing unrelated/post-programme deferrals remain in force; no blanket optimisation batch or production action is authorized.
 
 > **E104, 6 November 2026:** P01.6 is closed with explicit residual limits. The recovery snapshot CPU, older fallback attachment/acknowledgement behavior and residual SQL-consumption investigations remain deferred until after P01-P05. P02 retains its existing observer/admission scope; any overlap requiring an earlier deferred rewrite must be presented as a concrete dependency, not silently absorbed. See [closeout](../task_packs/archive/Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md).
@@ -55,7 +57,7 @@
 26 October overlay: the six Startup Cache Foundations packages are delivered,
 deployed and closed for exercised paths. The original eligible Ark callback passed.
 Natural event transition and exact Daily KVK Overview disposition remain open.
-See the [closeout / R01–R18 ledger](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Closeout%20-%202026-10-26.md) and
+See the [closeout / R01â€“R18 ledger](../task_packs/P1%20Startup%20Cache%20Foundations%20-%20Closeout%20-%202026-10-26.md) and
 [next-phase scope](../task_packs/P1%20Startup%20Coordination%20and%20Background%20Delivery%20-%20Scope%20-%202026-10-26.md). Current P0 defects remain F03/F05;
 this register does not turn them into optional debt or erase earlier accepted work.
 
@@ -79,7 +81,7 @@ clean deployed-main/restart evidence are now recorded. Unresolved items below re
 [Bot Operational Reliability](../task_packs/Bot%20Operational%20Reliability%20-%20Programme%20Pack.md) groups ProcConfig WS1, remaining executors,
 lifecycle, DM/JSON, durable dispatch and evidence-gated import admission as separate workstreams.
 The [24 October P0/P1 reconciliation](P0%20delivery%20and%20P1%20recovery%20status.md)
-supersedes historical design-only status: selected WS1–WS6 capabilities were delivered
+supersedes historical design-only status: selected WS1â€“WS6 capabilities were delivered
 in P0, while their residual scope remains open. Tracked-view restoration is the first
 P1 slice; its approved runtime implementation and local review are complete, with
 eligible original callback accepted on 26 October; exact overview disposition and other residuals remain open. Completed portions are recorded in the resolved history without closing
@@ -121,7 +123,7 @@ inventory upload privacy finding belongs in security triage, not this optimisati
 - Suggested Fix: Audit remaining entrypoints against the delivered transaction/result contract and existing tests. Reconcile legacy v1 reports, per-run artifact identity (including second-resolution naming), cleanup failures and truthful partial/unknown outcomes. Extend only demonstrated gaps; preserve accepted commits and do not rerun imports to reproduce historical evidence.
 - Impact: medium
 - Risk: medium
-- Dependencies: Separate SQL-aware scope and source-of-truth verification before implementation; deterministic cursor/transaction/result and wrapper tests. No repair in Phases 2G–2J; separate from Phase 2K delivery outcomes.
+- Dependencies: Separate SQL-aware scope and source-of-truth verification before implementation; deterministic cursor/transaction/result and wrapper tests. No repair in Phases 2Gâ€“2J; separate from Phase 2K delivery outcomes.
 - Status: WS1 partially delivered through P0; residual contract reconciliation required; owner Chris Watts
 - Last verified: 2026-10-24
 
@@ -141,7 +143,7 @@ inventory upload privacy finding belongs in security triage, not this optimisati
 
 - `implementation-ready`: the current defect or hardening opportunity is confirmed and bounded.
 - `operator policy decision required` / `operator-gated`: no implementation starts without an explicit owner decision.
-- `promoted task pack — refresh required before execution`: a task pack exists, but its evidence or object map must be refreshed.
+- `promoted task pack â€” refresh required before execution`: a task pack exists, but its evidence or object map must be refreshed.
 - `evidence required` / `re-audit required`: collect current measurements before proposing implementation.
 - `blocked`: a named prerequisite or source contract is missing.
 - `later refactor`: valid architectural debt with no immediate correctness requirement.
@@ -198,7 +200,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 ### Deferred Optimisation
 - Area: `core/event_rehydration_lifecycle.py::wait_for_events` and dependent scheduler readiness
 - Type: consistency
-- Description: The former empty-result readiness defect is delivered through #441/#690 and #442/#691. Reports 43–45 naturally show loaded_empty, not stale, with registration loops running and data-dependent one-shots/DM restoration waiting_for_events. Natural empty-to-populated transition remains unobserved.
+- Description: The former empty-result readiness defect is delivered through #441/#690 and #442/#691. Reports 43â€“45 naturally show loaded_empty, not stale, with registration loops running and data-dependent one-shots/DM restoration waiting_for_events. Natural empty-to-populated transition remains unobserved.
 - Suggested Fix: Preserve the delivered distinction and deterministic tests. Accept the natural populated transition only with each deferred member and DM restoration completing without duplicate entry; do not force events, refresh or restart.
 - Impact: medium
 - Risk: medium
@@ -242,15 +244,15 @@ prove current Production behaviour; Production evidence remains an explicit depe
 ### Deferred Optimisation
 - Area: SQL repo `dbo.UPDATE_ALL2`, SQL repo `dbo.SUMMARY_PROC`, and downstream stats/dashboard rebuild procedures
 - Type: performance
-- Description: Task C Slice 13 refreshed the authoritative SQL map and reviewed nine completed post-August fallback batches (IDs 306–345). Every batch recorded 13 completed `update_all2_*` rows. `update_all2_summary_proc` dominated 9/9 batches at 62.1–75.8 seconds and averaged 93.8% of measured subphase time, while the coarse phase still exceeded emitted subphases by 35.9–62.2 seconds. This confirms the outer audit target but does not identify which `SUMMARY_PROC` helper or shared-state responsibility is expensive.
-- Suggested Fix: New retained ON statement evidence attributes 118.841/127.589 seconds to the 32 history/window cache rebuilds (10,778,936 reported delete/insert row actions). Complete retained plan capture now verified: 192 full plans, unchanged 184 summary cost records and static incoming references across ten modules. Preferred proposal: temporary endpoint calculations from existing shared history, covering all eight metrics and the alternate healed path, preserving latest/delta/final outputs and explicitly settling intermediate-cache consumers and rollback freshness. See SQL-repo `docs/p021-summary-optimisation-proposal.md` and `docs/p021-summary-cost-evidence.md`. Broad read grants prevent assuming all external consumers are absent; production cache retirement remains conditional. No extra diagnostic import is currently required. Earlier approved early audit on 2026-11-07: use the P02.1 failed ON rehearsal and source/dependency map to attribute helper/write cost; inspect existing cached/Query Store evidence before any new workload. See SQL-repo `docs/p021-summary-audit.md`. Summary rewrite and isolated local tests subsequently approved and completed on 2026-11-07; no limit increase or production deployment is approved. Historical collection plan: collect naturally occurring evidence for 10–14 days and at least 30 completed fallback batches, then run Task C Slice 14 as a read-only `SUMMARY_PROC` responsibility/performance audit. Use existing Query Store/DMV evidence only where helper attribution is reliable. If attribution remains inconclusive, prepare a separate non-invasive instrumentation proposal; do not tune or decompose from the outer duration alone.
+- Description: Task C Slice 13 refreshed the authoritative SQL map and reviewed nine completed post-August fallback batches (IDs 306â€“345). Every batch recorded 13 completed `update_all2_*` rows. `update_all2_summary_proc` dominated 9/9 batches at 62.1â€“75.8 seconds and averaged 93.8% of measured subphase time, while the coarse phase still exceeded emitted subphases by 35.9â€“62.2 seconds. This confirms the outer audit target but does not identify which `SUMMARY_PROC` helper or shared-state responsibility is expensive.
+- Suggested Fix: New retained ON statement evidence attributes 118.841/127.589 seconds to the 32 history/window cache rebuilds (10,778,936 reported delete/insert row actions). Complete retained plan capture now verified: 192 full plans, unchanged 184 summary cost records and static incoming references across ten modules. Preferred proposal: temporary endpoint calculations from existing shared history, covering all eight metrics and the alternate healed path, preserving latest/delta/final outputs and explicitly settling intermediate-cache consumers and rollback freshness. See SQL-repo `docs/archive/p021-summary-optimisation-proposal.md` and `docs/archive/p021-summary-cost-evidence.md`. Broad read grants prevent assuming all external consumers are absent; production cache retirement remains conditional. No extra diagnostic import is currently required. Earlier approved early audit on 2026-11-07: use the P02.1 failed ON rehearsal and source/dependency map to attribute helper/write cost; inspect existing cached/Query Store evidence before any new workload. See SQL-repo `docs/archive/p021-summary-audit.md`. Summary rewrite and isolated local tests subsequently approved and completed on 2026-11-07; no limit increase or production deployment is approved. Historical collection plan: collect naturally occurring evidence for 10â€“14 days and at least 30 completed fallback batches, then run Task C Slice 14 as a read-only `SUMMARY_PROC` responsibility/performance audit. Use existing Query Store/DMV evidence only where helper attribution is reliable. If attribution remains inconclusive, prepare a separate non-invasive instrumentation proposal; do not tune or decompose from the outer duration alone.
 - Impact: high
 - Risk: high
 - Dependencies: Task C Slice 13 complete; KingdomScanData4 Phase 5/5.2 and August follow-up migrations complete; at least 10 days and 30 completed fallback batches for the formal audit; SQL owner approval before state-changing instrumentation, plan experiments that execute stateful work, procedure design, tuning, or migration work.
-- Status: promoted task pack — summary rewrite approved and implemented locally; 30 isolated SQL tests passed; see SQL-repo `docs/p021-summary-implementation.md`; external consumer clearance, release signing and full rehearsal/performance/production qualification remain open
-- Related type-alignment scope: Operator-requested 2026-11-07 review connects this summary chain to the retained Phase 3 legacy-float surface, not a new blanket conversion. SQL-repo `docs/p021-summary-numeric-type-review.md` records integer source counts, float output contracts, the demonstrated AVG rounding difference, equal float/bigint storage size, and required value/consumer/export/migration/performance proof. Extended analysis complete: both retained 2,452-row reports contain only integral numeric values, with 67 cells beyond int range; 112/184 legacy summary plans contain float conversions. A synthetic nullable-integer DataFrame case demonstrates a precision risk above 2^53, so include the existing export DAL/planner and immutable payload compatibility. Full stored-value/consumer proof and candidate performance remain open; no datatype conversion implemented or approved. Collect the remaining bounded underlying-table profile during the next isolated rehearsal; preserve current rewrite behavior and all limits.
-- Last verified: 2026-11-07
-- Promoted task pack: `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 14 SUMMARY_PROC Responsibility and Performance Audit.md`
+- Status: delivered in P02 Phase 1 on 2026-11-09; SQL summary rewrite, shared latest names, 139-column exact types and export handling deployed and verified. Isolated qualification passed. Standard production import/export acceptance remains dependent on exact P03/P04 readiness; no repeat workload is authorized by this record.
+- Historical analysis of the now-delivered type-alignment scope: Operator-requested 2026-11-07 review connects this summary chain to the retained Phase 3 legacy-float surface, not a new blanket conversion. SQL-repo `docs/archive/p021-summary-numeric-type-review.md` records integer source counts, float output contracts, the demonstrated AVG rounding difference, equal float/bigint storage size, and required value/consumer/export/migration/performance proof. Extended analysis complete: both retained 2,452-row reports contain only integral numeric values, with 67 cells beyond int range; 112/184 legacy summary plans contain float conversions. A synthetic nullable-integer DataFrame case demonstrates a precision risk above 2^53, so include the existing export DAL/planner and immutable payload compatibility. Full stored-value/consumer proof and candidate performance remain open; no datatype conversion implemented or approved. Collect the remaining bounded underlying-table profile during the next isolated rehearsal; preserve current rewrite behavior and all limits.
+- Last verified: 2026-11-09 (deployment evidence and approved remaining-scope reconciliation)
+- Promoted task pack: `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 14 SUMMARY_PROC Responsibility and Performance Audit.md`
 
 ### Deferred Optimisation
 - Area: MINI_AMD SQL Agent transaction-log backup job schedules and SQL backup-policy documentation
@@ -271,7 +273,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Task C Slice 1 wrappers complete; durable audit foundation and Slice 12 projection deployed; KingdomScanData4 Phase 5/5.2 stabilised; Task C Slice 13 complete; avoid overlapping any Slice 14 instrumentation decision.
-- Status: later refactor — sequence after Task C Slice 14 audit decision
+- Status: later refactor â€” sequence after Task C Slice 14 audit decision
 - Last verified: 2026-09-01
 
 ### Deferred Optimisation
@@ -337,7 +339,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: medium
 - Risk: medium
 - Dependencies: Current post-KingdomScanData4-Phase-5 SQL schema and production statistics; representative Governor IDs; observed dashboard usage/concurrency; SQL owner-approved plan collection window; separate SQL review for any object change.
-- Status: evidence required — rebaseline
+- Status: evidence required â€” rebaseline
 - Last verified: 2026-08-29
 
 ### Deferred Optimisation
@@ -348,7 +350,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Impact: high
 - Risk: medium
 - Dependencies: SQL branch `codex/p016-personal-stats-read-plan`; Bot P01.6 companion; operator-approved publication/deployment and representative acceptance window; current production statistics and exact target inventory.
-- Status: deployed and installation verified — representative production performance acceptance remains open
+- Status: deployed and installation verified â€” representative production performance acceptance remains open
 - Last verified: 2026-11-06
 
 ### Deferred Optimisation
@@ -538,7 +540,7 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Dependencies: Separate operator-approved executor audit; preserve SQL/read behavior and telemetry; no SQL contract change approved.
 - Status: evidence required; owner Chris Watts; not a Phase 2G dependency
 - Last verified: 2026-09-08
-## Phase 2H historical closure — 2026-09-08
+## Phase 2H historical closure â€” 2026-09-08
 
 Pre-KVK diagnostic delivery is accepted and moved to archive/deferred_optimisations_resolved.md.
 Natural production calendar dispatch and Phase 2F's natural public-save observation remain pending
@@ -566,7 +568,7 @@ Phase 2J leaves existing production receipt/reservation, once-only executor, sin
 generic-view timeout, DM/broad JSON and ProcConfig records separately scoped. Natural production
 calendar admission and Phase 2F public-save observations remain pending.
 
-## Phase 2J reconciliation — 2026-09-09
+## Phase 2J reconciliation â€” 2026-09-09
 
 Completed Phase 2B/C/D and Phase 2I diagnostic items are moved to the resolved register; Phase 2J
 command removal is accepted there. Phase 2E keep-all confirmation history is an approved defer,

@@ -1,4 +1,4 @@
-> **Current E104:** [P01.6 accepted closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md); next [P02](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Older navigation below is historical.
+> **Current E104:** [P01.6 accepted closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md); next [P02](Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Older navigation below is historical.
 
 > **Current E95:** P01.4 delivered/deployed with natural checks tracked in [the active register](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md). Next: [P01.5](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md). Earlier navigation/status below is historical.
 

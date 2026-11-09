@@ -54,4 +54,4 @@ The completed P01.6 starter, scope, design, qualification, release plan and both
 
 Private receipts and raw captures remain under `.codex_artifacts/p016-contract-repair/`, including `render-post-deployment-review.json`, `render-post-deployment-timing-analysis.json` and `render-post-deployment-profile-analysis.json`. The documentation preservation/validation manifest is under `.codex_artifacts/p016-closeout-p02-20261106/`. Raw reports and incident identities must not be copied into public commits.
 
-Next: [P02 handover and scope](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md), review/design first. This documentation closeout changes no runtime code, SQL, permissions, packages, startup policy or production state.
+Next: [P02 handover and scope](Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md), review/design first. This documentation closeout changes no runtime code, SQL, permissions, packages, startup policy or production state.

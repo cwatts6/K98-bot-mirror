@@ -1,3 +1,5 @@
+> **Archived 9 November 2026:** Superseded or completed Phase 1 instructions. Preserve the dated evidence below; do not replay its commands. [Current P02 scope and dependencies](../Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md) govern remaining work. Deployment is verified; standard production import/export acceptance remains open.
+
 > **Current status, 9 November 2026:** Phase 1 isolated SQL, shared latest names, numeric/export accuracy and recovery-reader qualification passed. Production release and the remaining P02 phases are separate. See the final acceptance section below.
 
 # P02 Phase 1: SQL, names, numeric types and exact exports
