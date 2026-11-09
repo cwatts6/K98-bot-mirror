@@ -603,6 +603,7 @@ def test_direct_application_producer_session_preserves_actual_profile(contract, 
     )
     dal.authorize = Mock()
     cursor = Mock()
+    cursor.fetchone.return_value = ("NoLock",)
     connection = Mock(autocommit=True)
     connection.cursor.return_value = cursor
     snapshot = Mock(return_value=observed)

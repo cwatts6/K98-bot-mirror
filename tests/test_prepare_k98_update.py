@@ -205,7 +205,6 @@ def test_bootstrap_forbidden_artifacts_are_rejected_before_blob_reads(path):
         "core/export_release_seed.py",
         "core/export_process_pair.py",
         "core/export_automatic_pair.py",
-        "core/export_process_identity.py",
         "core/export_startup_windows.py",
         "scripts/run_export_process_gate.py",
         "scripts/provision_export_process_pair.py",
@@ -231,17 +230,18 @@ def test_startup_contract_changes_are_rejected_before_blob_reads(path):
         source_plan(inventory(), BEFORE, AFTER, [path], forbidden_read)
 
 
-def test_constants_change_requires_exact_reviewed_family():
+@pytest.mark.parametrize("path", ["constants.py", "core/export_process_identity.py"])
+def test_unchanged_dependency_requires_exact_reviewed_family(path):
     reads = []
 
     def unreviewed_read(revision, path):
         reads.append((revision, path))
-        return b"unreviewed constants or peer"
+        return b"unreviewed dependency or peer"
 
-    # Constants is an unchanged, authenticated P01.5 dependency. Merely naming
-    # it in a changed-path inventory cannot authorize modified content.
+    # These are unchanged authenticated P01.5/D2j dependencies. Merely naming
+    # one in a changed-path inventory cannot authorize modified content.
     with pytest.raises(ValueError):
-        source_plan(inventory(), BEFORE, AFTER, ["constants.py"], unreviewed_read)
+        source_plan(inventory(), BEFORE, AFTER, [path], unreviewed_read)
     assert reads
 
 

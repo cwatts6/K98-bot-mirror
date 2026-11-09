@@ -616,6 +616,27 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P02_D2L_OPERATION_POLICY_PATHS = frozenset(
+    {
+        "player_stats_cache.py",
+        "services/legacy_export_snapshot_dal.py",
+        "core/sql_connection_custody.py",
+        "services/export_contention.py",
+        "services/producer_recovery_intent.py",
+        "core/sql_operation_policy.py",
+        "file_utils.py",
+        "services/player_report_continuation.py",
+        "services/legacy_export_snapshot_service.py",
+        "core/export_sql_connection.py",
+        "services/legacy_snapshot_admission.py",
+        "kvk/dal/new_source_import_dal.py",
+        "core/recovery_sql_snapshot.py",
+        "services/sql_lock_holder_diagnostics.py",
+        "services/player_report_sql.py",
+    }
+)
+
+
 P02_D2K_HOLDER_DIAGNOSTICS_PATHS = frozenset(
     {
         "core/export_sql_connection.py",
@@ -1082,13 +1103,13 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    # Fixed D2k successor plus Windows newlines; still a bounded installed file.
-    if len(raw) > 224256:
+    # Fixed D2l successor plus Windows newlines; still a bounded installed file.
+    if len(raw) > 232448:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 80:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 81:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -1198,6 +1219,10 @@ def reviewed_transitions():
             )
             fixed_p02_phase1 = (
                 item["id"] == "p02_phase1_sql_exports_v1" and path in P02_PHASE1_SQL_EXPORT_PATHS
+            )
+            fixed_p02_d2l = (
+                item["id"] == "p02_d2l_operation_policy_v1"
+                and path in P02_D2L_OPERATION_POLICY_PATHS
             )
             fixed_p02_d2k = (
                 item["id"] == "p02_d2k_holder_diagnostics_v1"
@@ -1367,6 +1392,7 @@ def reviewed_transitions():
                     or fixed_p016
                     or fixed_p021
                     or fixed_p02_phase1
+                    or fixed_p02_d2l
                     or fixed_p02_d2k
                     or fixed_p02_d2j
                     or fixed_p02_d2i
@@ -1548,6 +1574,8 @@ def reviewed_transitions():
             and paths != P02_D2K_HOLDER_DIAGNOSTICS_PATHS
         ):
             raise ValueError("Complete fixed P02 D2k holder diagnostics transition required.")
+        if item["id"] == "p02_d2l_operation_policy_v1" and paths != P02_D2L_OPERATION_POLICY_PATHS:
+            raise ValueError("Complete fixed P02 D2l operation policy transition required.")
         if item["id"] == "p02_d2i_sql_lifecycle_v1" and paths != P02_D2I_SQL_LIFECYCLE_PATHS:
             raise ValueError("Complete fixed P02 D2i SQL lifecycle transition required.")
         if (

@@ -140,10 +140,16 @@ def connect(*, server, database, principal=None):
     with _setup_guard:
         _require_setup_admission()
     try:
-        connection = pyodbc.connect(target, autocommit=True, timeout=5)
-        connection.timeout = 15
+        from core.sql_operation_policy import (
+            DEFAULT_STATEMENT_SECONDS,
+            LOGIN_TIMEOUT_SECONDS,
+            METADATA_LOCK_MILLISECONDS,
+        )
+
+        connection = pyodbc.connect(target, autocommit=True, timeout=LOGIN_TIMEOUT_SECONDS)
+        connection.timeout = DEFAULT_STATEMENT_SECONDS
         cursor = connection.cursor()
-        cursor.execute("SET LOCK_TIMEOUT 1000")
+        cursor.execute(f"SET LOCK_TIMEOUT {METADATA_LOCK_MILLISECONDS}")
         closing, cursor = cursor, None
         closing.close()
         connection.autocommit = False

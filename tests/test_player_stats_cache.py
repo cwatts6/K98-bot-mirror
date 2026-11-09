@@ -11,6 +11,8 @@ def test_admitted_cache_refresh_never_reexecutes_unknown_sql(monkeypatch):
     import player_stats_cache as mod
 
     connection = Mock()
+    connection.autocommit = False
+    connection.timeout = 15
     connection.cursor.return_value.execute.side_effect = [None, mod.pyodbc.Error("unknown")]
     monkeypatch.setattr(mod, "current_owner", lambda: object())
     sleep = Mock(side_effect=AssertionError("retry forbidden"))
@@ -115,6 +117,12 @@ class _FakeStatsConnection:
 
     def cursor(self):
         return self.cursor_instance
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
 
 
 def _install_fake_stats_connection(monkeypatch, mod, *, rows, columns, expected_kvk=16):

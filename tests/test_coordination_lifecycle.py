@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 
+from core.sql_connection_custody import SqlCleanupUnknown, custody_snapshot
 from core.sql_observation import ObservationBusy, observation
 from kvk.dal.new_source_import_dal import SourceBusy, SourceConflict, UncertainCommit, transaction
 from services import export_contention as contention
@@ -69,13 +70,16 @@ def test_observation_wait_requires_rollback_and_close(cleanup):
     if cleanup:
         getattr(connection, cleanup).side_effect = OSError("cleanup unavailable")
     error = SqlTimeout("42000", "private query data (1222)")
-    with observation(), pytest.raises(OSError if cleanup else ObservationBusy) as caught:
+    with observation(), pytest.raises(SqlCleanupUnknown if cleanup else ObservationBusy) as caught:
         with transaction(lambda: connection):
             raise error
     connection.rollback.assert_called_once()
     connection.close.assert_called_once()
     connection.commit.assert_not_called()
     assert "private query" not in str(caught.value)
+    if cleanup:
+        assert caught.value.__cause__ is error
+        assert custody_snapshot()["unconfirmed"] == (1 if cleanup == "close" else 0)
 
 
 def test_write_timeout_and_unknown_commit_are_not_observer_waits():

@@ -274,6 +274,18 @@ def test_reviewed_source_inventory_matches_current_runtime():
             "p1_mge_lifecycle_v1",
             "p021_observer_snapshots_v1",
             "p02_phase1_sql_exports_v1",
+            "p02_d2a_connection_selection_v1",
+            "p02_d2b_profile_sql_custody_v1",
+            "p02_d2c_sql_setup_custody_v1",
+            "p02_d2d_unowned_hold_observation_v1",
+            "p02_d2e_config_observation_v1",
+            "p02_d2f_queue_observation_v1",
+            "p02_d2g_recovery_pool_observation_v1",
+            "p02_d2h_season_observation_v1",
+            "p02_d2i_sql_lifecycle_v1",
+            "p02_d2j_observation_dispatch_v1",
+            "p02_d2k_holder_diagnostics_v1",
+            "p02_d2l_operation_policy_v1",
         }:
             continue  # Authenticated separately before the historical assertion below.
         members = transition["members"]

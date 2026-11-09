@@ -4075,6 +4075,86 @@
           "after_sha256": "8addfd7a80941429a4cf23476585b605b3b52063c6e355fd2b59906baefdb6df"
         }
       ]
+    },
+    {
+      "id": "p02_d2l_operation_policy_v1",
+      "members": [
+        {
+          "path": "core/export_sql_connection.py",
+          "before_sha256": "d78906b799ffdb3503e2413802498c7452408d15d2f6377e253bc3d62973da5d",
+          "after_sha256": "a3f7bac2c78e36787b19a1647590d5b2703dbcc399d44736959c7f50f1f2332e"
+        },
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "6ca7f8a21a506198e771e396360a051bebfb48fa928cc000f7848bd8e02fd9eb",
+          "after_sha256": "fa4ffbc5efcdf3202d28b30727c9606a9c6001f4bd2bec2fadd4918ab87faab2"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91",
+          "after_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91"
+        },
+        {
+          "path": "core/sql_operation_policy.py",
+          "before_sha256": null,
+          "after_sha256": "8b1a30cbb638cb84deab68a509eb62a2a86749eb5988662326d37f15ddd5a4be"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "afafac934b8f91dee485206fe4c16c57272315e008c72c7290c0eca6dffd0af2",
+          "after_sha256": "afafac934b8f91dee485206fe4c16c57272315e008c72c7290c0eca6dffd0af2"
+        },
+        {
+          "path": "kvk/dal/new_source_import_dal.py",
+          "before_sha256": "367f58a4fa4f5b9b0841692855a200eebbef52acb21d287daed3d5f4795720b3",
+          "after_sha256": "367f58a4fa4f5b9b0841692855a200eebbef52acb21d287daed3d5f4795720b3"
+        },
+        {
+          "path": "player_stats_cache.py",
+          "before_sha256": "699164608492e42f80d1564700491612c90bc9bddf642e6e074127477927e802",
+          "after_sha256": "f583f5dfa4f5f14f61a0e105e8d16f61b84ffd9fa0dc1df1f9f98166e0013d4c"
+        },
+        {
+          "path": "services/export_contention.py",
+          "before_sha256": "ba225008dde44992cb513af9448586ea98b5b70f263de8fbd6c0d6987baba854",
+          "after_sha256": "0b2d12ef0b9871520d60af3e080e2ccb9235db2815ea807a02323d18186b40eb"
+        },
+        {
+          "path": "services/legacy_export_snapshot_dal.py",
+          "before_sha256": "c3d8507ff11d9c9e18406525bf8ff4cc2d6c19c5072587ddbd8615f7a4040273",
+          "after_sha256": "73292c3665c2801e89221f4300c179e93645f2941bb71ad861bbdd376eff02c7"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "dd6afc432cba152a5553572464b4419b7aa4aad9acbcb847ff085c068c82e145",
+          "after_sha256": "e9c4c1ffbdc13e89db394310114da592581e5d32e6a44ff734b8d00b8734fb60"
+        },
+        {
+          "path": "services/legacy_snapshot_admission.py",
+          "before_sha256": "14e331b16f7bc18f3d583de0900caa9998fffc6e75cfd1471da3358984956b56",
+          "after_sha256": "14e331b16f7bc18f3d583de0900caa9998fffc6e75cfd1471da3358984956b56"
+        },
+        {
+          "path": "services/player_report_continuation.py",
+          "before_sha256": "87b3f112573bab417a6cc37ca4f2c0f5289792387c69e9b67cba2cbf0238d8ee",
+          "after_sha256": "161efac1c2bf29ff9cc504d76b3c9b471f9cea27f548f04c24bf60227ef14bd4"
+        },
+        {
+          "path": "services/player_report_sql.py",
+          "before_sha256": null,
+          "after_sha256": "a7b193fa34347282d763eb11586a20e2cc0992c7763f0a9044cb788713266fd5"
+        },
+        {
+          "path": "services/producer_recovery_intent.py",
+          "before_sha256": "5256d04ac0587b473d748eaebcc07dc296689f61e4765008d699501a363ef976",
+          "after_sha256": "5256d04ac0587b473d748eaebcc07dc296689f61e4765008d699501a363ef976"
+        },
+        {
+          "path": "services/sql_lock_holder_diagnostics.py",
+          "before_sha256": "8addfd7a80941429a4cf23476585b605b3b52063c6e355fd2b59906baefdb6df",
+          "after_sha256": "8addfd7a80941429a4cf23476585b605b3b52063c6e355fd2b59906baefdb6df"
+        }
+      ]
     }
   ]
 }

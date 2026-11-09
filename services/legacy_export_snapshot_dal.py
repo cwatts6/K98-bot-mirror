@@ -680,6 +680,9 @@ class LegacySnapshotDAL:
         if not connection.autocommit:
             raise ValueError("Session admission requires an autocommit connection.")
         cursor = connection.cursor()
+        failure = None
+        cleanup_error = None
+        attempted = False
         try:
             if self.execution_evidence:
                 from services.export_execution_dal import legacy_installation_snapshot
@@ -694,26 +697,59 @@ class LegacySnapshotDAL:
                 )
             from services.legacy_snapshot_admission import acquire_snapshot_guard
 
+            attempted = True
             acquire_snapshot_guard(cursor)
-            try:
-                if self.application_sql_contract is not None:
-                    from services.export_runtime_composition import (
-                        application_snapshot_for_contract,
-                        verify_application_installation_contract,
-                    )
-
-                    verify_application_installation_contract(
-                        application_snapshot_for_contract(cursor, self.application_sql_contract),
-                        self.application_sql_contract,
-                    )
-                yield claim
-            finally:
-                # Releasing this SQL session lock never releases durable ownership.
-                cursor.execute(
-                    "EXEC sys.sp_releaseapplock @Resource=N'k98-legacy-output-snapshot',@LockOwner='Session';"
+            if self.application_sql_contract is not None:
+                from services.export_runtime_composition import (
+                    application_snapshot_for_contract,
+                    verify_application_installation_contract,
                 )
+
+                verify_application_installation_contract(
+                    application_snapshot_for_contract(cursor, self.application_sql_contract),
+                    self.application_sql_contract,
+                )
+            yield claim
+        except BaseException as error:
+            failure = error
         finally:
-            cursor.close()
+            from types import SimpleNamespace
+
+            from core.sql_connection_custody import (
+                SqlCleanupUnknown,
+                preserve_failure,
+                retain_connection,
+            )
+
+            if attempted:
+                try:
+                    cursor.execute(
+                        "IF APPLOCK_MODE('public','k98-legacy-output-snapshot','Session')='Exclusive' "
+                        "EXEC sys.sp_releaseapplock @Resource=N'k98-legacy-output-snapshot',@LockOwner='Session'; "
+                        "SELECT APPLOCK_MODE('public','k98-legacy-output-snapshot','Session') AS Mode"
+                    )
+                    row = cursor.fetchone()
+                    if row is None or row[0] != "NoLock":
+                        raise SqlCleanupUnknown("Writer guard release was not acknowledged.")
+                except BaseException as error:
+                    failure = preserve_failure(failure, error, "writer_guard_release")
+                    cleanup_error = error
+            try:
+                cursor.close()
+            except BaseException as error:
+                failure = preserve_failure(failure, error, "writer_guard_cursor_close")
+                cleanup_error = cleanup_error or error
+            if cleanup_error is not None:
+                retain_connection(
+                    SimpleNamespace(connection=connection, cursor=cursor),
+                    effect="unknown",
+                    first_failure=failure,
+                    cleanup_error=cleanup_error,
+                )
+        if cleanup_error is not None and isinstance(failure, Exception):
+            raise SqlCleanupUnknown("Writer guard cleanup remains unconfirmed.") from failure
+        if failure is not None:
+            raise failure
 
     def verify_producer_cursor(self, claim, cursor):
         """Check the actual producer session without committing or rolling it back."""

@@ -9,9 +9,10 @@ from contextlib import contextmanager
 
 from core.sql_connection_custody import require_sql_admission, retain_connection
 from core.sql_observation import ObservationBusy, lock_contention, observation
+from core.sql_operation_policy import RECOVERY_STATEMENT_SECONDS
 from kvk.dal.source_sql_diagnostics import diagnostic_call, diagnostic_cursor
 
-STATEMENT_TIMEOUT_SECONDS = 3
+STATEMENT_TIMEOUT_SECONDS = RECOVERY_STATEMENT_SECONDS
 # Microsoft ODBC Driver 18 SDK, msodbcsql.h. SNAPSHOT is a SQL Server-specific
 # connection attribute; a SET statement is too late with ODBC automatic BEGIN.
 SQL_COPT_SS_TXN_ISOLATION = 1227
