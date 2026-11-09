@@ -210,3 +210,110 @@ P02 fixes may deploy before P03 retained-work recovery. The first standard produ
 import/export test still waits for actual P03 blockers and essential P04 convergence;
 it need not wait for every P05 item or a zero incident count. Promotion, deployment,
 restart, recovery and provider actions remain separate concrete authorizations.
+
+## D2c dedicated connection setup custody
+
+D2b merged into the mirror as PR 500 after GitHub's exact-commit code review
+completed without findings. D2c addresses F01/F26's setup boundary in
+`core/export_sql_connection.connect`: after receiving a driver handle, timeout,
+cursor, session-setting or autocommit setup could fail; cleanup could mask the first
+failure or discard an unclosed handle. A concurrent setup could still hand out a
+new connection after that uncertainty became known.
+
+The existing dedicated factory now owns failed setup through physical close. It
+reuses `SqlOutcome` and sanitized `error_facts`; the shared lifecycle helper stays
+unchanged. Failed setups publish private custody before cursor/connection cleanup.
+A short process-local lock protects admission and custody metadata only, never
+driver I/O. Normal setups remain concurrent. New attempts and late handoffs are
+refused while cleanup is pending or unconfirmed. Confirmed physical close removes
+only that setup's hold; failed close retains the handle indefinitely in this
+process. There is no timer, automatic repair, reset API or cleanup retry.
+
+Every cleanup step still runs after ordinary or abrupt setup failure. The first
+failure's sanitized facts remain distinct from cleanup failure, and cancellation
+identity propagates after cleanup. Public exceptions retain the existing sanitized
+configuration-error boundary. The new passive snapshot reports only admission,
+pending and unconfirmed counts; it does not expose handles, targets or driver prose.
+An underlying driver allocation exception that returns no handle retains its
+existing sanitized contract: this slice cannot take custody of an unreturned
+driver-internal allocation.
+
+Affected direct callers are the application-profile authority connection factory
+and SQL headroom preflight. Producer wrappers and both retry adapters continue to
+use their existing selected factories. No credential fallback, broader retry,
+global timeout increase, business SQL, command/view change or SQL-repository change
+is introduced. The only setup statement remains `SET LOCK_TIMEOUT 1000`; no schema
+object assumption or migration is added. Once a connection has been handed out,
+its existing consumer still owns its operation and cleanup.
+
+This hold owns a live process resource before any business work is admitted. It
+does not replace durable workflow reservations or authorize restart/recovery.
+Cross-process startup/drain and combined performance remain D5 gates. Legacy
+factories, passive recovery previews, authority dispatch, holder attribution,
+season-read consistency and remaining operation budgets retain their D2 owners.
+
+Regression-first evidence records ten failures and five passes on the predecessor.
+Coverage includes all five setup failure phases, failed physical close, first-error
+preservation, cancellation, blocking cleanup, late concurrent handoff, two competing
+uncertain owners, normal parallel setup, sanitized allocation failure and reopening
+only after acknowledged close. The expanded factory/selection set passed 77 tests.
+
+One native test uses only the existing explicitly opted-in unique disposable local
+database, a SELECT-only user and pooling-disabled driver. It checks real setup
+settings, successful handoff, failed-setup close, an injected refused close, exact
+connection identity and explicit test-owned final cleanup. The test passed and its
+database teardown completed without forced eviction. Host memory/disk and test
+database log headroom were checked; the immediate post-test development SQL sample
+recorded zero version-store use and log usage below 70%. No retained rehearsal,
+production database or provider operation was used.
+
+The exact `p02_d2c_sql_setup_custody_v1` transition includes the changed factory plus
+five unchanged caller/helper dependencies. All 71 earlier entries and source hashes
+remain immutable. The registry count becomes 72; the 179,200-byte bound is unchanged.
+Current source is authenticated before historical assertions, with no production
+admission bypass. This is source compatibility preparation, not updater installation.
+
+The exact Bot patch requires a Changes security review with Deep off. No SQL diff
+exists to scan. Focused release/source tests precede the full regression suite,
+architecture/deferred/security-routing/test-selection checks, formatting, type,
+smoke and registration validation. Final results belong in the delivery receipt
+and PR. Production promotion and deployment remain separate.
+
+### D2c delivery validation
+
+The final combined connection/release set passed 226 tests. Architecture,
+deferred-item, security-routing, test selection, formatting/lint, smoke imports
+and command registration passed. A new release-test assertion initially asked
+the per-path checker to reject an empty inventory; the outer release planner
+owns that rejection. The test was corrected to exercise that boundary, the first
+full run was stopped, and the final full run started after the correction.
+Original evidence is retained privately; final full-suite results are recorded
+in the delivery receipt and PR.
+
+The final full suite passed: **12,403 passed, 1,128 skipped, 8 subtests passed**
+in 20 minutes 9 seconds, with one existing Google/Python dependency warning.
+Both the repository log-noise check and independent before/after snapshot
+confirmed that production operational logs were unchanged. The native opt-in
+test passed separately; its normal full-suite skip does not replace that evidence.
+
+Changes security scan `e5d36f4c-8e9c-456f-b186-1d5e78c12672` completed with
+zero findings and complete coverage against base
+`2bd3fbfd2a41203ff2fa0c1122a8214c22e345b8`, working-tree digest
+`aeac53b2ccddaf650321dfea5cf7b79df2c25c49edf5e68c9e953ab71682208f`.
+Deep was off. The subsequent evidence-only documentation delta was inspected;
+another scan is skipped because no executable, dependency, input, persistence
+or release-authority behavior changed. The SQL repository remains unchanged.
+
+Pyright reports three errors in the unchanged mixed integer/string settings
+dictionary. All three reproduce on the exact base source; no new errors arise
+in the changed setup logic. Dependency-resolution warnings also remain.
+Current and baseline type-check output are retained privately.
+
+### Deferred Optimisation
+- Area: `core/export_sql_connection.py::settings`
+- Type: consistency
+- Description: Existing mixed settings dictionary inference causes three Pyright errors, reproduced on the exact base.
+- Suggested Fix: Add precise settings typing in a separate configuration-focused change, preserving validation and secret handling.
+- Impact: low
+- Risk: low
+- Dependencies: Existing configuration tests and an exact updater successor if executable bytes change.
