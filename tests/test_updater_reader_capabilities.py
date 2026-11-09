@@ -16,6 +16,7 @@ from tests.updater_source_assertions import (
     before_d2c_hash,
     before_d2d_hash,
     before_d2e_hash,
+    before_d2f_hash,
     before_event_delivery_hash,
     before_finalisation_hash,
     before_monitoring_hash,
@@ -102,6 +103,10 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     )
 
     for transition in update.reviewed_transitions():
+        if transition["id"] == "p02_d2f_queue_observation_v1":
+            for member in transition["members"]:
+                before_d2f_hash(root, member["path"])
+            continue
         if transition["id"] == "p02_d2e_config_observation_v1":
             for member in transition["members"]:
                 before_d2e_hash(root, member["path"])
@@ -130,8 +135,9 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             continue
         if transition["id"] == "p02_phase1_sql_exports_v1":
             for member in transition["members"]:
-                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
-                assert update.sha256(raw) == member["after_sha256"], member["path"]
+                assert before_d2a_hash(root, member["path"]) == member["after_sha256"], member[
+                    "path"
+                ]
             continue
         if transition["id"] == "p016_personal_stats_render_submission_v1":
             for member in transition["members"]:

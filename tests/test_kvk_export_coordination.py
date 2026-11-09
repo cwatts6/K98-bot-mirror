@@ -168,6 +168,8 @@ def transaction_cursor(cursor):
 
 def scripted(monkeypatch, cursor):
     monkeypatch.setattr(mod, "transaction", lambda _: transaction_cursor(cursor))
+    # Scripted query assertions; dedicated read lifecycle is tested separately.
+    monkeypatch.setattr(mod, "recovery_snapshot", lambda _: transaction_cursor(cursor))
     monkeypatch.setattr(mod, "one", lambda _: next(cursor.singles))
     monkeypatch.setattr(mod, "rows", lambda _: next(cursor.batches))
     return ExportCoordinationDAL(Mock())
