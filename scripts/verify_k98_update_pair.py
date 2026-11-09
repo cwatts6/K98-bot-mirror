@@ -63,6 +63,43 @@ P016_APPLICATION_BEFORE = "e124283154b15e57427626f929aff27c508fd4da20ac95f05f2b2
 P016_APPLICATION_AFTER_METADATA = "b5b33d42b15db44ab2bee1ebefa3dfd54557d9b8a8b1cb3340be30253a540f73"
 P016_APPLICATION_REVIEW = "9dcb6602-a4a4-5bf5-9073-d00a6db99f76"
 
+# Exact correction for the already-applied Phase 1 release. The expected rows
+# come from its protected predecessor and independently qualified new objects;
+# SQL's within-object permission ordering must not be replaced by Python sorting.
+PHASE1_PERMISSION_REPAIR = {
+    "version": 1,
+    "id": "p02_phase1_permission_order_v1",
+    "predecessor": "5fe2dbdc203c8d7268271b2baccac9d49915d280",
+    "sql_commit": "a202a51440f17233800b49801bd31c3ead2a9227",
+    "migration_id": "20261109_001_p02_phase1_sql_exports",
+    "migration_sha256": "520b58c1b25d80bd28f32324d99b5fede0d6191ddab93ac93469ed5c1f6e4041",
+}
+PHASE1_PERMISSION_BEFORE = "820351b6c09660881a5513145c6c8e4e583e5d87090ba28b9cb2d864aeddf62b"
+PHASE1_PERMISSION_AFTER = "81d81816c1eeabb6071984890f6ff3f66bc117cee2cac49e2bb90080bfc85697"
+PHASE1_PERMISSION_HASH = "e172bc534f02ab73efaee5e663bcb815ce36ec68209b3ba73320b9faab7adf96"
+PHASE1_PERMISSION_REVIEW = "ab403c8f-03f4-5b65-aeb6-dbcbdc8f0dd4"
+
+
+def phase1_permission_transition(before, bot):
+    """Correct one reviewed permission ordering without changing SQL rights."""
+    from services.export_execution_protocol import encode
+
+    if before != PHASE1_PERMISSION_REPAIR["predecessor"]:
+        raise ValueError("Phase 1 permission repair requires the exact installed predecessor")
+    application = bot["application_sql_contract"]
+    if hashlib.sha256(encode(application)).hexdigest() != PHASE1_PERMISSION_BEFORE:
+        raise ValueError("Phase 1 predecessor application contract differs")
+    after = deepcopy(application)
+    after.update(permissions_hash=PHASE1_PERMISSION_HASH, review_id=PHASE1_PERMISSION_REVIEW)
+    if hashlib.sha256(encode(after)).hexdigest() != PHASE1_PERMISSION_AFTER:
+        raise ValueError("Phase 1 corrected application contract differs")
+    contracts = {
+        key: {"before": deepcopy(bot[key]), "after": deepcopy(bot[key])}
+        for key in ("sql_contract", "legacy_sql_contract", "application_sql_contract")
+    }
+    contracts["application_sql_contract"]["after"] = after
+    return {"contracts": contracts}
+
 
 def p016_application_transition(before, bot):
     """Amend one exact predecessor contract, preserving all other expectations."""
@@ -374,14 +411,19 @@ def repair_verification_bot(config, predecessor, candidate):
     """Verify exact before/after bindings before comparing already-applied SQL."""
     from services.export_execution_protocol import encode
 
-    if encode(config["application_contract_repair"]) != encode(P016_APPLICATION_REPAIR):
+    repair = config["application_contract_repair"]
+    if encode(repair) == encode(P016_APPLICATION_REPAIR):
+        build_transition = p016_application_transition
+    elif encode(repair) == encode(PHASE1_PERMISSION_REPAIR):
+        build_transition = phase1_permission_transition
+    else:
         raise ValueError("Unreviewed application contract repair")
     if "sql" in config or "recovery_seed" in config:
         raise ValueError("Application contract repair cannot replay or combine SQL work")
-    transition = p016_application_transition(config["before"], predecessor)
+    transition = build_transition(config["before"], predecessor)
     for key, pair in transition["contracts"].items():
         if encode(candidate[key]) != encode(pair["after"]):
-            raise ValueError("P016 candidate contract differs from exact reviewed amendment")
+            raise ValueError("Candidate contract differs from exact reviewed amendment")
     return candidate
 
 

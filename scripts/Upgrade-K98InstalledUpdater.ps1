@@ -2,7 +2,7 @@
 # Exact installed package, current startup state and operator lock are revalidated.
 # Close all other updater PowerShell windows before running this reviewed helper.
 [CmdletBinding()]
-param()
+param([switch]$Phase1PermissionRepair)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0'
@@ -93,6 +93,16 @@ if((Upgrade-Hash $installerBytes) -cne $InstallerSHA256){throw 'Reviewed install
 $installerText=[Text.Encoding]::UTF8.GetString($installerBytes)
 if($installerText -cnotmatch "\`$encoded='([A-Za-z0-9+/=]+)'"){throw 'Installer payload missing'}
 $newPayload=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Matches[1]))|ConvertFrom-Json
+if($Phase1PermissionRepair) {
+ if($PreviousManifestSHA256 -cne '4230b7b0eb344d087d29c56935fa6565f5ba050570b042812df174c68f9ce3a4'){throw 'Phase 1 repair requires its exact inventoried updater predecessor'}
+ $libraryText=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($newPayload.'K98-SourceUpdate.ps1'))
+ $repairTokens=$null;$repairErrors=$null
+ $repairAst=[Management.Automation.Language.Parser]::ParseInput($libraryText,[ref]$repairTokens,[ref]$repairErrors)
+ if(@($repairErrors).Count){throw 'Repair library parse failure'}
+ $repairFunctions=@($repairAst.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Assert-Phase1PermissionRepairState'},$true))
+ if($repairFunctions.Count -ne 1){throw 'Exact bounded repair admission function required'}
+ . ([scriptblock]::Create($repairFunctions[0].Extent.Text))
+}
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseInput($installerText,[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Installer parse failure'}
@@ -122,9 +132,29 @@ Assert-Custody $policy.state_directory
 $lockPath=Join-Path $updates 'operator.lock'
 Assert-Custody $lockPath
 $lock=[IO.File]::Open($lockPath,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
-try {
- if(Test-Path -LiteralPath (Join-Path $updates 'active.json')){throw 'Active release exists; tool replacement refused'}
+function Assert-UpgradeReleaseState {
+ if($Phase1PermissionRepair) {
+  $readRecord={param($path,$expected)
+   Assert-Custody $path
+   $item=Get-Item -LiteralPath $path -Force
+   if($item.PSIsContainer -or $item.Length -gt 1MB){throw 'Repair record bound differs'}
+   $raw=[IO.File]::ReadAllBytes($path)
+   if((Upgrade-Hash $raw) -cne $expected){throw 'Repair record identity differs'}
+   [Text.Encoding]::UTF8.GetString($raw)|ConvertFrom-Json
+  }
+  $inventory={param($path,$filter)
+   Assert-Custody $path
+   $items=@(Get-ChildItem -LiteralPath $path -Filter $filter -File -Force|Select-Object -First 65)
+   if($items.Count -gt 64){throw 'Repair inventory bound exceeded'}
+   foreach($item in $items){Assert-Custody $item.FullName;$item.Name}
+  }
+  $repair=Assert-Phase1PermissionRepairState $readRecord $inventory
+  if([IO.Path]::GetFullPath($policyPath) -cne (Join-Path $repair.seed 'AutomaticStartupPolicy.json')){throw 'Phase 1 repair task policy differs'}
+ } elseif(Test-Path -LiteralPath (Join-Path $updates 'active.json')){throw 'Active release exists; tool replacement refused'}
  if(Test-Path -LiteralPath (Join-Path $policy.state_directory 'deployment-request.json')){throw 'Deployment request exists; tool replacement refused'}
+}
+try {
+ Assert-UpgradeReleaseState
  # Only the fully inventoried old package or exact completed new package is eligible.
  $oldHash=$PreviousManifestSHA256
  $newHash=$TargetManifestSHA256
@@ -146,8 +176,7 @@ try {
  }
  Assert-UpgradeTool $candidate $newHash
  # Recheck admission after staging; the exclusive operator lock stays held.
- if(Test-Path -LiteralPath (Join-Path $updates 'active.json')){throw 'Active release exists; tool replacement refused'}
- if(Test-Path -LiteralPath (Join-Path $policy.state_directory 'deployment-request.json')){throw 'Deployment request exists; tool replacement refused'}
+ Assert-UpgradeReleaseState
  Assert-NoUpgradeProcess
  if(-not(Test-Path -LiteralPath $archive)) {
   Assert-UpgradeTool $tool $oldHash

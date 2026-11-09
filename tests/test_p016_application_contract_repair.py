@@ -183,6 +183,16 @@ def test_both_native_sql_gates_authenticate_templates_before_comparison(
 
 
 def test_complete_packet_rebinds_seed_and_does_not_replay_sql(tmp_path, monkeypatch, bot):
+    assert_complete_repair_packet(
+        tmp_path,
+        monkeypatch,
+        bot,
+        verifier.P016_APPLICATION_REPAIR,
+        "p016_application_transition",
+    )
+
+
+def assert_complete_repair_packet(tmp_path, monkeypatch, bot, repair, transition_name):
     from core.export_release_seed import successor_seed
     from tests.test_export_release_seed import predecessor
     from tests.updater_source_assertions import installed_tool_fixture
@@ -207,7 +217,7 @@ def test_complete_packet_rebinds_seed_and_does_not_replay_sql(tmp_path, monkeypa
     path = str(
         PureWindowsPath(policy["seed_plan"]["path"]).with_name("AutomaticStartupPolicy.json")
     )
-    config = bindings() | dict(
+    config = {"before": repair["predecessor"]} | dict(
         target="c" * 40,
         root="C:\\fixture",
         host="FIXTURE",
@@ -215,7 +225,7 @@ def test_complete_packet_rebinds_seed_and_does_not_replay_sql(tmp_path, monkeypa
         old_policy=dict(Path=path, SHA256=updater.sha256(encode(policy))),
         old_plan=dict(Python="C:\\fixture\\python.exe", PythonSHA256="a" * 64),
     )
-    config.pop("application_contract_repair")  # It must be selected by installed authority.
+    # The repair must be selected by installed authority, not supplied by a caller.
     observation = dict(
         seed=previous,
         gate=f"$policy='{path}'\n$policyHash='{updater.sha256(encode(policy))}'\n",
@@ -228,7 +238,7 @@ def test_complete_packet_rebinds_seed_and_does_not_replay_sql(tmp_path, monkeypa
     def reviewed_fixture_authority(path, *args, **kwargs):
         result = real_run_path(path, *args, **kwargs)
         if Path(path).name == "verify_k98_update_pair.py":
-            result["p016_application_transition"] = verifier.p016_application_transition
+            result[transition_name] = getattr(verifier, transition_name)
         return result
 
     monkeypatch.setattr(updater.runpy, "run_path", reviewed_fixture_authority)
@@ -246,7 +256,7 @@ def test_complete_packet_rebinds_seed_and_does_not_replay_sql(tmp_path, monkeypa
     package = Path(result["manifest"]).parent
     manifest = json.loads(Path(result["manifest"]).read_bytes())
     saved = json.loads((package / "ReleaseBindings.json").read_bytes())
-    assert saved["application_contract_repair"] == verifier.P016_APPLICATION_REPAIR
+    assert saved["application_contract_repair"] == repair
     assert "sql" not in saved and "recovery_seed" not in saved
     assert [s["kind"] for s in manifest["steps"]] == ["source", "seed", "start", "readiness"]
     candidate_bot = json.loads((package / "bot-template.json").read_bytes())

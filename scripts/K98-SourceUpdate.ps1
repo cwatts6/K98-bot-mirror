@@ -71,6 +71,44 @@ function Write-AtomicRecord([string]$Path,$Value) {
  Write-Record $pending $Value
  [IO.File]::Move($pending,$Path)
 }
+function Assert-Phase1PermissionRepairState([scriptblock]$ReadRecord,[scriptblock]$Inventory) {
+ # This is one inventoried partial release, not a generic active-update bypass.
+ # Callbacks perform bounded custody/hash reads; no SQL or process action occurs.
+ $work='C:\ProgramData\K98\S11\updates\f25b9a13-ee10-4268-9e75-357bde4eac51'
+ $stage='C:\ProgramData\K98\S11\automatic-startup\56c256c7-7b4a-4607-a866-a9712e1ba410\release-dad1d06d-f342-40e6-92ee-74676bee7842'
+ $state='C:\ProgramData\K98\S11\automatic-startup\f93d45ed-7e90-4af7-baf2-66971d303eb1'
+ $seed='C:\ProgramData\K98\S11\runtime\f93d45ed-7e90-4af7-baf2-66971d303eb1'
+ $release='dad1d06d-f342-40e6-92ee-74676bee7842'
+ $activeHash='78ad11d814e174620fb0cd59c4e803b917ab2232da87b9e997b9102e6d12e7a2'
+ $active=& $ReadRecord 'C:\ProgramData\K98\S11\updates\active.json' $activeHash
+ if($active.release_id -cne $release -or $active.directory -cne $work){throw 'Phase 1 repair active identity differs'}
+ $manifest=& $ReadRecord (Join-Path $work 'package\release.json') '4fc4b22e5198dc9a7428d42e5cf37195420963cc84103b666ce9474b072259af'
+ $null=& $ReadRecord (Join-Path $stage '.release.json') '4fc4b22e5198dc9a7428d42e5cf37195420963cc84103b666ce9474b072259af'
+ $bindings=& $ReadRecord (Join-Path $work 'package\ReleaseBindings.json') 'fc99a61e5547bd95a8e13c07a8f0c1ce57ef4f31beceb11bccf1a44336bb3521'
+ if($manifest.release_id -cne $release -or $bindings.release_id -cne $release -or $bindings.target -cne '5fe2dbdc203c8d7268271b2baccac9d49915d280'){throw 'Phase 1 repair original bindings differ'}
+ $receiptRoot=Join-Path $stage '.receipts'
+ $expected=@('seed.complete.json','seed.intent.json','source.complete.json','source.intent.json','sql-00.complete.json','sql-00.intent.json','start.intent.json')
+ $found=@(& $Inventory $receiptRoot '*.json' | Sort-Object)
+ if(($found -join '|') -cne ($expected -join '|')){throw 'Phase 1 repair original stage inventory differs'}
+ $pins=@{
+  'sql-00.complete.json'='ea9de82bf10775312cf049988ce2ba06901d7161e004ba82d9732f9c018fba91'
+  'source.complete.json'='bb88c164d4b8f689917517c68035ec31a67a848d9df4b9cfb3a159397e4095b1'
+  'seed.complete.json'='12ff89e015ce357246d04abac74472623c4a96073112ce5f61134187f6745a88'
+  'start.intent.json'='7235562619708098a5b08c3115f1c12fe8f47ff3287bec63f2540fac0e4e0887'
+ }
+ foreach($name in $pins.Keys){$null=& $ReadRecord (Join-Path $receiptRoot $name) $pins[$name]}
+ foreach($root in @($work,$stage)){
+  $names=@(& $Inventory $root '*.json')
+  if(@($names|Where-Object {$_ -in @('verified.json','readiness-status.json','.amendment-selected.json','phase1-repair-selected.json')}).Count){throw 'Phase 1 repair original release has advanced'}
+ }
+ $journal='incarnation-00000000000000000099-0fb4a20c-6798-48c4-a3d6-38a1717b2603.json'
+ $journals=@(& $Inventory $state 'incarnation-*.json')
+ if($journals.Count -ne 1 -or $journals[0] -cne $journal){throw 'Phase 1 repair requires the recorded first successor'}
+ if(@(& $Inventory $state 'deployment-request.json').Count){throw 'Phase 1 repair successor already has a deployment request'}
+ $null=& $ReadRecord (Join-Path $state $journal) '918735014dc1ea147cb2af70ef3f5050f8e165d5e0c816c2141fb9ab4b513f07'
+ $null=& $ReadRecord (Join-Path $seed 'AutomaticStartupPolicy.json') '0b0e6f2f3f800c447f09f0974a921524a33280c95a0a1cefe18389c6e5bf1bef'
+ return [pscustomobject]@{release_id=$release;work=$work;stage=$stage;state=$state;seed=$seed;active_sha256=$activeHash;target=$bindings.target}
+}
 function Get-CompletedUpdateReadiness($Prepared,$Manifest,[string]$Stage) {
  if(-not(Test-Path -LiteralPath $Stage)){return $null}
  $null=Read-Bytes (Join-Path $Stage '.release.json') $Prepared.manifest_sha256 65536
@@ -84,6 +122,88 @@ function Get-CompletedUpdateReadiness($Prepared,$Manifest,[string]$Stage) {
  $readiness=Read-Json (Join-Path $Stage 'readiness-status.json')
  if($readiness.release_id -cne $Prepared.release_id -or $readiness.target -cne $Prepared.target -or $readiness.discord_status -cne 'online' -or $readiness.import_export.status -cne 'degraded'){throw 'Historical readiness classification differs'}
  return $readiness
+}
+function Read-Phase1PermissionRepairState {
+ $readRecord={param($path,$expected) Read-Json $path $expected}
+ $inventory={param($path,$filter)
+  Assert-Protected $path
+  $items=@(Get-ChildItem -LiteralPath $path -Filter $filter -File -Force|Select-Object -First 65)
+  if($items.Count -gt 64){throw 'Repair inventory bound exceeded'}
+  foreach($item in $items){Assert-Protected $item.FullName;$item.Name}
+ }
+ return Assert-Phase1PermissionRepairState $readRecord $inventory
+}
+function Assert-Phase1RepairCandidate($Prepared,[string]$Work) {
+ if($Work -cnotmatch '^C:\\ProgramData\\K98\\S11\\updates\\[0-9a-f-]{36}$' -or
+    $Prepared.manifest -cne (Join-Path $Work 'package\release.json') -or
+    $Prepared.before -cne '5fe2dbdc203c8d7268271b2baccac9d49915d280' -or
+    $Prepared.target -cnotmatch '^[0-9a-f]{40}$' -or $Prepared.target -ceq $Prepared.before -or
+    $Prepared.release_id -ceq 'dad1d06d-f342-40e6-92ee-74676bee7842'){throw 'Exact corrective source-only release required'}
+ $manifest=Read-Json $Prepared.manifest $Prepared.manifest_sha256
+ $bindings=Read-Json (Join-Path $Work 'package\ReleaseBindings.json') $Prepared.bindings_sha256
+ if($manifest.release_id -cne $Prepared.release_id -or $bindings.release_id -cne $Prepared.release_id -or
+    $bindings.before -cne $Prepared.before -or $bindings.target -cne $Prepared.target -or
+    $null -ne $bindings.PSObject.Properties['sql'] -or $null -ne $bindings.PSObject.Properties['recovery_seed'] -or
+    $bindings.application_contract_repair.id -cne 'p02_phase1_permission_order_v1' -or
+    (@($manifest.steps|ForEach-Object {$_.kind}) -join ',') -cne 'source,seed,start,readiness'){
+  throw 'Corrective release bindings or stages differ; SQL replay is prohibited'
+ }
+ # Full exact before/after contracts are authenticated again by the sealed
+ # candidate's preflight before any original active pointer is replaced.
+ $member=@($manifest.members|Where-Object {$_.name -ceq 'Release-Step.ps1'})
+ if($member.Count -ne 1){throw 'Corrective preflight adapter missing'}
+ $adapter=Join-Path $Work 'package\Release-Step.ps1'
+ $null=Read-Bytes $adapter $member[0].sha256 2MB
+ & $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $adapter -Action Preflight -ExpectedBindingsSHA256 $Prepared.bindings_sha256 | Out-Host
+ if($LASTEXITCODE -ne 0){throw 'Corrective live preflight refused; original release remains retained'}
+}
+function Select-Phase1PermissionRepair($Prepared,[string]$Work) {
+ $candidateChecked=$false
+ $updates='C:\ProgramData\K98\S11\updates'
+ $selectionPath=Join-Path $updates 'phase1-permission-repair-selection.json'
+ $activePath=Join-Path $updates 'active.json'
+ $backup=Join-Path $updates 'phase1-permission-repair-original-active.json'
+ $pending=Join-Path $updates 'phase1-permission-repair-candidate-active.json'
+ if(Test-Path -LiteralPath $selectionPath){
+  $selection=Read-Json $selectionPath
+  if($selection.version -ne 1 -or $selection.original_release_id -cne 'dad1d06d-f342-40e6-92ee-74676bee7842' -or
+     $selection.original_active_sha256 -cne '78ad11d814e174620fb0cd59c4e803b917ab2232da87b9e997b9102e6d12e7a2' -or
+     $selection.work -cnotmatch '^C:\\ProgramData\\K98\\S11\\updates\\[0-9a-f-]{36}$') {throw 'Repair selection identity differs'}
+  $Work=$selection.work
+  $Prepared=Read-Json (Join-Path $Work 'prepared.json') $selection.prepared_sha256
+  if($Prepared.release_id -cne $selection.release_id){throw 'Repair selected preparation differs'}
+ } else {
+  $repair=Read-Phase1PermissionRepairState
+  Assert-Phase1RepairCandidate $Prepared $Work
+  $candidateChecked=$true
+  $null=Read-Phase1PermissionRepairState
+  $selected=@{directory=$Work;release_id=$Prepared.release_id}
+  $bytes=[Text.UTF8Encoding]::new($false).GetBytes(($selected|ConvertTo-Json -Depth 4 -Compress))
+  $selection=@{version=1;original_release_id=$repair.release_id;original_active_sha256=$repair.active_sha256;work=$Work;release_id=$Prepared.release_id;prepared_sha256=(Hash (Read-Bytes (Join-Path $Work 'prepared.json')));active_sha256=(Hash $bytes);active_base64=[Convert]::ToBase64String($bytes)}
+  Write-Record $selectionPath $selection
+ }
+ $bytes=[Convert]::FromBase64String($selection.active_base64)
+ if((Hash $bytes) -cne $selection.active_sha256){throw 'Repair candidate pointer bytes differ'}
+ $selected=[Text.Encoding]::UTF8.GetString($bytes)|ConvertFrom-Json
+ if($selected.directory -cne $Work -or $selected.release_id -cne $Prepared.release_id -or @($selected.PSObject.Properties).Count -ne 2){throw 'Repair candidate pointer identity differs'}
+ $activeHash=Hash (Read-Bytes $activePath)
+ if($activeHash -ceq $selection.original_active_sha256){
+  $null=Read-Phase1PermissionRepairState
+  if(-not $candidateChecked){Assert-Phase1RepairCandidate $Prepared $Work}
+  $null=Read-Phase1PermissionRepairState
+  if(Test-Path -LiteralPath $backup){throw 'Original pointer backup already exists before selection; inspect retained state'}
+  if(Test-Path -LiteralPath $pending){$null=Read-Bytes $pending $selection.active_sha256}else{Write-New $pending $bytes}
+  # One same-volume atomic replacement preserves the original active pointer.
+  # A process interruption leaves either exact old or exact new active bytes.
+  [IO.File]::Replace($pending,$activePath,$backup)
+ } elseif($activeHash -cne $selection.active_sha256){throw 'Active pointer is neither the original nor selected repair'}
+ $null=Read-Bytes $backup $selection.original_active_sha256
+ $null=Read-Bytes $activePath $selection.active_sha256
+ $completed=Join-Path $updates 'phase1-permission-repair-selected.json'
+ $record=[pscustomobject]@{original_release_id=$selection.original_release_id;release_id=$Prepared.release_id;directory=$Work;original_readiness='unverified';sql_replayed=$false}
+ if(Test-Path -LiteralPath $completed){if(-not(Same (Read-Json $completed) $record)){throw 'Repair selection completion differs'}}else{Write-Record $completed $record}
+ Write-Host 'Corrective source-only package selected. Original SQL/source/seed receipts and unconfirmed start are preserved; no SQL or restart was performed.'
+ return $Prepared
 }
 function Invoke-UpdateSql([string]$Operation,[string]$Id) {
  if($null -eq $c.PSObject.Properties['sql']){return 0}
@@ -528,7 +648,7 @@ function Assert-PartialSeed {
   }
  }
 }
-function Test-UpdateCanRefresh([string]$StateDirectory,[string]$ReleaseId,[switch]$PrepareOnly) {
+function Test-UpdateCanRefresh([string]$StateDirectory,[string]$ReleaseId,[switch]$PrepareOnly,[switch]$RetainSelectedRepair) {
  foreach($name in @('deployment-request.json',('deployment-drained-'+$ReleaseId+'.json'))) {
   if(Test-Path -LiteralPath (Join-Path $StateDirectory $name)) {
    if($PrepareOnly){throw 'Deployment already staged or requested; rerun Update-K98.ps1 without -PrepareOnly to resume the same release.'}
@@ -547,7 +667,9 @@ function Test-UpdateCanRefresh([string]$StateDirectory,[string]$ReleaseId,[switc
    return $false
   }
  }
- return $true
+ # A corrective selection is already durable even before deployment staging.
+ # Its recorded preparation must not be replaced by the routine refresh path.
+ return (-not $RetainSelectedRepair)
 }
 function Assert-ParentSpelling([string]$RelativePath) {
  $current=$c.root
