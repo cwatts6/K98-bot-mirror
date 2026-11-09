@@ -7,11 +7,12 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_d2a_hash
 
 
 def test_all_66_historical_transitions_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 69
+    assert len(entries) == 70
     assert hashlib.sha256(json.dumps(entries[:66], sort_keys=True).encode()).hexdigest() == (
         "1d31dce46f54023a020f8e34373deaf2084356747f20200190794d629a155f78"
     )
@@ -29,7 +30,10 @@ def pair(monkeypatch):
     for member in transition["members"]:
         path = member["path"]
         after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert hashlib.sha256(after[path]).hexdigest() == member["after_sha256"], path
+        assert before_d2a_hash(root, path) == member["after_sha256"], path
+        if updater.sha256(after[path]) != member["after_sha256"]:
+            after[path] = ("inert P01.6 reference:" + path).encode()
+            known[after[path]] = member["after_sha256"]
         if member["before_sha256"] == member["after_sha256"]:
             before[path] = after[path]
         elif member["before_sha256"] is None:

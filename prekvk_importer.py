@@ -194,18 +194,10 @@ def _normalize_prekvk_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _conn():
-    """
-    Prefer central connection-with-retries helper (env/config driven).
-    Falls back to constants._conn if retry helper is unavailable.
-    """
-    try:
-        from file_utils import get_conn_with_retries
+    """Use the central policy; preserve failures without switching credentials."""
+    from file_utils import get_conn_with_retries
 
-        return get_conn_with_retries()
-    except Exception:
-        from constants import _conn as _conn_env
-
-        return _conn_env()
+    return get_conn_with_retries()
 
 
 def _emit_telemetry(payload: dict) -> None:

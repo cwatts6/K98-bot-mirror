@@ -3590,6 +3590,46 @@
           "after_sha256": "9a3ce9737c513b6e56da520f165d4d7347abe88cf57b1f05f247b8dd73cfc9dc"
         }
       ]
+    },
+    {
+      "id": "p02_d2a_connection_selection_v1",
+      "members": [
+        {
+          "path": "constants.py",
+          "before_sha256": "704f7f046778f54c634543c14979989fdbcd9f099444bbc0b6daf684fedb4e07",
+          "after_sha256": "704f7f046778f54c634543c14979989fdbcd9f099444bbc0b6daf684fedb4e07"
+        },
+        {
+          "path": "core/export_sql_connection.py",
+          "before_sha256": "41a9ed5437a4c0a8ca115696db4f64225bd3baf4f68d7d6add2156307b20373f",
+          "after_sha256": "91dca2f8260c9a5ccc43ade0145ed551694d25ee2b5e4a14f620cada4d2e7b69"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "7dbb13089315fdf0d214053d68e31f1c098546d17668ca31534d2705894c886f",
+          "after_sha256": "afafac934b8f91dee485206fe4c16c57272315e008c72c7290c0eca6dffd0af2"
+        },
+        {
+          "path": "prekvk_importer.py",
+          "before_sha256": "cc0c36d35d1154685f85a1f6bbf035b2acb883e624a71beccd688405c23b003a",
+          "after_sha256": "c49c0c808e7439fef01b6ba59d5e4b9fb3344d4a605e31e605f00ba4aab309d2"
+        },
+        {
+          "path": "proc_config_import.py",
+          "before_sha256": "c9cab77d57e4c0a271a6b5c5044862709e214784159a202631cdb0d51baa42eb",
+          "after_sha256": "b7e8ab5a1aa6cc1a3420b5878d97634a8bee497941cbbaaa92d65be3d2ae2c8f"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "dd6afc432cba152a5553572464b4419b7aa4aad9acbcb847ff085c068c82e145",
+          "after_sha256": "dd6afc432cba152a5553572464b4419b7aa4aad9acbcb847ff085c068c82e145"
+        },
+        {
+          "path": "stats/profile_cache_repository.py",
+          "before_sha256": "5141154dfc397241ef3112aee8e8f7e05cc37fa7529db0e1952301d76db5d165",
+          "after_sha256": "f71e08ae30a76af29a99a5e72b6f34186c30ef724ef6f985379863ab098b7f50"
+        }
+      ]
     }
   ]
 }

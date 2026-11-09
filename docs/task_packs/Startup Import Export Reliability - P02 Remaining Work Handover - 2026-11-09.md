@@ -59,6 +59,10 @@ deployment, migration, rehearsal or recovery tooling to refresh evidence.
 
 ## Remaining P02 delivery slices
 
+The [D2 delivery review](Startup%20Import%20Export%20Reliability%20-%20P02%20D2%20Delivery%20Review%20-%202026-11-09.md)
+records the refreshed caller/resource matrix, original finding disposition and
+first connection-selection slice. It does not close the remaining qualification.
+
 | Slice / findings | Required result | Verification before release |
 | --- | --- | --- |
 | D2: readers, factories and budgets; F01/F03/F09/F12/F14/F26 | Complete the caller/resource census. Choose connection factories once; no fallback after execution failure. Extend passive reads only to proved read-only paths. Keep mutation fencing and current-state checks. Prevent slow observations monopolizing authenticated authority dispatch; identify actual holder separately from requester. | Both arrival orders, known competing owners, stale views, alternate factories, permission refusal, lost replies/acknowledgements, observation saturation, cancellation and physical drain. Keep original errors and explicit unavailable diagnostics. |

@@ -87,45 +87,31 @@ def test_conn_prefers_get_conn_with_retries(monkeypatch):
     assert called["fallback"] == 0
 
 
-def test_conn_falls_back_to_constants_conn_when_retry_helper_fails(monkeypatch):
-    """
-    Task 6 Option A: if get_conn_with_retries is unavailable or raises,
-    prekvk_importer._conn() should fall back to constants._conn().
-    """
+def test_conn_preserves_retry_failure_without_legacy_fallback(monkeypatch):
+    """A failed selected connection must not switch to legacy credentials."""
     called = {"retry": 0, "fallback": 0}
-
-    class DummyConn:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def cursor(self):
-            raise AssertionError("cursor() should not be called in this test")
-
-    # Make retry helper raise
+    error = RuntimeError("simulated get_conn_with_retries failure")
     import file_utils
 
     def fake_get_conn_with_retries():
         called["retry"] += 1
-        raise RuntimeError("simulated get_conn_with_retries failure")
+        raise error
 
     monkeypatch.setattr(file_utils, "get_conn_with_retries", fake_get_conn_with_retries)
 
-    # Fallback should be used
     import constants
 
     def fake_constants_conn():
         called["fallback"] += 1
-        return DummyConn()
+        raise AssertionError("legacy fallback must not run")
 
     monkeypatch.setattr(constants, "_conn", fake_constants_conn)
 
-    conn = pki._conn()
-    assert isinstance(conn, DummyConn)
+    with pytest.raises(RuntimeError) as caught:
+        pki._conn()
+    assert caught.value is error
     assert called["retry"] == 1
-    assert called["fallback"] == 1
+    assert called["fallback"] == 0
 
 
 def _fake_df_with_columns(columns, rows):

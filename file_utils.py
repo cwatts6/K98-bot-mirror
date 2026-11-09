@@ -237,9 +237,9 @@ def get_conn_with_retries(
     operational: bool = False,
 ):
     """
-    Attempt to create a DB connection using constants._conn() with retry/backoff and
-    full jitter for transient failures. Returns a live pyodbc.Connection or raises
-    the last exception after retries.
+    Select the admitted producer factory (or explicit operational factory) once,
+    then retry connection creation with full jitter for transient failures.
+    Returns a live pyodbc.Connection or raises the last exception after retries.
 
     Optional `meta` is attached to telemetry (best-effort).
     """
@@ -257,13 +257,13 @@ def get_conn_with_retries(
     base = backoff_base if backoff_base is not None else _DB_BACKOFF_BASE
     cap = backoff_max if backoff_max is not None else _DB_BACKOFF_MAX
 
+    from core.export_sql_connection import producer_connection_factory
+
+    factory = _conn if operational else producer_connection_factory(_conn)
     while attempts < max_retries:
         attempts += 1
         try:
-            # _conn is the canonical factory in constants
-            from core.export_sql_connection import producer_connection
-
-            return _conn() if operational else producer_connection(_conn)
+            return factory()
         except Exception as e:
             # Detect if this is a pyodbc.OperationalError if pyodbc is available.
             is_operational = False

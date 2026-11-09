@@ -4,28 +4,14 @@ from contextlib import nullcontext
 from datetime import datetime
 import logging
 
-from constants import _conn
-
 logger = logging.getLogger(__name__)
 
 
 def _connect():
-    """
-    Return a pyodbc.Connection using our centralized retry helper when available.
+    """Use the central policy; preserve failures without switching credentials."""
+    from file_utils import get_conn_with_retries
 
-    - Prefer file_utils.get_conn_with_retries if present; falls back to constants._conn().
-    """
-    try:
-        # lazy import to avoid circulars
-        from file_utils import get_conn_with_retries
-
-        return get_conn_with_retries()
-    except Exception:
-        # fallback: use constants._conn (may raise)
-        logger.debug(
-            "file_utils.get_conn_with_retries not available; falling back to constants._conn()"
-        )
-        return _conn()
+    return get_conn_with_retries()
 
 
 def _rowdicts(cursor, rows):

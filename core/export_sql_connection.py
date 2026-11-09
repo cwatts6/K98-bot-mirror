@@ -98,10 +98,19 @@ def connect(*, server, database, principal=None):
         ) from None
 
 
-def producer_connection(legacy_factory):
-    """Use the admitted runtime's factory; never reuse its guard connection."""
+def producer_connection_factory(legacy_factory):
+    """Select once before attempting connections, including any bounded retries.
+
+    A failed attempt must not select a different credential profile if the runtime
+    context changes. Returning the callable also avoids reusing the guard connection.
+    """
     from services.legacy_export_snapshot_service import has_runtime_context, require_runtime
 
     if has_runtime_context():
-        return require_runtime().dal.connect()
-    return legacy_factory()
+        return require_runtime().dal.connect
+    return legacy_factory
+
+
+def producer_connection(legacy_factory):
+    """Use the admitted runtime's factory; never reuse its guard connection."""
+    return producer_connection_factory(legacy_factory)()
