@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 ALWAYS_RUN = [
     "python scripts/smoke_imports.py",
     "python scripts/validate_command_registration.py",
+    "python -m pytest -q tests/test_release_identity_regressions.py "
+    "tests/test_export_schema_fingerprint.py tests/test_p02_phase1_permission_repair.py "
+    "tests/test_p016_application_contract_repair.py",
 ]
 RULES = [
     (
