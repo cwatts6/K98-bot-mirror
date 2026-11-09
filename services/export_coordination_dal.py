@@ -15,6 +15,7 @@ import logging
 import re
 from uuid import uuid4
 
+from core.recovery_sql_snapshot import recovery_snapshot
 from kvk.dal.new_source_import_dal import (
     SourceConflict,
     canonical,
@@ -251,8 +252,9 @@ class Claim:
     intent_id: str | None = None
 
 
-def _job(cursor, job_id):
-    cursor.execute("SELECT * FROM dbo.ExportJob WITH (UPDLOCK,HOLDLOCK) WHERE JobID=?", job_id)
+def _job(cursor, job_id, *, passive=False):
+    locks = "" if passive else "WITH (UPDLOCK,HOLDLOCK)"
+    cursor.execute(f"SELECT * FROM dbo.ExportJob {locks} WHERE JobID=?", job_id)
     row = one(cursor)
     if row:
         for name in ("JobID", "SupersededByJobID", "RepairID"):
@@ -383,7 +385,7 @@ class ExportCoordinationDAL:
             )
             for r in registrations:
                 parameters.extend((r.kvk_no, r.account, r.epoch, digest(r.destinations)))
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (?) i.* FROM KVK.SourceExportIntent i "
                 "WHERE " + eligibility + " "
@@ -804,7 +806,7 @@ class ExportCoordinationDAL:
         )
 
     def accounts(self):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT DISTINCT AccountKey FROM dbo.ExportJob WHERE State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')"
                 + (
@@ -817,7 +819,7 @@ class ExportCoordinationDAL:
             return [r["AccountKey"] for r in rows(cursor)]
 
     def pending_source_jobs(self, account):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT * FROM dbo.ExportJob WHERE AccountKey=? AND ConsumerKind='new_source' AND (State='ready' OR (State='failed' AND JSON_VALUE(ProvenanceJson,'$.safe_retry.requested')='true')) ORDER BY EnqueueSequence,JobID",
                 account,
@@ -1597,10 +1599,10 @@ class ExportCoordinationDAL:
             self._sync_intent(cursor, claim.intent_id)
 
     @staticmethod
-    def _operator_snapshot(cursor, job_id):
+    def _operator_snapshot(cursor, job_id, *, passive=False):
         from kvk.dal.source_output_pool_dal import SourceOutputPoolDAL, _wire
 
-        job = _job(cursor, job_id)
+        job = _job(cursor, job_id, passive=passive)
         if not job or job["ConsumerKind"] != "new_source":
             raise SourceConflict("Exact new-source JobID required.")
         cursor.execute(
@@ -1640,8 +1642,8 @@ class ExportCoordinationDAL:
     def operator_snapshot(self, job_id):
         if not self.output_operations:
             raise SourceConflict("S10E ownership contract is unavailable.")
-        with transaction(self.connect) as cursor:
-            return self._operator_snapshot(cursor, identity(job_id))
+        with recovery_snapshot(self.connect) as cursor:
+            return self._operator_snapshot(cursor, identity(job_id), passive=True)
 
     @retry_coordination(budget_seconds=5)
     def reconcile_operator(self, snapshot, proof, *, actor):
@@ -1787,7 +1789,7 @@ class ExportCoordinationDAL:
     def repair_receipt(self, repair_id):
         if not self.output_operations:
             raise SourceConflict("S10E ownership contract is unavailable.")
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT JobID,State,ProvenanceJson FROM dbo.ExportJob WHERE RepairID=?",
                 identity(repair_id),

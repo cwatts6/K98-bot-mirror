@@ -483,3 +483,73 @@ unchanged. This is a test-only post-scan correction, inspected separately; no
 runtime or updater behavior changed. The final affected checks and log-isolation
 result are recorded in the private validation receipt and PR. Ten inherited
 Pyright diagnostics match the exact base. Native final rerun: nine passed.
+## D2f queue discovery and operator observations
+
+D2e PR 503 merged as `19367f9076042e86722078cdfac19c3abd8dd244` after exact-head
+Codex review completed without findings or inline issues. D2f builds on that merge.
+
+Scope: `ExportCoordinationDAL.pending_intents`, `accounts`, `pending_source_jobs`,
+`repair_receipt` and `operator_snapshot` use the existing owned recovery snapshot.
+The nested operator tuple includes job, resources, attempt/part receipts, unique
+pool, slots, related jobs, legacy receipts and retirement evidence. Nested
+`read_coordinated_receipts` and `SourceOutputPoolDAL._snapshot` were traced and
+remain unchanged: their hash, membership and registration checks are read-only.
+Only `_job` gains a fixed passive lock choice, defaulting to original locks;
+`_operator_snapshot` forwards it only from the public owned preview context.
+Reconcile/admit/claim paths retain account/resource locks and fresh-state checks.
+No service/command, schema, permission, retry or credential changes are included.
+
+The SQL source definitions for ExportJob, ExportJobResource, ExportResource,
+ExportAttempt/Part, SourceOutputPool/Slot/Disposition, SourceDelivery,
+SourceOutputOperation and SourceExportIntent were inspected. The native fixture
+uses their columns/checks with external FKs omitted in a new uniquely owned
+local database. SELECT-only previews pass while a writer holds the job and intent;
+an observer-first writer commit leaves the complete old job/resource/pool/slot
+tuple visible, then a new observation sees the new tuple. A stale reconciliation
+is refused. Corrupt manifest hash, missing parts and corrupt registration remain
+refused; permission failure physically closes the reader. Six native tests passed.
+
+Seven meaningful predecessor regressions failed, two passed after correcting the
+initial fixture's missing preparation-contract flag. After implementation and an
+older scripted query-fixture context correction, 128 focused queue/release tests
+passed. The first broader subsystem run had 242 passes and that one old scripted
+fixture failure. The fixture is explicitly query-only; borrowed temporary SQL
+containment tests likewise retain their transaction wrapper, while the dedicated
+native fixture proves isolation and cleanup. Full suite remains due at D2 closure.
+
+Release family `p02_d2f_queue_observation_v1` has six exact members and one changed
+runtime file. Prior 74 entries are immutable, canonical hash
+`e9182e4391687572ee4db3166e204e0a84297986c833c35203ff50eccb468595`.
+Count 75; byte bound 191488. Authenticated historical bridges retain prior pins.
+Security routing is exact Bot Changes review against merged D2e; Deep off. SQL
+review is skipped only because its repository is unchanged. No production action.
+
+The discovery weight gate still calls locked season helpers and stays with F14's
+complete season/config tuple work. ExportRecoveryDAL and standalone pool/recovery
+previews remain in the D2 reader census, not silently closed by this queue slice.
+Capture/session cleanup, authority admission, holder evidence and budgets remain
+separate D2 owners. No snapshot result authorizes provider effects or release.
+### D2f inherited coordination typing debt
+
+### Deferred Optimisation
+- Area: `services/export_coordination_dal.py`
+- Type: consistency
+- Description: Fifty-one existing row/result type diagnostics match the exact D2e base; no new type diagnostic is introduced by passive observations.
+- Suggested Fix: Give coordination rows and result tuples explicit types without changing wire identities, receipt bytes or mutation predicates.
+- Impact: low
+- Risk: medium
+- Dependencies: Coordination and receipt regressions plus authoritative SQL shapes.
+
+D2f exact Changes scan `08210d7b-e513-4241-b4a2-5b87f6a86fdf` completed with
+zero findings and complete three-source-item coverage; Deep off. Digest
+`4bab1f1cfdd4ddd39de8f46358f0dcf1b0e1c4d094605b6360b79db79b14b5e9`.
+Architecture, deferred/routing, import smoke and command registration passed.
+Full suite remains scheduled for combined D2; broad affected regressions are the
+slice gate. Production permissions, installed source and D5 are not claimed.
+
+D2f broad run: 2215 passed, one failed and 126 setup errors. All failures were
+historical release assertions for the changed coordination DAL. The tests now
+authenticate the actual D2f successor before projecting immutable D2d/Phase 1
+postimages; no historical release pin changed. All 215 affected rechecks passed,
+with production operational logs unchanged. These test-only corrections were
+inspected after the completed Changes scan; executable scan inventory is unchanged.
