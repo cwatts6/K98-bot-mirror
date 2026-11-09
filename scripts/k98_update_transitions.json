@@ -3850,6 +3850,56 @@
           "after_sha256": "8ce3eadc60b67df499d6be4c9cb2d636580328b4cd5f16886e9954a97ea86e75"
         }
       ]
+    },
+    {
+      "id": "p02_d2h_season_observation_v1",
+      "members": [
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "fa91faa72fa7a379148056ab94c5686a3f6f13b0e0f0fdc33467572f2437050b",
+          "after_sha256": "fa91faa72fa7a379148056ab94c5686a3f6f13b0e0f0fdc33467572f2437050b"
+        },
+        {
+          "path": "core/sql_observation.py",
+          "before_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130",
+          "after_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130"
+        },
+        {
+          "path": "kvk/dal/season_source_dal.py",
+          "before_sha256": "8bda84fc6d1bd10d865359805dbd1c67e803ee17cb25bf558727efc6e2647319",
+          "after_sha256": "d96d75b190d74e1b1e3d48cad82d8a4e776d10af1a6c1ea1fc541f93e0e71bc0"
+        },
+        {
+          "path": "kvk/dal/source_admin_review_dal.py",
+          "before_sha256": "5ec8ab02f18e9554669de89b8b23997f5ca82247a32b50dd912741e00640ff28",
+          "after_sha256": "5ec8ab02f18e9554669de89b8b23997f5ca82247a32b50dd912741e00640ff28"
+        },
+        {
+          "path": "kvk/dal/source_routing_dal.py",
+          "before_sha256": "7bb259bb08517f5b5e599c5140e45c12ce886e950dc2404ccfffadb1d33b6f74",
+          "after_sha256": "2472c7c2566c3c7f51dd25e87256a29571f12aaba16626a0d8e56d4a4c415df4"
+        },
+        {
+          "path": "kvk/dal/source_sql_diagnostics.py",
+          "before_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e",
+          "after_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e"
+        },
+        {
+          "path": "kvk/dal/source_update_dal.py",
+          "before_sha256": "06e177b01832325a0b7bab9bddb89e5416093d331361aadf39ecbb46b85a7235",
+          "after_sha256": "06e177b01832325a0b7bab9bddb89e5416093d331361aadf39ecbb46b85a7235"
+        },
+        {
+          "path": "kvk/dal/source_weight_dal.py",
+          "before_sha256": "262c0a87822e1b3d1258de66531841f099e1babc986e25fb461f48ac95512489",
+          "after_sha256": "262c0a87822e1b3d1258de66531841f099e1babc986e25fb461f48ac95512489"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "07457ba061832ae224185e6e05935691acd43b6e59f3e4e45bf02dac72244d8f",
+          "after_sha256": "9580a889f33f170b7e89b5aff3d83850ed1292ddcf24f88921202a715626d3df"
+        }
+      ]
     }
   ]
 }

@@ -3,9 +3,10 @@
 from dataclasses import replace
 import logging
 
+from core.recovery_sql_snapshot import recovery_snapshot
 from file_utils import get_conn_with_retries
-from kvk.dal.new_source_import_dal import SourceConflict, lock_scope, one, rows, transaction
-from kvk.dal.season_source_dal import lock_season
+from kvk.dal.new_source_import_dal import SourceConflict, one, rows
+from kvk.dal.season_source_dal import read_season
 from kvk.dal.source_update_dal import INPUT_COLUMNS, update_hash
 from kvk.models.source_integration import PUBLIC_REPORT_CAPABILITY, SeasonRead, identity
 from kvk.schemas.new_source_schema import SOURCE_KEY
@@ -64,17 +65,16 @@ def validate_complete(read, selection, update, publication):
 
 
 def resolve_season_read(kvk_no, *, period_id=None, use_display_period=True, connect=None):
-    """Resolve each request under the writer's season-first lock order.
+    """Resolve each request from one short, consistent metadata snapshot.
 
-    Only small authority rows are loaded under the mutex. Immutable result rows,
+    Only small authority rows are loaded here. Immutable result rows,
     verification and presentation are loaded after this transaction has closed.
     Missing schema/database/choice is unavailable, never implicit legacy.
     """
     read = SeasonRead(kvk_no, period_id=period_id)
     try:
-        with transaction(connect or get_conn_with_retries) as cursor:
-            lock_scope(cursor, kvk_no)
-            choice = lock_season(cursor, kvk_no)
+        with recovery_snapshot(connect or get_conn_with_retries) as cursor:
+            choice = read_season(cursor, kvk_no)
             if not choice:
                 return replace(read, reason="season_choice_missing")
             read = replace(
@@ -85,9 +85,7 @@ def resolve_season_read(kvk_no, *, period_id=None, use_display_period=True, conn
             )
             if read.source_key == "legacy_full_data":
                 return replace(read, availability="legacy", reason="legacy_source")
-            cursor.execute(
-                "SELECT * FROM KVK.SourceRouting WITH (UPDLOCK,HOLDLOCK) WHERE KVK_NO=?", kvk_no
-            )
+            cursor.execute("SELECT * FROM KVK.SourceRouting WHERE KVK_NO=?", kvk_no)
             routing = one(cursor)
             if not routing or routing["SourceKey"] != SOURCE_KEY:
                 return replace(read, reason="routing_missing")
@@ -109,15 +107,10 @@ def resolve_season_read(kvk_no, *, period_id=None, use_display_period=True, conn
                     reason="display_period_missing" if use_display_period else "period_missing",
                 )
             read = replace(read, period_id=identity(selected_period))
-            # Same ordering as locked_period: component rows, complete rows, then config.
+            # Component pointers do not grant public authority. Resolve the
+            # sealed complete tuple within this same snapshot instead.
             cursor.execute(
-                "SELECT PeriodID FROM KVK.SourceSelection WITH (UPDLOCK,HOLDLOCK) WHERE SourceKey=? AND KVK_NO=? ORDER BY PeriodID",
-                SOURCE_KEY,
-                kvk_no,
-            )
-            cursor.fetchall()
-            cursor.execute(
-                "SELECT * FROM KVK.SourceCompleteSelection WITH (UPDLOCK,HOLDLOCK) WHERE SourceKey=? AND KVK_NO=? ORDER BY PeriodID",
+                "SELECT * FROM KVK.SourceCompleteSelection WHERE SourceKey=? AND KVK_NO=? ORDER BY PeriodID",
                 SOURCE_KEY,
                 kvk_no,
             )
