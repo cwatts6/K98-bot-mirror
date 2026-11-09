@@ -3,7 +3,7 @@
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
-from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
+from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL, capture_cursor
 from services.legacy_export_snapshot_service import (
     LegacySnapshot,
     SnapshotUnavailable,
@@ -133,11 +133,8 @@ class ImportCaptureRecovery:
                 claim, generation = self.dal.adopt(
                     connection, preparation_id, token, actor, self.generation
                 )
-                cursor = connection.cursor()
-                try:
+                with capture_cursor(connection) as cursor:
                     self.runtime.dal.verify_producer_cursor(claim, cursor)
-                finally:
-                    cursor.close()
                 scope = json.loads(self.runtime.configuration)[self.consumer]
                 sections, planned = self.runtime.capture(connection, scope)
                 if generation["capture"] == "pending":

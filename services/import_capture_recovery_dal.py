@@ -3,9 +3,62 @@
 from contextlib import contextmanager
 import json
 
-from kvk.dal.new_source_import_dal import SourceConflict, one
+from core.sql_connection_custody import (
+    SqlCleanupUnknown,
+    preserve_failure,
+    require_sql_admission,
+    retain_connection,
+)
+from kvk.dal.new_source_import_dal import SourceConflict, UncertainCommit, one
 from services.export_coordination_dal import _cas, _mutex, bounded_json, identity
 from services.legacy_export_snapshot_dal import PreparationClaim
+
+
+@contextmanager
+def capture_cursor(connection):
+    """Own one cursor; preserve body/commit uncertainty if cursor close also fails."""
+    cursor = connection.cursor()
+    failure = None
+    try:
+        yield cursor
+    except BaseException as error:
+        failure = error
+    finally:
+        try:
+            cursor.close()
+        except BaseException as error:
+            failure = preserve_failure(failure, error, "capture_cursor_close")
+            if not isinstance(failure, UncertainCommit):
+                raise SqlCleanupUnknown("Capture cursor cleanup was not acknowledged.") from failure
+    if failure is not None:
+        raise failure
+
+
+@contextmanager
+def capture_transaction(connection):
+    """Short transaction inside an independently guarded capture session."""
+    with capture_cursor(connection) as cursor:
+        commit_attempted = False
+        try:
+            cursor.execute("BEGIN TRANSACTION")
+            yield cursor
+            commit_attempted = True
+            cursor.execute("COMMIT TRANSACTION")
+        except BaseException as first:
+            failure = first
+            rollback_failed = False
+            try:
+                cursor.execute("IF @@TRANCOUNT>0 ROLLBACK TRANSACTION")
+            except BaseException as error:
+                rollback_failed = True
+                failure = preserve_failure(failure, error, "capture_rollback")
+            if commit_attempted:
+                raise UncertainCommit(
+                    "Read the durable capture operation before retrying."
+                ) from failure
+            if rollback_failed:
+                raise SqlCleanupUnknown("Capture rollback was not acknowledged.") from failure
+            raise
 
 
 class ImportCaptureRecoveryDAL:
@@ -20,45 +73,89 @@ class ImportCaptureRecoveryDAL:
 
     @contextmanager
     def session(self, preparation_id):
+        resources = self.guards(preparation_id)
+        require_sql_admission()
         connection = self.outcomes.connect()
+        cursor = None
+        failure = None
+        cleanup_failed = False
+        release_error = None
         try:
+            require_sql_admission()
             connection.autocommit = True
             cursor = connection.cursor()
-            try:
-                # Match producer lock order. Neither elapsed time nor a completed
-                # receipt substitutes for exclusion of a still-live SQL session.
-                for resource in self.guards(preparation_id):
-                    cursor.execute(
-                        "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
-                        "@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; "
-                        "SELECT @r AS LockResult",
-                        resource,
-                    )
-                    result = one(cursor)
-                    if not result or result["LockResult"] < 0:
-                        from kvk.dal.new_source_import_dal import SourceBusy
+            # Preserve producer lock order. A lost acknowledgement may still
+            # have granted a lock, so cleanup checks every intended guard.
+            for resource in resources:
+                cursor.execute(
+                    "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
+                    "@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; "
+                    "SELECT @r AS LockResult",
+                    resource,
+                )
+                result = one(cursor)
+                if not result or result["LockResult"] < 0:
+                    from kvk.dal.new_source_import_dal import SourceBusy
 
-                        raise SourceBusy("The original producer is still active. Recheck later.")
-                yield connection
-            finally:
-                # Explicit release also covers drivers which pool closed connections.
-                for resource in reversed(self.guards(preparation_id)):
-                    cursor.execute(
-                        "IF APPLOCK_MODE('public',?,'Session')='Exclusive' "
-                        "EXEC sys.sp_releaseapplock @Resource=?,@LockOwner='Session'",
-                        resource,
-                        resource,
-                    )
-                cursor.close()
+                    raise SourceBusy("The original producer is still active. Recheck later.")
+            yield connection
+        except BaseException as error:
+            failure = error
         finally:
-            connection.close()
+            if cursor is not None:
+                for resource in reversed(resources):
+                    try:
+                        cursor.execute(
+                            "IF APPLOCK_MODE('public',?,'Session')='Exclusive' "
+                            "EXEC sys.sp_releaseapplock @Resource=?,@LockOwner='Session'; "
+                            "SELECT APPLOCK_MODE('public',?,'Session') AS Mode",
+                            resource,
+                            resource,
+                            resource,
+                        )
+                        row = one(cursor)
+                        if not row or row.get("Mode") != "NoLock":
+                            raise SqlCleanupUnknown("Capture guard release was not acknowledged.")
+                    except BaseException as error:
+                        cleanup_failed = True
+                        release_error = release_error or error
+                        failure = preserve_failure(failure, error, "capture_guard_release")
+                try:
+                    cursor.close()
+                except BaseException as error:
+                    cleanup_failed = True
+                    failure = preserve_failure(failure, error, "capture_cursor_close")
+            try:
+                connection.close()
+            except BaseException as error:
+                cleanup_failed = True
+                failure = preserve_failure(failure, error, "capture_connection_close")
+                retain_connection(
+                    connection, effect="unknown", first_failure=failure, cleanup_error=error
+                )
+            else:
+                if release_error is not None:
+                    # Driver close may pool a session. A lost explicit guard
+                    # release acknowledgement is not proof that guard is gone.
+                    retain_connection(
+                        connection,
+                        effect="unknown",
+                        first_failure=failure,
+                        cleanup_error=release_error,
+                    )
+        if failure is not None:
+            if isinstance(failure, UncertainCommit):
+                raise failure
+            if cleanup_failed:
+                raise SqlCleanupUnknown(
+                    "Capture cleanup was not acknowledged; retain its first failure."
+                ) from failure
+            raise failure
 
     def adopt(self, connection, preparation_id, token, actor, generation_factory):
         """Short atomic CAS; keep both independent guards until capture finishes."""
         preparation_id = identity(preparation_id)
-        cursor = connection.cursor()
-        try:
-            cursor.execute("BEGIN TRANSACTION")
+        with capture_transaction(connection) as cursor:
             for resource in self.guards(preparation_id):
                 cursor.execute("SELECT APPLOCK_MODE('public',?,'Session') AS Mode", resource)
                 if one(cursor)["Mode"] != "Exclusive":
@@ -105,7 +202,6 @@ class ImportCaptureRecoveryDAL:
                 prep["Fence"],
                 resource["Version"],
             )["Version"]
-            cursor.execute("COMMIT TRANSACTION")
             return (
                 PreparationClaim(
                     preparation_id,
@@ -117,16 +213,6 @@ class ImportCaptureRecoveryDAL:
                 ),
                 generation,
             )
-        except BaseException:
-            # An unknown COMMIT leaves a durable marker; the same action reads it
-            # on its next attempt. Never infer rollback from this cleanup.
-            try:
-                cursor.execute("IF @@TRANCOUNT>0 ROLLBACK TRANSACTION")
-            except Exception:
-                pass
-            raise
-        finally:
-            cursor.close()
 
     def conclude(self, preparation_id, token, actor, reason, generation_factory, *, abandon):
         """Fence an unavailable capture or abandon its export; never undo SQL data."""
@@ -141,9 +227,7 @@ class ImportCaptureRecoveryDAL:
         marker = dict(token=token, actor=actor, reason=reason)
         key = "capture_abandoned" if abandon else "capture_failure"
         with self.session(preparation_id) as connection:
-            cursor = connection.cursor()
-            try:
-                cursor.execute("BEGIN TRANSACTION")
+            with capture_transaction(connection) as cursor:
                 _mutex(cursor, "account:" + self.outcomes.account)
                 prep, execution, resources = self.outcomes._snapshot(cursor, preparation_id)
                 self.outcomes._scope(prep)
@@ -153,7 +237,6 @@ class ImportCaptureRecoveryDAL:
                 if generation.get(key) == marker:
                     if abandon and (prep["State"] != "unavailable" or resources):
                         raise SourceConflict("Abandonment receipt differs from its release.")
-                    cursor.execute("COMMIT TRANSACTION")
                     return
                 if prep["State"] == "unavailable" or generation.get("capture_abandoned"):
                     raise SourceConflict("Capture was already closed by another action.")
@@ -209,12 +292,3 @@ class ImportCaptureRecoveryDAL:
                     prep["OwnerID"],
                     prep["Fence"],
                 )
-                cursor.execute("COMMIT TRANSACTION")
-            except BaseException:
-                try:
-                    cursor.execute("IF @@TRANCOUNT>0 ROLLBACK TRANSACTION")
-                except Exception:
-                    pass
-                raise
-            finally:
-                cursor.close()

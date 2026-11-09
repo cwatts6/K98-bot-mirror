@@ -109,44 +109,75 @@ def rows(cursor):
 
 @contextmanager
 def transaction(connect):
+    from core.sql_connection_custody import (
+        SqlCleanupUnknown,
+        preserve_failure,
+        require_sql_admission,
+        retain_connection,
+    )
     from core.sql_observation import ObservationBusy, lock_contention, observing
 
-    refused = None
+    require_sql_admission()
     connection = diagnostic_call("connect", connect)
+    failure = None
+    cleanup_failed = False
+    commit_attempted = False
+    committed = False
     try:
+        require_sql_admission()
         if connection.autocommit:
             raise ValueError("Source operations require a dedicated transactional connection.")
         cursor = diagnostic_cursor(diagnostic_call("cursor", connection.cursor))
         cursor.execute("SET XACT_ABORT ON; SET NOCOUNT ON;")
         if observing():
-            # Dedicated connection: recovery reads must yield instead of holding
-            # earlier row locks while waiting on a later producer-owned row.
             cursor.execute("SET LOCK_TIMEOUT 0;")
-        try:
-            yield cursor
-        except BaseException as error:
-            diagnostic_call("rollback", connection.rollback)
-            from services.export_contention import CoordinationLockRefused
-
-            if observing() and (
-                lock_contention(error)
-                or (isinstance(error, CoordinationLockRefused) and error.result == -1)
-            ):
-                refused = error
-            else:
-                raise
-        if refused is None:
+        yield cursor
+        commit_attempted = True
+        diagnostic_call("commit", connection.commit)
+        committed = True
+    except BaseException as error:
+        failure = error
+        if not commit_attempted:
             try:
-                diagnostic_call("commit", connection.commit)
-            except Exception as exc:
-                # Do not replay, or claim rollback when COMMIT may have succeeded.
-                raise UncertainCommit("Read the durable operation before retrying.") from exc
+                diagnostic_call("rollback", connection.rollback)
+            except BaseException as cleanup:
+                cleanup_failed = True
+                failure = preserve_failure(failure, cleanup, "rollback")
     finally:
-        diagnostic_call("close", connection.close)
-    if refused is not None:
-        raise ObservationBusy(
-            "Evidence is busy with active SQL work; recheck after it progresses."
-        ) from refused
+        # The owning connection closes its cursors. A nested admin adapter can
+        # borrow the outer cursor, so this helper must not close that cursor.
+        try:
+            diagnostic_call("close", connection.close)
+        except BaseException as cleanup:
+            cleanup_failed = True
+            failure = preserve_failure(failure, cleanup, "close")
+            retain_connection(
+                connection,
+                effect="committed" if committed else "unknown",
+                first_failure=failure,
+                cleanup_error=cleanup,
+            )
+    if failure is not None:
+        if commit_attempted and not committed:
+            raise UncertainCommit("Read the durable operation before retrying.") from failure
+        if cleanup_failed:
+            raise SqlCleanupUnknown(
+                "SQL cleanup was not acknowledged; retain its first failure."
+            ) from failure
+        from services.export_contention import CoordinationLockRefused
+
+        if (
+            getattr(connection, "owns_connection", True) is not False
+            and observing()
+            and (
+                lock_contention(failure)
+                or (isinstance(failure, CoordinationLockRefused) and failure.result == -1)
+            )
+        ):
+            raise ObservationBusy(
+                "Evidence is busy with active SQL work; recheck after it progresses."
+            ) from failure
+        raise failure
 
 
 def lock_scope(cursor, kvk_no: int):

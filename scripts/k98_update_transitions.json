@@ -3900,6 +3900,66 @@
           "after_sha256": "9580a889f33f170b7e89b5aff3d83850ed1292ddcf24f88921202a715626d3df"
         }
       ]
+    },
+    {
+      "id": "p02_d2i_sql_lifecycle_v1",
+      "members": [
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "fa91faa72fa7a379148056ab94c5686a3f6f13b0e0f0fdc33467572f2437050b",
+          "after_sha256": "6ca7f8a21a506198e771e396360a051bebfb48fa928cc000f7848bd8e02fd9eb"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": null,
+          "after_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91"
+        },
+        {
+          "path": "core/sql_observation.py",
+          "before_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130",
+          "after_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130"
+        },
+        {
+          "path": "event_calendar/sql_lifecycle.py",
+          "before_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d",
+          "after_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d"
+        },
+        {
+          "path": "kvk/dal/new_source_admin_dal.py",
+          "before_sha256": "b6dc19c18761d9cb9281d59b29e0d160a6da6113faa557809c5f256209b31c08",
+          "after_sha256": "626ebb4ccfc70840a51c83721aa1a57e618dbdbf7f3bca67873fdfda57c54abc"
+        },
+        {
+          "path": "kvk/dal/new_source_import_dal.py",
+          "before_sha256": "8d623702c01660eb97aa2de63cc5333103a721ba164df82229b9b3f23887c48f",
+          "after_sha256": "367f58a4fa4f5b9b0841692855a200eebbef52acb21d287daed3d5f4795720b3"
+        },
+        {
+          "path": "kvk/dal/source_sql_diagnostics.py",
+          "before_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e",
+          "after_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e"
+        },
+        {
+          "path": "services/export_contention.py",
+          "before_sha256": "33eb5afae1b2ad0d8aed153d658cd8cd369c04db1bb94b7a29af4124617a8eab",
+          "after_sha256": "4f6838c0671f58bc80143896566f87914f1915c2ad7e93067fda39a905f872b0"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "9580a889f33f170b7e89b5aff3d83850ed1292ddcf24f88921202a715626d3df",
+          "after_sha256": "9580a889f33f170b7e89b5aff3d83850ed1292ddcf24f88921202a715626d3df"
+        },
+        {
+          "path": "services/import_capture_recovery_dal.py",
+          "before_sha256": "a0b9175d12f9240d60a95f8f00469a05c4a6beeb8de8d842fba12f3374423ff9",
+          "after_sha256": "f7958567c6829b5e34bc1b58ce6cd47906ec15cb666268bfd65f779ddac6806c"
+        },
+        {
+          "path": "services/import_capture_recovery_service.py",
+          "before_sha256": "76811bfd33812857a2dc088ad9df9ee5019a98bf4f2caefaf28f91d19b3370c6",
+          "after_sha256": "ef701b247b1a39870babcc50e92c6702fa97c4907ae05f9c06c64058594bddc8"
+        }
+      ]
     }
   ]
 }

@@ -28,9 +28,24 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_d2i_hash(root, path):
+    """Authenticate D2i before exposing the unchanged prior release assertion."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path not in prepare_k98_update.P02_D2I_SQL_LIFECYCLE_PATHS:
+        return actual
+    successor = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "p02_d2i_sql_lifecycle_v1"
+    )
+    member = next(m for m in successor["members"] if m["path"] == path)
+    assert actual == member["after_sha256"], path
+    return member["before_sha256"]
+
+
 def before_d2h_hash(root, path):
     """Authenticate D2h before exposing the unchanged prior release assertion."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_d2i_hash(root, path)
     if path not in prepare_k98_update.P02_D2H_SEASON_OBSERVATION_PATHS:
         return actual
     successor = next(

@@ -7,6 +7,7 @@ retain their independent session guards, current-row locks and evidence CAS.
 
 from contextlib import contextmanager
 
+from core.sql_connection_custody import require_sql_admission, retain_connection
 from core.sql_observation import ObservationBusy, lock_contention, observation
 from kvk.dal.source_sql_diagnostics import diagnostic_call, diagnostic_cursor
 
@@ -39,11 +40,13 @@ def recovery_snapshot(connect):
     No business commit, retry or application lock is performed here.
     A snapshot is a preview: it does not prove that a producer has physically ended.
     """
+    require_sql_admission()
     connection = diagnostic_call("connect", connect)
     cursor = None
     failure = None
     cleanup_failed = False
     try:
+        require_sql_admission()
         if connection.autocommit:
             raise ValueError("Recovery observation requires a dedicated transactional connection.")
         # Set before creating the cursor; LOCK_TIMEOUT is a different budget.
@@ -85,6 +88,13 @@ def recovery_snapshot(connect):
                     failure = error
                 else:
                     failure.add_note(f"Recovery observation {phase} failed: {type(error).__name__}")
+                if phase == "close":
+                    retain_connection(
+                        connection,
+                        effect="not_applicable",
+                        first_failure=failure,
+                        cleanup_error=error,
+                    )
     if failure is not None:
         if cleanup_failed:
             raise RecoveryObservationCleanupUnknown(
