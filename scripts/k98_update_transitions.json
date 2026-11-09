@@ -3700,6 +3700,46 @@
           "after_sha256": "49fb0ff9e280030d0f9032654982340e0af93480958aee1c05928f7868d874ee"
         }
       ]
+    },
+    {
+      "id": "p02_d2d_unowned_hold_observation_v1",
+      "members": [
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "fa91faa72fa7a379148056ab94c5686a3f6f13b0e0f0fdc33467572f2437050b",
+          "after_sha256": "fa91faa72fa7a379148056ab94c5686a3f6f13b0e0f0fdc33467572f2437050b"
+        },
+        {
+          "path": "core/sql_observation.py",
+          "before_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130",
+          "after_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130"
+        },
+        {
+          "path": "kvk/dal/source_sql_diagnostics.py",
+          "before_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e",
+          "after_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "013869f18f9ad4971564173e400457130077ed4ce38a2147cf22746a3ca38316",
+          "after_sha256": "013869f18f9ad4971564173e400457130077ed4ce38a2147cf22746a3ca38316"
+        },
+        {
+          "path": "services/import_capture_recovery_dal.py",
+          "before_sha256": "a0b9175d12f9240d60a95f8f00469a05c4a6beeb8de8d842fba12f3374423ff9",
+          "after_sha256": "a0b9175d12f9240d60a95f8f00469a05c4a6beeb8de8d842fba12f3374423ff9"
+        },
+        {
+          "path": "services/unowned_sql_hold_dal.py",
+          "before_sha256": "7ab45a4c8468fa15ef734cdd74607b7e72614c11f20a71b752b0913c4398e942",
+          "after_sha256": "652e65eeb8e2a4a1b3991353da674205efe8d90d6a5daf657c4b45838aa8d7f7"
+        },
+        {
+          "path": "services/unowned_sql_hold_recovery.py",
+          "before_sha256": "60671608f25fe47562ed2e4ff4410d6751c24a95674d94fcf6f03fd7852d45e4",
+          "after_sha256": "60671608f25fe47562ed2e4ff4410d6751c24a95674d94fcf6f03fd7852d45e4"
+        }
+      ]
     }
   ]
 }

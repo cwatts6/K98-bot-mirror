@@ -25,6 +25,13 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def held(monkeypatch, request):
+    from kvk.dal.new_source_import_dal import transaction
+    from services import unowned_sql_hold_dal
+
+    # This legacy fixture borrows one session containing #tables. Keep its
+    # query/CAS/receipt tests; dedicated multi-session snapshot and physical
+    # cleanup evidence lives in test_unowned_hold_observation_native.py.
+    monkeypatch.setattr(unowned_sql_hold_dal, "recovery_snapshot", transaction)
     monkeypatch.setattr(
         fixtures,
         "TABLES",

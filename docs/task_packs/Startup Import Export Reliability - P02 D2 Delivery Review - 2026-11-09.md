@@ -317,3 +317,91 @@ Current and baseline type-check output are retained privately.
 - Impact: low
 - Risk: low
 - Dependencies: Existing configuration tests and an exact updater successor if executable bytes change.
+
+## D2d unowned SQL-blocker observations
+
+D2c merged as mirror PR 501 at `4dc966926947702e0da6e927275c1bc5f03a0a58`.
+Its exact-head Codex review was clean. Copilot's cancellation comment was a false
+positive: Python 3.11.9 reports `asyncio.CancelledError` as a direct `BaseException`
+subclass, and both existing cancellation identity/cleanup cases passed again.
+The evidence was recorded on the PR and the thread resolved without a code change.
+
+D2d is limited to `UnownedSqlHoldDAL` discovery, preview and saved-action reads.
+These now reuse the deployed `recovery_snapshot` contract: a dedicated consistent
+snapshot, three-second statement limit, zero row-lock wait, rollback and physical
+close acknowledgement. There is no locking-read fallback, retry loop or commit on
+these observation paths. Missing snapshot support, permission failure and unknown
+cleanup propagate through the established helper. Its implementation is unchanged.
+
+The shared row mapping and queries retain the same scope, foreign/detached producer
+checks, global active-stream count, 101-row producer bound and receipt validation.
+Only the passive call opts out of account/resource mutexes and update/hold hints.
+`clear` retains the default locked snapshot, all physical worker guards, exact
+evidence digest, owner/fence/version predicates and atomic audit/flag update. A
+preview is never physical-termination evidence or permission to clear a blocker.
+No command, recovery service, restart state, SQL repository, schema, grant,
+credential or production timeout policy changes. No provider or retained work runs.
+
+The six source table definitions and `ACQUIRE_KS4_IMPORT_LOCK` were checked against
+the authoritative SQL repository. The new native fixture creates only a unique
+disposable database, uses source columns/checks and a SELECT-only preview user,
+and omits external foreign keys/unrelated ownership objects. Nine checks passed:
+both reader/writer arrival orders, a consistent tuple across a real commit,
+detached foreign owners, stale-token refusal, a fresh exact receipt, active
+physical guards and permission failure with closed connection. Non-forced teardown
+passed. This is bounded metadata/confirmation evidence, not D5 cost or production
+permission qualification. Host free memory exceeded 8 GiB, disk reserve exceeded
+8 GiB and the test database log-use check was below 70%.
+
+The older unowned-hold tests intentionally borrow one session containing temporary
+tables. Their fixture uses its existing transaction helper for reads and continues
+to test query/CAS/containment/receipt behavior; it cannot prove dedicated-session
+snapshot isolation or physical cleanup. The new native tests own that evidence.
+Four predecessor regressions failed before the implementation; final focused
+connection, observation and release checks passed 297 tests.
+
+The exact seven-member `p02_d2d_unowned_hold_observation_v1` transition includes
+the changed DAL and six unchanged lifecycle/diagnostic/mutation/service dependencies.
+All 72 previous entries remain immutable; registry count becomes 73. Its byte bound
+increases by 4 KiB to 183,296 for this fixed package. Historical assertions first
+authenticate the current successor. No updater installation is performed.
+
+The Bot patch requires a Changes security review with Deep off, against the D2c
+merge above. There is no SQL-repository diff to scan. Final full-regression,
+log-isolation, review and validation receipts belong in the PR and private delivery
+record. Configuration/queue previews, capture custody, authority dispatch, holder
+evidence, season tuples and budgets remain with their existing D2 owners; D3-D5
+and the deployment checkpoint are unchanged.
+
+Changes review `28f1853f-2f51-436a-85e6-c64f9e5c6442` completed with zero
+findings and complete coverage at working-tree digest
+`a07adaed75d64fc57d996db64cf9e9fe51e2c1985420140922768b60c6e02940`.
+Subsequent evidence documentation and three test-only registry-limit constants
+are separately inspected and skipped for another scan: no application runtime,
+tooling, dependency, persistence or release-authority delta.
+Architecture, deferred-item, security-routing, lint, smoke and registration checks
+passed. The DAL's 17 Pyright diagnostics reproduce on the exact predecessor with
+the same diagnostic messages; they are not introduced by this patch.
+
+### Deferred Optimisation
+- Area: `services/unowned_sql_hold_dal.py`, existing `one`/`_wire` result typing
+- Type: consistency
+- Description: Seventeen pre-existing Pyright diagnostics arise from optional/heterogeneous row-mapping types; exact-base comparison reproduces the same messages.
+- Suggested Fix: Define precise row/result types in a separate DAL typing change while retaining query, validation and receipt semantics.
+- Impact: low
+- Risk: low
+- Dependencies: Row-mapping and receipt regressions; exact updater successor for executable changes.
+
+The full run recorded 12,444 passes, 1,137 skips, eight passing subtests and one
+existing Google/Python dependency warning. Three old release-size assertions
+still padded to 179,200 bytes rather than the new 183,296-byte limit. Those test
+constants were corrected; no application or tooling bytes changed. The original
+failure output is retained, and final related-suite results are in the delivery
+receipt and PR. Independent before/after checks confirmed unchanged operational
+logs even though pytest reported those failures. A second full run is unnecessary
+for these test-only constants after all three failed cases and their related
+release-boundary suite pass; other full-suite cases already passed.
+
+The final related recheck passed **2,043 tests**, including all three corrected
+cases, with operational-log isolation passing. No runtime/tooling change was
+needed after the full run or sealed security review.

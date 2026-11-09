@@ -24,7 +24,8 @@ def refusal(result=-1):
 def test_original_lock_result_preserved_without_driver_payload(result):
     cursor = Mock()
     cursor.execute.side_effect = Exception(
-        "42000", f"K98_COORDINATION_LOCK result={result} session=77 xact=1 count=1 (51400) secret"
+        "42000",
+        f"K98_COORDINATION_LOCK result={result} session=77 xact=1 count=1 (51400) secret",
     )
     with pytest.raises(module.CoordinationLockRefused) as caught:
         _mutex(cursor, "account:sensitive")
@@ -383,7 +384,7 @@ def test_longer_window_cannot_extend_parent_deadline(monkeypatch):
     assert calls == [1]
 
 
-def test_monitor_snapshot_retries_only_after_close(monkeypatch):
+def test_monitor_snapshot_propagates_failure_after_close_without_retry(monkeypatch):
     from types import SimpleNamespace
 
     from services.unowned_sql_hold_dal import UnownedSqlHoldDAL
@@ -392,9 +393,6 @@ def test_monitor_snapshot_retries_only_after_close(monkeypatch):
     connections = []
 
     def connect():
-        if connections:
-            connections[-1].close.assert_called_once()
-            connections[-1].rollback.assert_called_once()
         cn = Mock(autocommit=False)
         connections.append(cn)
         return cn
@@ -406,11 +404,16 @@ def test_monitor_snapshot_retries_only_after_close(monkeypatch):
             store=SimpleNamespace(storage_owner="s"),
         )
     )
-    snapshots = Mock(side_effect=[refusal(), {"resource": None}])
+    error = refusal()
+    snapshots = Mock(side_effect=error)
     monkeypatch.setattr(dal, "_snapshot", snapshots)
-    assert dal.snapshot(dal.source_id) == {"resource": None}
-    assert len(connections) == 2
-    connections[1].commit.assert_called_once()
+    with pytest.raises(module.CoordinationLockRefused) as caught:
+        dal.snapshot(dal.source_id)
+    assert caught.value is error
+    assert len(connections) == 1
+    connections[0].close.assert_called_once()
+    assert connections[0].rollback.call_count == 2
+    connections[0].commit.assert_not_called()
 
 
 def test_refusal_timings_separate_connect_body_and_cleanup(monkeypatch):
