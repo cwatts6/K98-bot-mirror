@@ -3665,6 +3665,41 @@
           "after_sha256": "6c4d7b315f83b87d68c8cc5a41447db578a91adf64508b43ce3c28a3b9e6dbba"
         }
       ]
+    },
+    {
+      "id": "p02_d2c_sql_setup_custody_v1",
+      "members": [
+        {
+          "path": "core/export_sql_connection.py",
+          "before_sha256": "91dca2f8260c9a5ccc43ade0145ed551694d25ee2b5e4a14f620cada4d2e7b69",
+          "after_sha256": "d78906b799ffdb3503e2413802498c7452408d15d2f6377e253bc3d62973da5d"
+        },
+        {
+          "path": "event_calendar/sql_lifecycle.py",
+          "before_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d",
+          "after_sha256": "f887fe1f0f4361ed7e69af1991d9961be5af21d824255b4ab8260108138b264d"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "afafac934b8f91dee485206fe4c16c57272315e008c72c7290c0eca6dffd0af2",
+          "after_sha256": "afafac934b8f91dee485206fe4c16c57272315e008c72c7290c0eca6dffd0af2"
+        },
+        {
+          "path": "proc_config_import.py",
+          "before_sha256": "b7e8ab5a1aa6cc1a3420b5878d97634a8bee497941cbbaaa92d65be3d2ae2c8f",
+          "after_sha256": "b7e8ab5a1aa6cc1a3420b5878d97634a8bee497941cbbaaa92d65be3d2ae2c8f"
+        },
+        {
+          "path": "scripts/run_export_authority.py",
+          "before_sha256": "16fa93fff2d1dcd8a92cf5c46bd0b1ec6127a586779d05a3281b40b9e56a256c",
+          "after_sha256": "16fa93fff2d1dcd8a92cf5c46bd0b1ec6127a586779d05a3281b40b9e56a256c"
+        },
+        {
+          "path": "services/export_sql_health_dal.py",
+          "before_sha256": "49fb0ff9e280030d0f9032654982340e0af93480958aee1c05928f7868d874ee",
+          "after_sha256": "49fb0ff9e280030d0f9032654982340e0af93480958aee1c05928f7868d874ee"
+        }
+      ]
     }
   ]
 }
