@@ -1,0 +1,62 @@
+from copy import deepcopy
+import json
+from pathlib import Path
+
+import pytest
+
+from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import historical_runtime_hash
+
+
+@pytest.mark.parametrize(
+    "transition,paths",
+    [
+        ("publication_result_v1", updater.PUBLICATION_RESULT_PATHS),
+        ("publication_result_handoff_v1", updater.PUBLICATION_RESULT_HANDOFF_PATHS),
+    ],
+)
+def test_result_transition_pins_all_runtime_members(transition, paths):
+    item = next(t for t in updater.reviewed_transitions() if t["id"] == transition)
+    assert {m["path"] for m in item["members"]} == paths
+    root = Path(__file__).resolve().parents[1]
+    successors = {
+        m["path"]: m["after_sha256"]
+        for t in updater.reviewed_transitions()
+        if t["id"]
+        in {
+            "guided_rollover_v1",
+            "publication_timing_v1",
+            "configuration_intent_replay_v1",
+            "publication_detail_v1",
+            "publication_readback_batches_v1",
+            "evidence_backup_collection_v1",
+        }
+        for m in t["members"]
+    }
+    for member in item["members"]:
+        assert historical_runtime_hash(root, member["path"]) == successors.get(
+            member["path"], member["after_sha256"]
+        )
+        assert member["before_sha256"] != member["after_sha256"]
+
+
+@pytest.mark.parametrize("change", ["missing", "extra", "renamed"])
+@pytest.mark.parametrize("transition", ["publication_result_v1", "publication_result_handoff_v1"])
+def test_result_transition_refuses_partial_or_foreign_bundle(
+    tmp_path, monkeypatch, change, transition
+):
+    item = deepcopy(next(t for t in updater.reviewed_transitions() if t["id"] == transition))
+    if change == "missing":
+        item["members"].pop()
+    elif change == "extra":
+        item["members"].append(
+            dict(path="services/export_foreign.py", before_sha256=None, after_sha256="a" * 64)
+        )
+    else:
+        item["id"] = "unreviewed_result"
+    (tmp_path / "k98_update_transitions.json").write_text(
+        json.dumps(dict(version=1, transitions=[item]))
+    )
+    monkeypatch.setattr(updater, "__file__", str(tmp_path / "prepare_k98_update.py"))
+    with pytest.raises(ValueError):
+        updater.reviewed_transitions()
