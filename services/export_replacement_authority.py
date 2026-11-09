@@ -4,6 +4,7 @@ import hashlib
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
+from services.authority_observation import observation_guard
 from services.export_coordination_dal import ExportCoordinationDAL, identity
 from services.export_execution_protocol import decode, encode
 from services.export_manual_enrollment import manual_profile
@@ -96,7 +97,7 @@ class ReplacementAuthority:
         )
 
     def authenticated_history(self):
-        with self.authority._lock:
+        with observation_guard(self.authority._lock, read_only=True):
             authenticated = []
             records = self.activation_dal.chain(self.base.value()["account"])
 
@@ -451,7 +452,7 @@ class ReplacementAuthority:
         }:
             raise SourceConflict("Exact bounded replacement recovery message required.")
         job_id = identity(message["job_id"])
-        with self.authority._lock:
+        with observation_guard(self.authority._lock, read_only=operation == "inspect"):
             self.broker.boundary.recheck()
             if message["action"] == "rollover_replacement_recovery":
                 from services.rollover_replacement_authority import workflow as rollover_workflow

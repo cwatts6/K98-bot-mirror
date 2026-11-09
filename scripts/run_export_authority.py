@@ -379,6 +379,7 @@ class AuthorityBroker:
         self.execution_progress = ExecutionProgress(
             self._execute_owned, report_failure=report_dispatch_failure
         )
+        self.observation_progress = _observation_progress(self.dispatch)
 
     def _execute_owned(self, selector, progress):
         if self.boundary is not None:
@@ -751,6 +752,49 @@ class AuthorityBroker:
         raise ValueError("Unsupported authority action.")
 
 
+def _report_connection_failure(error):
+    from services.export_authority_diagnostics import report_authority_event
+
+    report_authority_event("AUTHORITY_CONNECTION_FAILED", error=error)
+
+
+def _observation_progress(dispatch):
+    from services.authority_observation import ObservationProgress
+
+    return ObservationProgress(
+        dispatch,
+        report_failure=report_dispatch_failure,
+        report_connection_failure=_report_connection_failure,
+    )
+
+
+class _PipeRequest:
+    """Original authenticated request handles; a worker owns only this request."""
+
+    def __init__(self, handle):
+        self.handle = handle
+        self.peer = None
+        self.bot = None
+        self.pipe = None
+
+    def close(self):
+        if self.pipe is not None and getattr(self.pipe, "_unconfirmed_io", ()):
+            from core.export_execution_host import HostBoundaryError
+
+            raise HostBoundaryError("Original IPC operation remains in physical custody.")
+        first = None
+        for handle in (self.peer, self.handle, self.bot):
+            if handle is None:
+                continue
+            try:
+                handle.Close()
+            except BaseException as error:
+                if first is None:
+                    first = error
+        if first is not None:
+            raise first
+
+
 def serve(*, manifest, authority, make_pipe, authenticate, broker):
     from core.export_execution_host import MessagePipe
     from core.export_process_identity import (
@@ -761,6 +805,11 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
         process_snapshot,
         verify_process_snapshot,
     )
+    from services.authority_observation import ObservationProgress, is_parallel_observation
+
+    observations = getattr(broker, "observation_progress", None)
+    if not isinstance(observations, ObservationProgress):
+        observations = broker.observation_progress = _observation_progress(broker.dispatch)
 
     name = "\\\\.\\pipe\\K98Export-" + manifest["pipe_id"]
     shared = manifest.get("trust_model") == TRUST_MODEL
@@ -768,6 +817,23 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
     if shared:
         expected_bot = manifest["process_bindings"]["bot"]
         bot = open_pinned_process(expected_bot["pid"], expected_bot)
+    listener = None
+
+    def listen(*, first=False):
+        # Active observation + queued observation + current request + next
+        # listener. Keep an owned instance alive while allocating its successor,
+        # so the namespace never passes through an unowned close/reopen gap.
+        return _PipeRequest(
+            make_pipe(
+                name,
+                authority_sid=manifest["authority_sid"],
+                client_sid=manifest["bot_sid"],
+                overlapped=True,
+                max_instances=4,
+                first_instance=first,
+            )
+        )
+
     try:
         while True:
             if shared:
@@ -777,27 +843,46 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
                     return
                 own = open_pinned_process(os.getpid(), manifest["process_bindings"]["authority"])
                 own.Close()
-            handle = make_pipe(
-                name,
-                authority_sid=manifest["authority_sid"],
-                client_sid=manifest["bot_sid"],
-                overlapped=True,
-            )
-            peer = None
+            if listener is None:
+                listener = listen(first=True)
+            request, listener = listener, None
+            handle = request.handle
+            listener_failed = False
             try:
                 pipe = MessagePipe(handle, timeout_ms=30000, **({"process": bot} if shared else {}))
+                request.pipe = pipe
                 pipe.connect()
                 if shared:
-                    peer = authenticate_process_peer(
+                    request.peer = authenticate_process_peer(
                         handle, manifest["process_bindings"]["bot"], server=False
-                    )
-                else:
-                    authenticate(
-                        handle, manifest["bot_sid"], bot_authority_sid=manifest["authority_sid"]
                     )
                 message = pipe.receive()
                 if shared:
-                    verify_process_snapshot(process_snapshot(peer), expected_bot)
+                    verify_process_snapshot(process_snapshot(request.peer), expected_bot)
+                else:
+                    # Windows impersonation uses the last message read. Receive
+                    # only the existing bounded frame first; authenticate before
+                    # admitting or dispatching any action from that frame.
+                    authenticate(
+                        handle, manifest["bot_sid"], bot_authority_sid=manifest["authority_sid"]
+                    )
+                try:
+                    listener = listen()
+                except BaseException:
+                    listener_failed = True
+                    raise
+                if is_parallel_observation(message):
+                    if shared:
+                        # The server's pinned handle may close during shutdown.
+                        # This request keeps its own exact process handle through
+                        # reply cancellation/drain and physical transport cleanup.
+                        request.bot = open_pinned_process(expected_bot["pid"], expected_bot)
+                        pipe.process = request.bot
+                    if observations.submit(message, pipe.send, request.close):
+                        request = None  # Ownership transferred exactly once.
+                    else:
+                        pipe.send({"version": 1, "error": "authority_busy"})
+                    continue
                 try:
                     result = broker.dispatch(message)
                 except Exception as exc:
@@ -814,20 +899,41 @@ def serve(*, manifest, authority, make_pipe, authenticate, broker):
                     reply = {"version": 1, "result": result}
                 pipe.send(reply)
             except Exception as exc:
-                from services.export_authority_diagnostics import report_authority_event
-
-                report_authority_event("AUTHORITY_CONNECTION_FAILED", error=exc)
+                _report_connection_failure(exc)
+                if listener_failed:
+                    raise
                 # A malformed, stalled, unauthenticated or disconnected peer owns
                 # only this connection. Retain claims and never replay dispatch.
                 # The next iteration independently checks the pinned Bot handle.
                 pass
             finally:
-                if peer is not None:
-                    peer.Close()
-                handle.Close()
+                try:
+                    # Failed authentication/receive still rotates while this
+                    # original instance owns the namespace. On interruption or
+                    # failed creation, stop instead of reopening an unowned name.
+                    if listener is None and not listener_failed and sys.exc_info()[0] is None:
+                        listener = listen()
+                finally:
+                    if request is not None:
+                        try:
+                            request.close()
+                        except BaseException:
+                            observations.retain_transport(request)
+                            raise
     finally:
-        if bot is not None:
-            bot.Close()
+        try:
+            if listener is not None:
+                try:
+                    listener.close()
+                except BaseException:
+                    observations.retain_transport(listener)
+                    raise
+        finally:
+            try:
+                observations.drain()
+            finally:
+                if bot is not None:
+                    bot.Close()
 
 
 def _main(argv=None):
@@ -957,13 +1063,24 @@ def _main(argv=None):
             pass
     finally:
         # Construction opens no streams; once constructed, require a proven drain.
+        observation_drained = True
         if authority is not None and "broker" in locals():
             broker.execution_progress.stop_admission()
             if authority.settlement is not None:
                 authority.settlement.stop.set()
             broker.proof_progress.drain()
             broker.execution_progress.drain()
+            observation_drained = broker.observation_progress.drain(timeout=0)
         drained = authority is None or authority.drain()
+        from core.export_execution_host import MessagePipe
+        from core.sql_connection_custody import custody_snapshot
+
+        drained = (
+            drained
+            and observation_drained
+            and not custody_snapshot()["unconfirmed"]
+            and not MessagePipe.unconfirmed_io_count()
+        )
         if drained:
             dal.transition(
                 "session", SessionID=session_id, Action="close", ExpectedVersion=session["Version"]

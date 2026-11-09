@@ -1,6 +1,7 @@
 """Fixed failed-export decisions inside the registered private authority boundary."""
 
 from kvk.dal.new_source_import_dal import SourceConflict
+from services.authority_observation import observation_guard
 from services.export_coordination_dal import identity
 from services.failed_export_closeout import FailedExportCloseout
 from services.failed_export_closeout_dal import FailedExportCloseoutDAL
@@ -20,7 +21,7 @@ def dispatch(broker, message):
     if broker.boundary is None or broker.replacements is None:
         raise SourceConflict("Protected recovery authority and registration history required.")
     job_id = identity(message["job_id"])
-    with broker.authority._lock:
+    with observation_guard(broker.authority._lock, read_only=operation == "inspect"):
         broker.boundary.recheck()
         registrations, current = broker.replacements.registrations()
         registered = current.value()

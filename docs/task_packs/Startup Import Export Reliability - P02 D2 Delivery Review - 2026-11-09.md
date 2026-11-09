@@ -751,3 +751,89 @@ checkpoint; native fixture evidence is not production qualification.
 - Impact: low
 - Risk: medium
 - Dependencies: Source import/admin, capture and contention regression coverage with authoritative SQL shapes.
+
+## D2j bounded authority observation dispatch — scoped before coding
+
+The authenticated accept loop currently waits for each observation's SQL/private
+I/O. Exact read-only selectors may move to one owned observation worker with one
+waiting request. Excess observations return the existing busy wire response.
+Mutations, configuration inspection (which may close/reconcile), context sealing,
+proof/provider actions and unknown selectors retain the authoritative dispatcher.
+The worker must independently validate its allowlist; the original broker still
+validates deployment, exact fields, protected registration and scoped identifiers.
+
+Read-only failed-export, replacement/rollover, target and evidence inspections
+currently take the same in-process authority lock as mutations. Remove that lock
+only inside the independently admitted read-only context, including authenticated
+registration reconstruction; preserve it for every mutation and ordinary caller.
+All reconstructed registrations and service instances remain local to the request;
+previews grant no authority and mutations repeat current ownership/receipt checks.
+SQL metadata reads keep their existing owned transaction/snapshot contracts; no
+query budget, SQL schema, provider capacity or persistent scheduler is added.
+
+Each admitted request owns its original peer, pipe and (for shared identity) a
+separate pinned Bot handle until reply I/O and cleanup finish. A lost reply cannot
+replay dispatch or move a response onto a reconnected request. Shutdown closes
+admission, cancels queued observations without dispatch, and drains the active
+owner. Unconfirmed SQL or transport cleanup retains custody and prevents a clean
+authority-session close; elapsed deadlines do not prove physical completion.
+
+Validation covers slow active work, one queued request, saturation, serial mutation
+progress, exact-selector refusal, original authentication/reply ownership, lost
+reply/reconnect, cancellation and shutdown/cleanup failures. Existing broker,
+registration/evidence, native Windows pipe and release checks remain relevant.
+Bot Changes review required, Deep off; SQL source repository remains unchanged.
+
+D2i merged as mirror PR 507 at `5e2f539f013e40860ed28a3c13aaf5464e9cfc17`
+after exact-head review completed without findings. D2j's 13 initial worker
+regressions fail on that predecessor. The implemented worker and broker/transport
+checks pass 251 cases (one opt-in skip); shared-identity/shutdown rechecks pass 237.
+
+Native Windows qualification exposed two adjacent transport defects: a single
+pipe instance cannot accept work while its old reply remains owned, and legacy
+token impersonation was attempted before any message was read. The authority now
+keeps one reserved successor listener, authenticates a bounded received frame
+before admission on that token path, and retains pre-read process authentication
+plus post-read incarnation verification on the shared-account path. The fixed
+four-instance maximum covers active observation, one waiter, current request and
+reserved listener; only the first instance uses first-instance creation. Every
+successor is created while an owned instance still protects the namespace. Normal
+single-instance provider/other pipe callers retain their defaults.
+
+A lost native reply also exposed a wait on an OVERLAPPED event for a WriteFile
+operation that Windows had synchronously refused. Such errors now preserve their
+original failure without waiting for unissued I/O. Actual pending operations still
+cancel and obtain their terminal result. Unconfirmed completion retains the exact
+operation, event, buffer closure and pipe strongly; cleanup cannot free them or
+close the authority session. This follows Microsoft's
+[asynchronous I/O lifetime contract](https://learn.microsoft.com/en-us/windows/win32/fileio/synchronous-and-asynchronous-i-o)
+and [completion/cancellation contract](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getoverlappedresult).
+
+Both real-pipe tests now pass, including saturation, independently progressing
+serial mutation, original replies, a disconnected original peer and fresh
+reconnection. They use unique local pipe names, current-user/exact-PID fixture
+authentication and inert requests; they do not claim production token provisioning
+or execute SQL/provider work. Failed fixtures were diagnosed with timed stacks;
+only their verified test processes were stopped. Fixture shutdown now retains the
+original failure and exits its owned server reliably.
+
+Final worker review also reproduced interruption both before and after thread
+creation. The worker is now retained before start; interrupted acknowledgement
+closes admission and wakes any started worker, without transferring the request.
+An unacknowledged launch cannot be reported as a clean drain.
+
+Broad D2j regression: 3661 passed, 305 opt-in skips, one dependency warning, with
+21 setup errors from D2c's obsolete literal authority postimage. That fixture now
+authenticates the complete successor chain before using its inert historical
+image; all 128 final worker, historical/new release and reader-capability checks
+pass. Operational-log isolation passed. Architecture, deferred-item, routing,
+selection, lint, imports and command-registration gates passed. Exact-path type
+comparison retains the same 21 errors and 32 warnings, with no new diagnostics.
+
+The 13-member, seven-change `p02_d2j_observation_dispatch_v1` package preserves all
+78 predecessor entries. Registry count is 79 and its bounded size is 216064 bytes.
+The first Changes review found no security issue; the subsequent lifecycle fix
+was separately reviewed in final Changes scan
+`d0f1ad35-c6b1-4f27-bc83-38040a9ca59a`, complete with zero findings, snapshot
+`03f22f49cae70a1742cdb56cf8021cee0f4031d68f85f4f2ba26025362fdaef7`.
+No production release, restart, provider execution or retained recovery occurred.

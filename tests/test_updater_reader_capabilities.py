@@ -20,6 +20,7 @@ from tests.updater_source_assertions import (
     before_d2g_hash,
     before_d2h_hash,
     before_d2i_hash,
+    before_d2j_hash,
     before_event_delivery_hash,
     before_finalisation_hash,
     before_monitoring_hash,
@@ -106,6 +107,10 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     )
 
     for transition in update.reviewed_transitions():
+        if transition["id"] == "p02_d2j_observation_dispatch_v1":
+            for member in transition["members"]:
+                before_d2j_hash(root, member["path"])
+            continue
         if transition["id"] == "p02_d2i_sql_lifecycle_v1":
             for member in transition["members"]:
                 before_d2i_hash(root, member["path"])

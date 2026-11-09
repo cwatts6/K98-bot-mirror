@@ -10,6 +10,7 @@ import re
 import socket
 import subprocess
 import time
+from typing import ClassVar
 
 from services.export_execution_protocol import MAX_MESSAGE_BYTES, ProviderThrottled, decode, encode
 from services.export_snapshot_store import ExportSnapshotStore, SnapshotReceipt
@@ -666,6 +667,8 @@ class PrivateEvidenceStore:
 
 
 class MessagePipe:
+    _retained_io: ClassVar[dict[int, "MessagePipe"]] = {}
+
     def __init__(
         self, handle, *, api=None, timeout_ms=None, event_api=None, overlapped=None, process=None
     ):
@@ -687,6 +690,17 @@ class MessagePipe:
                 overlapped = pywintypes.OVERLAPPED
         self.timeout_ms, self.events, self.overlapped = timeout_ms, event_api, overlapped
         self.process = process
+        self._unconfirmed_io = []
+
+    @classmethod
+    def unconfirmed_io_count(cls):
+        return len(cls._retained_io)
+
+    def _retain_io(self, operation, start):
+        # The start closure retains the exact read/write buffer. Keep both it
+        # and OVERLAPPED alive even if a higher layer drops this pipe object.
+        self._unconfirmed_io.append((operation, start))
+        MessagePipe._retained_io[id(self)] = self
 
     def _bounded_io(self, start):
         """One overlapped operation; cancellation completes before buffer release.
@@ -694,15 +708,35 @@ class MessagePipe:
         The caller keeps its read/write buffer alive across this entire call.
         A timeout is never proof that an action or reply did not happen.
         """
+        if self._unconfirmed_io:
+            raise HostBoundaryError("IPC cleanup remains unconfirmed; retain the original pipe.")
         operation = self.overlapped()
         operation.hEvent = self.events.CreateEvent(None, True, False, None)
         pending = True
+        failure = None
+        count = 0
+
+        def preserve(error):
+            nonlocal failure
+            if failure is None:
+                failure = error
+            else:
+                failure.add_note(f"IPC cleanup failed: {type(error).__name__}")
+
         try:
-            status = start(operation)
+            try:
+                status = start(operation)
+            except Exception as error:
+                # A synchronous Windows failure did not queue this operation.
+                # Waiting on its never-signalled OVERLAPPED event can hang after
+                # an ordinary disconnected peer. Unknown interruption still
+                # follows the conservative cancellation/drain path below.
+                code = getattr(error, "winerror", None)
+                if type(code) is int and code != 997:
+                    pending = False
+                raise
             pending = status == 997  # ERROR_IO_PENDING
-            if status is None:  # Connect completed before an I/O request was issued.
-                return 0
-            if status not in (0, 997):
+            if status not in (None, 0, 997):
                 raise HostBoundaryError("Incomplete IPC operation; do not replay.")
             if pending:
                 if self.process is None:
@@ -720,25 +754,38 @@ class MessagePipe:
                     wait = 0 if wait == 1 else wait
                 if wait != 0:
                     raise HostBoundaryError("IPC deadline expired; outcome is unresolved.")
-            count = self.api.GetOverlappedResult(self.handle, operation, False)
+            if status is not None:
+                count = self.api.GetOverlappedResult(self.handle, operation, False)
             pending = False
-            return count
+        except BaseException as error:
+            failure = error
         finally:
-            try:
-                if pending:
-                    try:
-                        # This issuing thread owns the sole pending operation
-                        # on this handle. CancelIo is the pywin32 API; no helper
-                        # thread or provider operation shares this Bot pipe.
-                        self.api.CancelIo(self.handle)
-                    finally:
-                        try:
-                            self.api.GetOverlappedResult(self.handle, operation, True)
-                        except Exception as exc:
-                            if getattr(exc, "winerror", None) not in (995, 109, 232, 234):
-                                raise
-            finally:
-                operation.hEvent.Close()
+            if pending:
+                try:
+                    # This thread issued this sole operation. Cancellation is
+                    # followed by its terminal result, never treated as a drain.
+                    self.api.CancelIo(self.handle)
+                except BaseException as error:
+                    preserve(error)
+                try:
+                    self.api.GetOverlappedResult(self.handle, operation, True)
+                    pending = False
+                except BaseException as error:
+                    if getattr(error, "winerror", None) in (995, 109, 232, 234):
+                        pending = False
+                    else:
+                        preserve(error)
+            if pending:
+                self._retain_io(operation, start)
+            else:
+                try:
+                    operation.hEvent.Close()
+                except BaseException as error:
+                    preserve(error)
+                    self._retain_io(operation, start)
+        if failure is not None:
+            raise failure
+        return count
 
     def connect(self):
         """Bounded accept for an overlapped server handle."""
@@ -826,10 +873,17 @@ def open_message_pipe(name, *, timeout_ms=30000):
         raise
 
 
-def create_private_pipe(name, *, authority_sid, client_sid, overlapped=False):
+def create_private_pipe(
+    name, *, authority_sid, client_sid, overlapped=False, max_instances=1, first_instance=True
+):
     import pywintypes
     import win32pipe
     import win32security
+
+    if type(max_instances) is not int or max_instances not in {1, 4}:
+        raise HostBoundaryError("Fixed authority pipe capacity required.")
+    if type(first_instance) is not bool or (not first_instance and max_instances != 4):
+        raise HostBoundaryError("Additional pipes require the bounded authority listener group.")
 
     # Explicit SID parsing prevents SDDL injection. The caller does not receive
     # FILE_CREATE_PIPE_INSTANCE (0x4), unlike generic write access.
@@ -848,8 +902,10 @@ def create_private_pipe(name, *, authority_sid, client_sid, overlapped=False):
     attributes = pywintypes.SECURITY_ATTRIBUTES()
     attributes.SECURITY_DESCRIPTOR = descriptor
     attributes.bInheritHandle = False
-    flags = 3 | 0x80000 | (0x40000000 if overlapped else 0)
-    return win32pipe.CreateNamedPipe(name, flags, 4 | 2 | 8, 1, 65536, 65536, 0, attributes)
+    flags = 3 | (0x80000 if first_instance else 0) | (0x40000000 if overlapped else 0)
+    return win32pipe.CreateNamedPipe(
+        name, flags, 4 | 2 | 8, max_instances, 65536, 65536, 0, attributes
+    )
 
 
 def validate_bot_token_profile(profile, expected_sid, *, authority_sid=None):

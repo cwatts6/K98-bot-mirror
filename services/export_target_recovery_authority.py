@@ -1,6 +1,7 @@
 """Bounded IPC-facing diagnosis for guided permanent target isolation."""
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
+from services.authority_observation import observation_guard
 from services.export_coordination_dal import identity
 from services.export_recovery_dal import ExportRecoveryDAL
 from services.export_target_containment import ExportTargetContainment
@@ -42,7 +43,7 @@ def _present(job_id, report):
 
 def inspect_target_recovery(authority, registration, job_id):
     job_id = identity(job_id)
-    with authority._lock:
+    with observation_guard(authority._lock, read_only=True):
         service = _service(authority, registration)
         # Scope failures must not disclose another account's job/evidence.
         scoped = service.discovery.job(job_id)
