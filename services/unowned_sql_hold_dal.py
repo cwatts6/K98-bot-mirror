@@ -3,9 +3,9 @@
 import json
 from uuid import NAMESPACE_URL, uuid5
 
-from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
+from core.recovery_sql_snapshot import recovery_snapshot
+from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows
 from kvk.dal.source_output_pool_dal import _wire
-from services.export_contention import retry_coordination, transaction as retry_transaction
 from services.export_coordination_dal import _cas, _mutex, identity
 from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 
@@ -34,29 +34,31 @@ class UnownedSqlHoldDAL:
     def pending(self, after=None):
         # Discovery is a hint, not a release decision. Avoid locking every active
         # producer/import merely to discover that no blocked resource exists.
-        # inspect/action still take the complete authoritative locked snapshot.
-        with transaction(self.connect) as cursor:
+        # Confirmation still takes the complete authoritative locked snapshot.
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT BlockedReason FROM dbo.ExportResource WHERE ResourceKey=?", RESOURCE
             )
             resource = one(cursor)
         return [self.source_id] if resource and resource["BlockedReason"] else []
 
-    def _snapshot(self, cursor):
-        _mutex(cursor, "account:" + self.account)
-        _mutex(cursor, RESOURCE)
-        cursor.execute(
-            "SELECT * FROM dbo.ExportResource WITH(UPDLOCK,HOLDLOCK) WHERE ResourceKey=?", RESOURCE
-        )
+    def _snapshot(self, cursor, *, passive=False):
+        # Only the preview opts out. Mutation callers retain the default locks.
+        if not passive:
+            _mutex(cursor, "account:" + self.account)
+            _mutex(cursor, RESOURCE)
+        lock = "" if passive else "WITH(UPDLOCK,HOLDLOCK)"
+        membership_lock = "" if passive else "WITH(HOLDLOCK)"
+        cursor.execute(f"SELECT * FROM dbo.ExportResource {lock} WHERE ResourceKey=?", RESOURCE)
         resource = one(cursor)
         # Global SQL outputs are shared. Foreign and contradictory durable
         # owners remain blockers even if their resource pointer was cleared.
         cursor.execute(
             "SELECT TOP(101) p.PreparationID,p.AccountKey,p.StorageOwner,p.ConsumerKind,p.State,p.Version,"
             "JSON_VALUE(p.RequestJson,'$.request.producer.kind') AS ProducerKind "
-            "FROM dbo.ExportPreparation p WITH(UPDLOCK,HOLDLOCK) "
-            "LEFT JOIN dbo.StatsImportExecution e WITH(UPDLOCK,HOLDLOCK) ON e.PreparationID=p.PreparationID "
-            "WHERE EXISTS(SELECT 1 FROM dbo.ExportPreparationResource m WITH(HOLDLOCK) "
+            f"FROM dbo.ExportPreparation p {lock} "
+            f"LEFT JOIN dbo.StatsImportExecution e {lock} ON e.PreparationID=p.PreparationID "
+            f"WHERE EXISTS(SELECT 1 FROM dbo.ExportPreparationResource m {membership_lock} "
             "WHERE m.PreparationID=p.PreparationID AND m.ResourceKey=?) "
             "AND (p.State IN ('writing','committed','uncertain') OR (e.Resolution IS NULL "
             "AND e.State IN ('prepared','running','import_committed','partial'))) ORDER BY p.PreparationID",
@@ -64,7 +66,7 @@ class UnownedSqlHoldDAL:
         )
         producers = rows(cursor)
         cursor.execute(
-            "SELECT COUNT_BIG(*) AS n FROM dbo.ExportExecutionStream WITH(UPDLOCK,HOLDLOCK) "
+            f"SELECT COUNT_BIG(*) AS n FROM dbo.ExportExecutionStream {lock} "
             "WHERE ActiveAccountKey IS NOT NULL OR State IN ('open','frozen')"
         )
         streams = one(cursor)["n"]
@@ -78,11 +80,10 @@ class UnownedSqlHoldDAL:
             dict(resource=resource, producers=producers, streams=streams, disposition=one(cursor))
         )
 
-    @retry_coordination(budget_seconds=5)
     def snapshot(self, source):
         self._scope(source)
-        with retry_transaction(self.connect) as cursor:
-            return self._snapshot(cursor)
+        with recovery_snapshot(self.connect) as cursor:
+            return self._snapshot(cursor, passive=True)
 
     @staticmethod
     def eligible(state):
@@ -105,7 +106,7 @@ class UnownedSqlHoldDAL:
         )
 
     def action(self, action_id):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT * FROM dbo.ExportUnownedHoldDisposition WHERE ActionID=? AND AccountKey=? AND StorageOwner=?",
                 identity(action_id),

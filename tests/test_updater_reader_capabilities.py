@@ -14,6 +14,7 @@ from tests.updater_source_assertions import (
     before_d2a_hash,
     before_d2b_hash,
     before_d2c_hash,
+    before_d2d_hash,
     before_event_delivery_hash,
     before_finalisation_hash,
     before_monitoring_hash,
@@ -100,6 +101,10 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     )
 
     for transition in update.reviewed_transitions():
+        if transition["id"] == "p02_d2d_unowned_hold_observation_v1":
+            for member in transition["members"]:
+                before_d2d_hash(root, member["path"])
+            continue
         if transition["id"] == "p02_d2c_sql_setup_custody_v1":
             for member in transition["members"]:
                 before_d2c_hash(root, member["path"])
