@@ -136,8 +136,9 @@ tie ordering stays recorded as a separate decision, not a silent release additio
 
 ## Final source review and packaging record
 
-The selected SQL commit is `87f2eabc6587576c0ccba266ada407fb9db768e2`
-([draft SQL PR 138](https://github.com/cwatts6/K98-bot-SQL-Server/pull/138)).
+The selected SQL commit is `a202a51440f17233800b49801bd31c3ead2a9227`.
+It includes the original [SQL PR 138](https://github.com/cwatts6/K98-bot-SQL-Server/pull/138)
+and the bounded preflight correction described below.
 The Bot descriptor and installed updater candidate pin this exact revision.
 
 - 130 native SQL tests passed. The later migration header added only a closed
@@ -187,3 +188,23 @@ cases agreeing. All nine earlier failures were rerun successfully in a 116-test
 follow-up. The completion run passed 1,025 tests with 117 skips. This is complete
 case coverage across runs, not one uninterrupted run. Final mirror release,
 numeric and snapshot checks passed 183 tests; lint passed for all changed Python.
+
+## Production preparation correction
+
+The first approved production preparation stopped before drain or SQL apply:
+the actual server reports `mini_AMD`, while the release helper compared its name
+case-sensitively against `MINI_AMD`. Read-only follow-up confirmed no active
+update, no Phase 1 migration receipt, and unchanged database settings.
+
+The corrected helper accepts casing differences only. Different hosts, named
+instances, suffixes, surrounding spaces, database identities and disallowed
+database settings remain refused. Native Windows PowerShell 5.1 reproduced the
+original refusal, then passed all 33 corrected runner checks. A focused SQL
+Changes security review completed with no findings. The migration body, profile,
+startup contracts, object scope and resource limits are unchanged.
+
+The Bot descriptor and updater pin the corrected SQL commit together. Preserve
+the stopped preparation as evidence and upgrade from the inventoried currently
+installed updater before preparing the corrected release. Production deployment
+is separately approved; import/export testing remains outside deployment until
+installation is verified.
