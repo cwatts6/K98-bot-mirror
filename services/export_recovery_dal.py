@@ -1,6 +1,7 @@
 """Bounded discovery tied to the protected runtime's account, custody and pools."""
 
-from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
+from core.recovery_sql_snapshot import recovery_snapshot
+from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows
 from kvk.dal.source_output_pool_dal import _wire
 from services.export_coordination_dal import identity, publication_successor
 
@@ -41,7 +42,7 @@ class ExportRecoveryDAL:
     def pending_jobs(self, *, after=None):
         from services.export_target_admission_dal import ISOLATED_JOB_TARGETS_SQL
 
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (20) JobID FROM dbo.ExportJob WHERE "
                 + self.job_scope
@@ -60,8 +61,8 @@ class ExportRecoveryDAL:
 
     def published_outputs(self, *, after=None):
         """Latest retained publication per destination/epoch, oldest first."""
-        with transaction(self.connect) as cursor:
-            marker = self.job(after)["job"] if after else None
+        with recovery_snapshot(self.connect) as cursor:
+            marker = self._job(cursor, after)["job"] if after else None
             cursor.execute(
                 "SELECT TOP (20) JobID,CreatedUTC,KVK_NO,InputHash FROM dbo.ExportJob j WHERE "
                 + self.job_scope
@@ -89,7 +90,7 @@ class ExportRecoveryDAL:
         return publication_decision_context(snapshot, self.registration.value())
 
     def pending_rollovers(self, *, after=None):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT TOP (20) OperationID FROM KVK.SourceOutputOperation WHERE AccountKey=? "
                 "AND PoolID IN (" + ",".join("?" for _ in self.pools) + ") "
@@ -103,80 +104,81 @@ class ExportRecoveryDAL:
             return [identity(row["OperationID"]) for row in rows(cursor)]
 
     def job(self, job_id):
+        with recovery_snapshot(self.connect) as cursor:
+            return self._job(cursor, job_id)
+
+    def _job(self, cursor, job_id):
         job_id = identity(job_id)
-        with transaction(self.connect) as cursor:
+        cursor.execute(
+            "SELECT *,CASE WHEN UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
+            "THEN 1 ELSE 0 END AS Stalled,CASE WHEN EXISTS "
+            "(SELECT 1 FROM dbo.ExportLegacyCloseout c WHERE c.JobID=dbo.ExportJob.JobID) "
+            "THEN 1 ELSE 0 END AS LegacyCloseoutRecorded,CASE WHEN EXISTS "
+            "(SELECT 1 FROM dbo.ExportReplacementPlan p JOIN dbo.ExportTargetContainment c "
+            "ON c.ContainmentID=p.ContainmentID WHERE c.JobID=dbo.ExportJob.JobID "
+            "AND p.AccountKey=dbo.ExportJob.AccountKey) "
+            "THEN 1 ELSE 0 END AS ReplacementRecorded FROM dbo.ExportJob WHERE JobID=? AND "
+            + self.job_scope,
+            job_id,
+            *self.job_parameters,
+        )
+        job = one(cursor)
+        if job is None:
+            raise SourceConflict("Export is outside this protected recovery registration.")
+        cursor.execute("SELECT * FROM dbo.ExportAttempt WHERE JobID=? ORDER BY AttemptID", job_id)
+        attempts = rows(cursor)
+        cursor.execute(
+            "SELECT StreamID FROM dbo.ExportExecutionStream WHERE JobID=? ORDER BY StreamID",
+            job_id,
+        )
+        streams = rows(cursor)
+        cursor.execute(
+            "SELECT r.* FROM dbo.ExportResource r JOIN dbo.ExportJobResource m "
+            "ON m.ResourceKey=r.ResourceKey WHERE m.JobID=? ORDER BY r.ResourceKey",
+            job_id,
+        )
+        resources = rows(cursor)
+        cursor.execute(
+            "SELECT c.FileID,c.ContainmentID FROM dbo.ExportContainedTarget c "
+            "JOIN dbo.ExportJobResource m ON m.ResourceKey='destination:'+c.FileID "
+            "WHERE m.JobID=? AND (? NOT IN ('scan_data','all_kvk') OR NOT EXISTS "
+            "(SELECT 1 FROM dbo.ExportLegacyCloseout released WHERE released.ContainmentID=c.ContainmentID "
+            "AND released.AccountKey=?)) ORDER BY c.FileID",
+            job_id,
+            job["ConsumerKind"],
+            job["AccountKey"],
+        )
+        isolated_targets = rows(cursor)
+        if job["ConsumerKind"] == "new_source" and frozenset(
+            r["ResourceKey"] for r in resources
+        ) != self.destinations.get(bytes(job["DestinationSetHash"])):
+            raise SourceConflict("Export resource membership differs from its registered pool.")
+        season = None
+        successor = None
+        if job["ConsumerKind"] == "new_source":
             cursor.execute(
-                "SELECT *,CASE WHEN UpdatedUTC<DATEADD(second,-120,SYSUTCDATETIME()) "
-                "THEN 1 ELSE 0 END AS Stalled,CASE WHEN EXISTS "
-                "(SELECT 1 FROM dbo.ExportLegacyCloseout c WHERE c.JobID=dbo.ExportJob.JobID) "
-                "THEN 1 ELSE 0 END AS LegacyCloseoutRecorded,CASE WHEN EXISTS "
-                "(SELECT 1 FROM dbo.ExportReplacementPlan p JOIN dbo.ExportTargetContainment c "
-                "ON c.ContainmentID=p.ContainmentID WHERE c.JobID=dbo.ExportJob.JobID "
-                "AND p.AccountKey=dbo.ExportJob.AccountKey) "
-                "THEN 1 ELSE 0 END AS ReplacementRecorded FROM dbo.ExportJob WHERE JobID=? AND "
-                + self.job_scope,
-                job_id,
-                *self.job_parameters,
+                "SELECT SourceKey,SeasonState,SeasonVersion FROM KVK.SeasonSource WHERE KVK_NO=?",
+                job["KVK_NO"],
             )
-            job = one(cursor)
-            if job is None:
-                raise SourceConflict("Export is outside this protected recovery registration.")
-            cursor.execute(
-                "SELECT * FROM dbo.ExportAttempt WHERE JobID=? ORDER BY AttemptID", job_id
+            season = one(cursor)
+            successor = publication_successor(cursor, job)
+        return _wire(
+            dict(
+                legacy_closeout=bool(job.pop("LegacyCloseoutRecorded", False)),
+                replacement_work=bool(job.pop("ReplacementRecorded", False)),
+                job=job,
+                attempts=attempts,
+                streams=streams,
+                resources=resources,
+                isolated_targets=isolated_targets,
+                season=season,
+                publication_successor=successor,
             )
-            attempts = rows(cursor)
-            cursor.execute(
-                "SELECT StreamID FROM dbo.ExportExecutionStream WHERE JobID=? ORDER BY StreamID",
-                job_id,
-            )
-            streams = rows(cursor)
-            cursor.execute(
-                "SELECT r.* FROM dbo.ExportResource r JOIN dbo.ExportJobResource m "
-                "ON m.ResourceKey=r.ResourceKey WHERE m.JobID=? ORDER BY r.ResourceKey",
-                job_id,
-            )
-            resources = rows(cursor)
-            cursor.execute(
-                "SELECT c.FileID,c.ContainmentID FROM dbo.ExportContainedTarget c "
-                "JOIN dbo.ExportJobResource m ON m.ResourceKey='destination:'+c.FileID "
-                "WHERE m.JobID=? AND (? NOT IN ('scan_data','all_kvk') OR NOT EXISTS "
-                "(SELECT 1 FROM dbo.ExportLegacyCloseout released WHERE released.ContainmentID=c.ContainmentID "
-                "AND released.AccountKey=?)) ORDER BY c.FileID",
-                job_id,
-                job["ConsumerKind"],
-                job["AccountKey"],
-            )
-            isolated_targets = rows(cursor)
-            if job["ConsumerKind"] == "new_source" and frozenset(
-                r["ResourceKey"] for r in resources
-            ) != self.destinations.get(bytes(job["DestinationSetHash"])):
-                raise SourceConflict("Export resource membership differs from its registered pool.")
-            season = None
-            successor = None
-            if job["ConsumerKind"] == "new_source":
-                cursor.execute(
-                    "SELECT SourceKey,SeasonState,SeasonVersion FROM KVK.SeasonSource WHERE KVK_NO=?",
-                    job["KVK_NO"],
-                )
-                season = one(cursor)
-                successor = publication_successor(cursor, job)
-            return _wire(
-                dict(
-                    legacy_closeout=bool(job.pop("LegacyCloseoutRecorded", False)),
-                    replacement_work=bool(job.pop("ReplacementRecorded", False)),
-                    job=job,
-                    attempts=attempts,
-                    streams=streams,
-                    resources=resources,
-                    isolated_targets=isolated_targets,
-                    season=season,
-                    publication_successor=successor,
-                )
-            )
+        )
 
     def repairs(self, job_id):
-        original = self.job(job_id)["job"]
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
+            original = self._job(cursor, job_id)["job"]
             cursor.execute(
                 "SELECT JobID FROM dbo.ExportJob WHERE "
                 + self.job_scope
@@ -188,8 +190,8 @@ class ExportRecoveryDAL:
                 identity(job_id),
             )
             ids = [identity(row["JobID"]) for row in rows(cursor)]
-        # A registered hash alone does not establish complete resource membership.
-        return [self.job(key)["job"] for key in ids]
+            # A registered hash alone does not establish complete resource membership.
+            return [self._job(cursor, key)["job"] for key in ids]
 
     def registered_publication(self, job_id, coordinator):
         if self.job(job_id).get("publication_successor"):

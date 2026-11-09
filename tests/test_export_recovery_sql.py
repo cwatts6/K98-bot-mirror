@@ -19,8 +19,15 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def scoped_jobs():
+def scoped_jobs(monkeypatch):
     import pyodbc
+
+    from kvk.dal.new_source_import_dal import transaction
+    from services import export_recovery_dal as recovery_module
+
+    # Borrowed temporary-table query proof; owned isolation/close is tested in
+    # test_recovery_pool_observation_native with independent real connections.
+    monkeypatch.setattr(recovery_module, "recovery_snapshot", transaction)
 
     names = (
         "ExportJobResource",

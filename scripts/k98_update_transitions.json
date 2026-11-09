@@ -3810,6 +3810,46 @@
           "after_sha256": "07457ba061832ae224185e6e05935691acd43b6e59f3e4e45bf02dac72244d8f"
         }
       ]
+    },
+    {
+      "id": "p02_d2g_recovery_pool_observation_v1",
+      "members": [
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "fa91faa72fa7a379148056ab94c5686a3f6f13b0e0f0fdc33467572f2437050b",
+          "after_sha256": "fa91faa72fa7a379148056ab94c5686a3f6f13b0e0f0fdc33467572f2437050b"
+        },
+        {
+          "path": "core/sql_observation.py",
+          "before_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130",
+          "after_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130"
+        },
+        {
+          "path": "kvk/dal/new_source_delivery_dal.py",
+          "before_sha256": "b6b4bd155382317306972290263e655f9abae48f5abb25bed106b3d517e6fae1",
+          "after_sha256": "b6b4bd155382317306972290263e655f9abae48f5abb25bed106b3d517e6fae1"
+        },
+        {
+          "path": "kvk/dal/source_output_pool_dal.py",
+          "before_sha256": "e965b22ac6a02bc3b846e07d118666243701ec0d8ca113fcab2ee86368c20aaf",
+          "after_sha256": "ab41123eaedc16a0c9bac11d23c23b79945520004c4d46ef07504cd429c395ed"
+        },
+        {
+          "path": "kvk/dal/source_sql_diagnostics.py",
+          "before_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e",
+          "after_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "before_sha256": "07457ba061832ae224185e6e05935691acd43b6e59f3e4e45bf02dac72244d8f",
+          "after_sha256": "07457ba061832ae224185e6e05935691acd43b6e59f3e4e45bf02dac72244d8f"
+        },
+        {
+          "path": "services/export_recovery_dal.py",
+          "before_sha256": "0804378bb863e69684e4bc70a9b6bf15af37525683fd98536ea4d8d1dffa886e",
+          "after_sha256": "8ce3eadc60b67df499d6be4c9cb2d636580328b4cd5f16886e9954a97ea86e75"
+        }
+      ]
     }
   ]
 }

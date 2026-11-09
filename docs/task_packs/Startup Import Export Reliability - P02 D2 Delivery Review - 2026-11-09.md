@@ -553,3 +553,65 @@ authenticate the actual D2f successor before projecting immutable D2d/Phase 1
 postimages; no historical release pin changed. All 215 affected rechecks passed,
 with production operational logs unchanged. These test-only corrections were
 inspected after the completed Changes scan; executable scan inventory is unchanged.
+
+## D2g recovery listings and standalone pool observations
+
+Scope reviewed before implementation: ExportRecoveryDAL's five SQL entry points
+and SourceOutputPoolDAL's standalone reads use the existing owned snapshot helper.
+Recovery pagination and repair membership checks share the same cursor as their
+parent observation. Drain previews read operation and pool in one transaction.
+This removes nested connections and inconsistent multi-transaction tuples without
+changing wire fields or registration/account/storage/resource membership checks.
+Pool retirement, claim, ready, reconciliation and admission retain their owned
+locks, durable receipts and fresh-state comparisons. Registered publication and
+rollover wrappers retain their protected-registration checks; neither grants write
+authority. No schema, permission, provider, retry or command changes are intended.
+
+The source-defined job/attempt/resource/containment/closeout/replacement/stream,
+season, pool/slot/disposition/delivery/intent/operation and operation-resource
+tables are the SQL contract. Tests must cover owned context cleanup, both writer
+arrival orders, complete old/new tuples, corruption and foreign registration
+refusal, plus related recovery/pool/release regressions. Borrowed temporary-table
+fixtures remain explicitly query-only. Changes review is required for the Bot
+patch, Deep off; SQL review is skipped only while that repository is unchanged.
+F14 season routing and the discovery weight gate remain the next coherent slice.
+
+D2g validation: 16 new predecessor regressions failed and one passed; all 17 pass
+after implementation. Nine native checks passed using a new disposable database:
+all 16 public read routes are nonblocking behind an uncommitted writer, recovery
+and operation/pool tuples stay consistent across commit, foreign account/membership
+and corrupted plan/registration hashes are refused, permission failures close the
+reader, and a stale pool preview cannot close admission or create an operation.
+No historical evidence database or retained input was used.
+
+The seven-member release successor authenticates two runtime changes and retains
+all 75 earlier entries, canonical hash
+`c04e0177ab4beb5e34f7611f05b1a3cbcb559c5a381516c4b688246698af60d6`.
+Registry count 76, byte bound 195584. A generator encoding error ran no tests;
+the corrected release tests exposed an overly specific one-file error assertion,
+now corrected for this two-file package. Historical pins remain immutable.
+
+Exact Changes scan `7025a344-b0cf-44c7-a896-05a82543b956` completed with zero
+findings and all four executable inventory items reviewed; Deep off. Digest:
+`49917c93c0d8a57cc9c92a3ebecb2dd72d9972bd370188248e8bc9ac9d5aba59`.
+Supporting native/borrowed-fixture assertions were reviewed before completion.
+Architecture, deferred and routing checks passed. Full-suite execution remains
+reserved for combined D2, with broad affected regressions required for this slice.
+
+D2g broad results: 3022 passed, 464 opt-in skips, one dependency warning and the
+already-corrected partial-package error-message assertion (the running process
+had loaded its predecessor). The separate subsystem run passed 330 checks;
+final affected recheck passed 53. Both broad and final log-isolation checks passed.
+Import smoke, command registration and lint passed. Exact-path base comparison
+reproduced all 210 Pyright diagnostics with identical messages; no new diagnostics.
+
+### D2g inherited row-shape typing debt
+
+### Deferred Optimisation
+- Area: `services/export_recovery_dal.py`, `kvk/dal/source_output_pool_dal.py`
+- Type: consistency
+- Description: The 210 row/result typing diagnostics reproduce with identical messages on the exact D2f source at its original paths. A copied-file baseline had a different import graph and was superseded by this exact-path comparison.
+- Suggested Fix: Give recovery and pool row/wire shapes precise types in a separate focused cleanup while retaining the current serialization and receipt checks.
+- Impact: low
+- Risk: medium
+- Dependencies: Recovery, pool ownership and native tuple/cleanup regression coverage.
