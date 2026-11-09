@@ -90,11 +90,17 @@ def local_sql(text):
 def contained_job(monkeypatch):
     import pyodbc
 
-    from services import export_coordination_dal as coordinator_module
+    from kvk.dal import source_output_pool_dal as pool_module
+    from services import (
+        export_coordination_dal as coordinator_module,
+        export_recovery_dal as recovery_module,
+    )
 
     # Borrowed #table session proves query/CAS semantics, not owned snapshot
     # isolation or physical close. Dedicated native queue tests cover those.
     monkeypatch.setattr(coordinator_module, "recovery_snapshot", coordinator_module.transaction)
+    monkeypatch.setattr(recovery_module, "recovery_snapshot", coordinator_module.transaction)
+    monkeypatch.setattr(pool_module, "recovery_snapshot", coordinator_module.transaction)
 
     root = Path(os.environ["K98_TARGET_CONTAINMENT_SQL_SOURCE"]) / "sql_schema"
     sql = pyodbc.connect(

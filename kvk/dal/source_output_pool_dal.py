@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 import json
 from uuid import UUID, uuid4
 
+from core.recovery_sql_snapshot import recovery_snapshot
 from kvk.dal.new_source_import_dal import SourceConflict, digest, one, rows, transaction
 from services.export_audience import check_audience
 from services.export_coordination_dal import ExportCoordinationDAL, _cas, _mutex, bounded_json
@@ -480,7 +481,7 @@ class SourceOutputPoolDAL:
         )
 
     def snapshot(self, pool_id):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             return self._snapshot(cursor, str(UUID(str(pool_id))))
 
     @contextmanager
@@ -930,7 +931,7 @@ class SourceOutputPoolDAL:
     def choice(self, kvk_no):
         if type(kvk_no) is not int or not 0 < kvk_no < 2**31:
             raise ValueError("Explicit positive target season required.")
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT KVK_NO,SourceKey,ChoiceID FROM KVK.SeasonSource WHERE KVK_NO=?", kvk_no
             )
@@ -940,7 +941,7 @@ class SourceOutputPoolDAL:
             return _wire(result)
 
     def resolve(self, kvk_no, index_file_id=None):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT PoolID,IndexFileID FROM KVK.SourceOutputPool WHERE ActiveKVK=? ORDER BY RegistrationNo",
                 kvk_no,
@@ -955,12 +956,12 @@ class SourceOutputPoolDAL:
             return str(matches[0]["PoolID"]).lower()
 
     def is_index(self, file_id):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute("SELECT PoolID FROM KVK.SourceOutputPool WHERE IndexFileID=?", file_id)
             return one(cursor) is not None
 
     def pending(self, account):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT OperationID FROM KVK.SourceOutputOperation WHERE AccountKey=? AND State IN ('closing','ready') ORDER BY EnqueueSequence,OperationID",
                 account,
@@ -968,7 +969,7 @@ class SourceOutputPoolDAL:
             return tuple(str(r["OperationID"]).lower() for r in rows(cursor))
 
     def completed_setup(self, pool_id):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT o.OldKVK,o.NewKVK FROM KVK.SourceOutputOperation o JOIN KVK.SourceOutputPool p ON p.PoolID=o.PoolID AND p.Epoch=o.TargetEpoch WHERE p.PoolID=? AND o.State='completed'",
                 pool_id,
@@ -976,7 +977,7 @@ class SourceOutputPoolDAL:
             return one(cursor)
 
     def export_context(self, pool_id):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             result = self._snapshot(cursor, pool_id)
             pool = result["pool"]
             cursor.execute(
@@ -1027,11 +1028,11 @@ class SourceOutputPoolDAL:
         return _wire(result)
 
     def operation(self, operation_id):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             return self._operation(cursor, str(UUID(str(operation_id))))
 
     def operation_snapshot(self, operation_id):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             op = self._operation(cursor, str(UUID(str(operation_id))))
             cursor.execute(
                 "SELECT r.* FROM dbo.ExportResource r JOIN KVK.SourceOutputOperationResource m ON m.ResourceKey=r.ResourceKey WHERE m.OperationID=? ORDER BY r.ResourceKey",
@@ -1277,8 +1278,9 @@ class SourceOutputPoolDAL:
             return self._operation(cursor, operation_id)
 
     def drain_snapshot(self, operation_id):
-        operation = self.operation(operation_id)
-        return self.snapshot(operation["PoolID"])
+        with recovery_snapshot(self.connect) as cursor:
+            operation = self._operation(cursor, str(UUID(str(operation_id))))
+            return self._snapshot(cursor, operation["PoolID"])
 
     def ready(self, operation_id, drain, proof):
         operation = self.operation(operation_id)
@@ -1320,7 +1322,7 @@ class SourceOutputPoolDAL:
             )
 
     def files(self, operation_id):
-        with transaction(self.connect) as cursor:
+        with recovery_snapshot(self.connect) as cursor:
             cursor.execute(
                 "SELECT FileID FROM KVK.SourceOutputOperationResource WHERE OperationID=? AND FileID IS NOT NULL ORDER BY FileID",
                 operation_id,
