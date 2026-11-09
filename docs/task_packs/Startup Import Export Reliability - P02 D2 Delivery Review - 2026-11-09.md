@@ -13,7 +13,7 @@ recovery are separate. This review does not authorize another full-scale rehears
 | Connection selection | `core/export_sql_connection.py`, `file_utils.get_conn_with_retries`, `proc_config_import._get_import_connection_with_retry` | D2a binds the selected callable before connection attempts. Existing retry caps, credential validation and explicit operational routing remain. |
 | Import/profile adapters | `stats/profile_cache_repository._connect`, `prekvk_importer._conn`, `honor_importer._conn` | Profile and pre-KVK execution/import-error fallbacks removed together; honor already uses the central helper without fallback. |
 | Direct factories | `kvk/dal/kvk_all_import_dal.py`, `services/stats_import_outcome_service.py`; `weekly_activity_importer._cxn` | Producer wrapper retains its public call contract. Weekly activity's explicit override/import-time selection is distinct from execution-failure fallback; no credential-policy expansion. |
-| Profile result lifecycle | `stats/profile_cache_repository.read_profiles`; `dbo.v_PlayerProfile`, `dbo.v_PlayerScanMeta`, `dbo.v_PlayerKVK_Last3` | SQL definitions verified in the authoritative repository. Mapping is unchanged. Driver context-manager exit does not itself prove physical close; lifecycle correction remains D2, with independent cursor/connection doubles required. |
+| Profile result lifecycle | `stats/profile_cache_repository.read_profiles`; `dbo.v_PlayerProfile`, `dbo.v_PlayerScanMeta`, `dbo.v_PlayerKVK_Last3` | D2b requires explicit rollback/close acknowledgement and retains uncertain connection custody in the cache owner. Mapping and SQL definitions are unchanged; separate cursor/connection regressions and disposable-driver qualification cover this slice. Combined lifecycle qualification remains D2/D5. |
 | Qualified passive recovery | `core/recovery_sql_snapshot.py`; all-KVK, historical import, stats import outcome and stats-report continuation inspections | Retain the deployed three-second explicit snapshot contract and cleanup acknowledgement. No repeated completed rehearsal. |
 | Remaining recovery inspection | `services/unowned_sql_hold_dal.py`, `services/config_preparation_recovery_dal.py`, `services/export_coordination_dal.py` | Inspection currently shares account/resource/preparation/queue locks with mutation helpers. Separate only proven read-only entry points. Mutation snapshots retain locks and current-state revalidation. |
 | Capture/mutation custody | `services/import_capture_recovery_dal.py`, `kvk/dal/new_source_import_dal.py` | Global/session guards can protect physical capture and mutation. An observation label alone is insufficient to remove them. Review first-error/cleanup handling with each affected caller. |
@@ -105,3 +105,108 @@ sampled log use <70%, and existing balanced cost limits where comparable work is
 required (overall ON <= OFF x1.20 +1,000 ms; stage ON <= OFF x1.20 +250 ms).
 Development SQL identity was checked after the crash; retained VM readiness is
 unverified. Existing 21 inputs and earlier failures remain untouched.
+
+## D2b profile SQL custody slice
+
+D2a merged into mirror main as PR 499. D2b addresses the adjacent profile leak:
+driver context exit could commit without closing the connection, and the cache
+owner cleared its refresh slot despite uncertain cleanup. Scope is the profile
+DAL, compatibility facade and existing cache service. No SQL definitions,
+credentials, query text, timeout policy, TTL or command behavior change.
+
+The DAL now requires its caller's explicit `SqlOutcome` and reuses the existing
+`SqlSession` without changing the shared helper. It acknowledges rollback and
+physical close separately, preserves statement exceptions, and retains the actual
+handle if cleanup is interrupted. The facade supplies the outcome to the cache
+owner. A failed or unconfirmed close prevents candidate publication and further
+SQL refreshes, including force/fresh requests and requests after invalidation.
+Last-known-good profiles remain readable. Passive health reports unknown cleanup;
+public cache results never expose the retained handle or driver messages.
+
+A confirmed close permits a later refresh after a statement or rollback failure.
+Cursor-close failure cannot prevent an attempted connection close. Ordinary
+observer cancellation drains the worker through physical cleanup before returning.
+This process-local hold has no timer, automatic repair, retry or restart claim:
+it retains an uncertain live handle for the owning process lifetime. D5 still
+qualifies combined process shutdown/restart and retained-state boundaries.
+If connection creation itself fails, the profile owner closes admission but cannot
+retain a handle the factory never returned. Allocation/initialization cleanup inside
+shared factories remains part of the existing D2 lifecycle work, not a claim that
+this profile slice repairs every connection failure boundary.
+
+The authoritative `dbo.v_PlayerProfile`, `dbo.v_PlayerScanMeta` and
+`dbo.v_PlayerKVK_Last3` definitions were checked in the SQL repository. Existing
+required/optional-view mapping and KVK-only rows are preserved. The only production
+caller of `read_profiles` is the updated facade; tests now use distinct cursor and
+connection objects so closing a cursor cannot falsely prove connection cleanup.
+
+Regression coverage includes original-error identity, rollback/cursor/connection
+cleanup failures, abrupt cleanup interruption, factory failure, cached availability,
+invalidation, shutdown retention, fresh requests joining an entered worker, and
+repeated async cancellation during physical close. The initial 11 failing tests
+are retained privately. Focused owner/DAL/shared-helper coverage passed before the
+expanded cancellation cases and final whole-suite run.
+
+One native test uses the existing uniquely owned disposable local database fixture
+with driver pooling disabled,
+synthetic view projections and a SELECT-only database user. It verified real-driver
+mapping, rollback acknowledgement, closed-handle refusal and retained ownership
+after an injected physical-close failure. A separate observer saw that exact live
+test connection identity disappear only after explicit close; a reusable session
+number alone is not the final assertion. This does not establish production pool
+behavior. The first two test assertions
+incorrectly required no transaction after rollback; the driver's continued session
+made that assumption invalid. Those failures remain retained, and the corrected
+test verifies the actual physical-close contract. Fixture teardown passed without
+forced eviction. No retained rehearsal input or production data was used.
+
+Preflight recorded more than 8 GiB free host RAM/disk, zero version-store use and
+tempdb log use below 70%; the new database also checked log use below 70%. This is
+bounded driver qualification, not D5 whole-pipeline cost or production readiness.
+
+Release compatibility adds the exact six-member
+`p02_d2b_profile_sql_custody_v1` transition: three changed profile files plus unchanged
+SQL-session, thread-drain and runtime-context dependencies. All 70 prior transition
+entries and source hashes remain immutable. The registry count becomes 71 and its
+byte bound increases by 2 KiB to 179,200 for the additional fixed package. Historical
+tests authenticate the successor before checking unchanged release assertions.
+Negative controls reject partial inventories, every changed/unchanged member's
+drift, foreign entries and old readers. This does not install or deploy an updater.
+
+Changes security review is required for the exact Bot patch, with Deep scan off.
+SQL-repository review is skipped because there is no SQL-repository diff. The full
+suite, architecture/deferred/security-routing checks, test selector, formatting,
+smoke imports and command registration are the delivery gates. Final results and
+the exact scan/PR identities are retained with the delivery receipt.
+
+The exact executable patch passed Changes scan
+`161b01be-8778-418f-a6b8-d6d523dbc648` with zero findings and complete coverage.
+Subsequent changes only remove two test-fixture mutable-class defaults, bind the
+native assertion to the unique connection ID, update the historical one-byte-over
+registry-bound assertion to the new fixed limit, and clarify this delivery record.
+Those deltas were inspected separately: fixed test-only metadata SQL remains
+parameterized and opt-in; no production/runtime/tooling bytes changed. A new scan
+is skipped for that test/document-only delta. Final fixture and native rechecks
+passed; the full-suite result is recorded in the delivery receipt and PR.
+
+Final full-suite evidence: 12,352 passed, 1,127 skipped, eight subtests passed,
+one existing dependency warning, and one obsolete registry-bound test failed.
+The test still used the old limit plus one byte; it now uses 179,201 bytes.
+All 580 related boundary/transition tests passed after correction, and the exact
+previously failing case passed again after the full run finished. Both rechecks
+passed operational-log isolation. A second full run was not repeated for this
+test-only constant correction: executable/runtime/tooling bytes were unchanged,
+and all other full-suite cases passed. The original failure remains retained.
+
+### Deployment checkpoint
+
+The default deployment decision follows remaining D2 lifecycle work, D3 maintenance
+and shared-lock work, D4 legacy/manual input custody, then D5 combined isolated
+qualification. An earlier deployment requires a separately justified operational
+benefit and complete source/SQL/updater, ownership/ACL, rollback and native evidence
+for that smaller package. Mirror merges alone are not deployment readiness.
+
+P02 fixes may deploy before P03 retained-work recovery. The first standard production
+import/export test still waits for actual P03 blockers and essential P04 convergence;
+it need not wait for every P05 item or a zero incident count. Promotion, deployment,
+restart, recovery and provider actions remain separate concrete authorizations.

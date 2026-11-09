@@ -30,6 +30,7 @@ class ProfileCacheService:
         self._state = Lock()
         self._commit = Lock()
         self._flight = None
+        self._sql_hold = None
         self._closed = False
         self._revision = 0
         self._generation = 0
@@ -47,6 +48,18 @@ class ProfileCacheService:
         # Called inside existing writer ownership, never by a presentation reader.
         try:
             outcome = self._outcome
+            if self._sql_hold is not None:
+                self._health = Observation(
+                    "profiles",
+                    "cached profiles",
+                    utc(),
+                    "cleanup_uncertain",
+                    "unknown",
+                    "profile_sql_cleanup_unconfirmed",
+                    reference=f"profile-{outcome.generation}",
+                    count=outcome.count,
+                )
+                return
             self._health = Observation(
                 "profiles",
                 "cached profiles",
@@ -149,7 +162,17 @@ class ProfileCacheService:
                 self._publish_health()
 
     def refresh(
-        self, *, path, ttl, parse_time, build, save, force=False, fresh=False, origin="legacy"
+        self,
+        *,
+        path,
+        ttl,
+        parse_time,
+        build,
+        save,
+        force=False,
+        fresh=False,
+        origin="legacy",
+        sql_outcome=None,
     ):
         # An explicit post-update request waits for the entered worker, then owns
         # its own build. It never certifies a pre-update candidate as fresh.
@@ -158,6 +181,8 @@ class ProfileCacheService:
                 with self._state:
                     if self._closed:
                         raise RuntimeError("profile_refresh_admission_closed")
+                    if self._flight is None and self._sql_hold is not None:
+                        return self._outcome
                     self._revision += 1
         while True:
             with self._state:
@@ -165,6 +190,8 @@ class ProfileCacheService:
                     raise RuntimeError("profile_refresh_admission_closed")
                 flight = self._flight
                 if flight is None:
+                    if self._sql_hold is not None:
+                        return self._outcome
                     flight = self._flight = Future()
                     revision = self._revision
                     previous = self._players
@@ -212,6 +239,8 @@ class ProfileCacheService:
                     try:
                         stage = time.monotonic()
                         players, omitted = build()
+                        if sql_outcome is not None and sql_outcome.cleanup != "settled":
+                            raise RuntimeError("profile_sql_cleanup_unconfirmed")
                         timings.append(("build", time.monotonic() - stage))
                         stage = time.monotonic()
                         validate_players(players)
@@ -224,6 +253,10 @@ class ProfileCacheService:
                             players, stamp = disk["players"], parse_time(disk.get("generated_at"))
                             persistence, omitted = "unchanged", ()
                         source = "retained_last_known_good" if players else "unavailable"
+            with self._state:
+                if sql_outcome is not None and sql_outcome.cleanup not in {"settled", "not_needed"}:
+                    self._sql_hold = sql_outcome
+                    diagnostic = "profile_sql_cleanup_unconfirmed"
             with self._commit:
                 with self._state:
                     eligible = revision == self._revision
@@ -283,6 +316,22 @@ class ProfileCacheService:
             flight.set_result(outcome)
             return outcome
         except BaseException as exc:
+            with self._state:
+                if sql_outcome is not None and sql_outcome.cleanup not in {"settled", "not_needed"}:
+                    self._sql_hold = sql_outcome
+                # Cancellation is not a successful empty refresh. Keep the
+                # published snapshot and record custody before waking joiners.
+                self._outcome = replace(
+                    self._outcome,
+                    execution="failed",
+                    source="retained_last_known_good" if self._players else "unavailable",
+                    diagnostic=(
+                        "profile_sql_cleanup_unconfirmed"
+                        if self._sql_hold is not None
+                        else type(exc).__name__
+                    ),
+                )
+                self._publish_health()
             flight.set_exception(exc)
             raise
         finally:

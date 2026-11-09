@@ -87,13 +87,16 @@ def _save(path, payload):
 
 
 def refresh_result(*, force=False, fresh=False, origin="legacy"):
+    from event_calendar.sql_lifecycle import SqlOutcome
     from stats.profile_cache_repository import read_profiles
 
+    sql_outcome = SqlOutcome()
     return _service.refresh(
         path=PLAYER_PROFILE_CACHE,
         ttl=CACHE_TTL_SECS,
         parse_time=_parse_generated_at,
-        build=read_profiles,
+        build=lambda: read_profiles(sql_outcome=sql_outcome),
+        sql_outcome=sql_outcome,
         save=_save,
         force=force,
         fresh=fresh,

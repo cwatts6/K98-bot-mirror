@@ -9,12 +9,8 @@ import pytest
 def test_profile_repository_mapping_and_optional_views(managed):
     from stats.profile_cache_repository import read_profiles
 
-    class Connection:
+    class Cursor:
         closed = False
-        cursor_closed = False
-
-        def cursor(self):
-            return self
 
         def execute(self, sql):
             self.queries.append(sql)
@@ -37,6 +33,23 @@ def test_profile_repository_mapping_and_optional_views(managed):
         def close(self):
             self.closed = True
 
+    class Connection:
+        closed = False
+        rolled_back = False
+
+        def __init__(self):
+            self.reader = Cursor()
+            self.reader.queries = []
+
+        def cursor(self):
+            return self.reader
+
+        def rollback(self):
+            self.rolled_back = True
+
+        def close(self):
+            self.closed = True
+
     class Managed(Connection):
         exited = False
 
@@ -47,16 +60,17 @@ def test_profile_repository_mapping_and_optional_views(managed):
             self.exited = True
 
     conn = Managed() if managed else Connection()
-    conn.queries = []
-    players, omitted = read_profiles(lambda: conn)
+    from event_calendar.sql_lifecycle import SqlOutcome
+
+    players, omitted = read_profiles(lambda: conn, sql_outcome=SqlOutcome())
     assert players["12"]["GovernorName"] == "Ada"
     assert players["12"]["CityHallLevel"] == 25
     assert players["12"]["PowerRank"] == 3
     assert [x["KVK"] for x in players["12"]["KVK"]] == [16, 15]
-    assert omitted == ("scan_meta",) and len(conn.queries) == 3
-    assert conn.closed
+    assert omitted == ("scan_meta",) and len(conn.reader.queries) == 3
+    assert conn.closed and conn.reader.closed and conn.rolled_back
     if managed:
-        assert conn.exited
+        assert not conn.exited
 
 
 def test_required_profile_source_failure_does_not_return_empty():
@@ -70,7 +84,9 @@ def test_required_profile_source_failure_does_not_return_empty():
             pass
 
     with pytest.raises(OSError):
-        read_profiles(Connection)
+        from event_calendar.sql_lifecycle import SqlOutcome
+
+        read_profiles(Connection, sql_outcome=SqlOutcome())
 
 
 def test_name_single_flight_and_failed_refresh_preserves_snapshot(monkeypatch):
