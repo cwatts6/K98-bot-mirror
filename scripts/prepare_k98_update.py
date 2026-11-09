@@ -1495,7 +1495,7 @@ PHASE1_CONTRACT_PINS = {
     },
     "application_sql_contract": {
         "before": "b2e93a617114ca73abd6f1290d108a7199f4e00b120df2ec464bccf6022e0366",
-        "after": "820351b6c09660881a5513145c6c8e4e583e5d87090ba28b9cb2d864aeddf62b",
+        "after": "81d81816c1eeabb6071984890f6ff3f66bc117cee2cac49e2bb90080bfc85697",
     },
 }
 PHASE1_CONTRACT_UPDATES = {
@@ -1505,8 +1505,8 @@ PHASE1_CONTRACT_UPDATES = {
     },
     "application_sql_contract": {
         "metadata_hash": "b5296198aa762c3c83fb9b4ac5ab22e7e6c9c6640b1344ee1e8bc8e373d410c8",
-        "permissions_hash": "dcecd8ebe0a7e560db9a5e6eca0239ca945cc8b2251a1522ee4a4fcffc9482c8",
-        "review_id": "0c95e9d1-83bf-5fa0-ab08-471c8a8c6d0d",
+        "permissions_hash": "e172bc534f02ab73efaee5e663bcb815ce36ec68209b3ba73320b9faab7adf96",
+        "review_id": "ab403c8f-03f4-5b65-aeb6-dbcbdc8f0dd4",
         "scope_hash": "e815147d0cea676248de87b50b39ced161151b86d10bd094993ae224ab58e816",
         "phase1_installation": "20261109_001_p02_phase1_sql_exports",
     },
@@ -2429,14 +2429,23 @@ def prepare_update(
     previous_description = read_blob(config["before"], RELEASE_DESCRIPTION)
     sql_files = {}
     mge_contracts = None
-    application_repair = config["before"] == verifier["P016_APPLICATION_REPAIR"]["predecessor"]
-    if application_repair:
+    application_repair = next(
+        (
+            (verifier[name], verifier[builder])
+            for name, builder in (
+                ("P016_APPLICATION_REPAIR", "p016_application_transition"),
+                ("PHASE1_PERMISSION_REPAIR", "phase1_permission_transition"),
+            )
+            if config["before"] == verifier[name]["predecessor"]
+        ),
+        None,
+    )
+    if application_repair is not None:
         if recovery or description_raw != previous_description:
-            raise ValueError("P016 application repair cannot combine another SQL release")
-        mge_contracts = verifier["p016_application_transition"](
-            config["before"], previous["bot-template.json"]
-        )
-        config["application_contract_repair"] = deepcopy(verifier["P016_APPLICATION_REPAIR"])
+            raise ValueError("Application contract repair cannot combine another SQL release")
+        repair, build_transition = application_repair
+        mge_contracts = build_transition(config["before"], previous["bot-template.json"])
+        config["application_contract_repair"] = deepcopy(repair)
     if recovery:
         if description_raw != previous_description:
             raise ValueError("Coordinated recovery cannot combine another SQL descriptor.")

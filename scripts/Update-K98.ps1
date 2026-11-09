@@ -1,9 +1,10 @@
 [CmdletBinding()]
-param([switch]$PrepareOnly,[switch]$Status)
+param([switch]$PrepareOnly,[switch]$Status,[switch]$RepairPhase1Permissions)
 # Routine operator entrypoint: run this same script, then the prompted Discord
 # restart. No release-specific arguments, packet editing or hash entry.
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+if($RepairPhase1Permissions -and (-not $PrepareOnly -or $Status)){throw 'Phase 1 permission repair is a preparation-only operation; use -RepairPhase1Permissions -PrepareOnly'}
 if($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5){throw 'Use Windows PowerShell 5.1, Run as administrator.'}
 if($env:COMPUTERNAME -cne 'MINI_AMD'){throw 'This is the MINI_AMD production updater. Do not run it on the development PC.'}
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
@@ -85,12 +86,23 @@ $transcript=Join-Path $updates ('update-'+[datetime]::UtcNow.ToString('yyyyMMddT
 $null=Start-Transcript -LiteralPath $transcript -NoClobber
 try {
  $active=Join-Path $updates 'active.json'
- if(Test-Path -LiteralPath $active) {
+ if($RepairPhase1Permissions) {
+  if(Test-Path -LiteralPath (Join-Path $updates 'phase1-permission-repair-selection.json')){
+   $prepared=Select-Phase1PermissionRepair $null ''
+   Write-Host ('Package ready: '+$prepared.manifest+'. Original release retained; run this same script without repair/preparation switches to deploy the selected correction.')
+   return
+  }
+  $repair=Read-Phase1PermissionRepairState
+  $prepared=$null
+ } elseif(Test-Path -LiteralPath $active) {
   $saved=Read-Json $active
   $work=$saved.directory
   if($work -cnotmatch '^C:\\ProgramData\\K98\\S11\\updates\\[0-9a-f-]{36}$'){throw 'Saved update path differs'}
   $prepared=Read-Json (Join-Path $work 'prepared.json')
   if($saved.release_id -cne $prepared.release_id){throw 'Saved release identity differs'}
+  if($prepared.release_id -ceq 'dad1d06d-f342-40e6-92ee-74676bee7842'){
+   throw 'This retained Phase 1 start needs the reviewed permission-order correction. Use -Status; do not replay SQL or restart.'
+  }
   if(Test-Path -LiteralPath (Join-Path $work 'verified.json')) {
    # Only the pointer is removed. All immutable release evidence is retained.
    $verified=Read-Json (Join-Path $work 'verified.json')
@@ -98,9 +110,18 @@ try {
    Remove-Item -LiteralPath $active
    Write-Host ('Previously completed release '+$prepared.target+' verified; no restart required.');return
   } else {
+   $selectedRepair=$false
+   $selectionPath=Join-Path $updates 'phase1-permission-repair-selection.json'
+   if(Test-Path -LiteralPath $selectionPath){
+    $selection=Read-Json $selectionPath
+    if($selection.release_id -ceq $prepared.release_id){
+     $prepared=Select-Phase1PermissionRepair $null ''
+     $selectedRepair=$true
+    }
+   }
    $savedManifest=Read-Json $prepared.manifest $prepared.manifest_sha256
    $savedPolicy=Read-Json $savedManifest.policy.path $savedManifest.policy.sha256
-   if(Test-UpdateCanRefresh $savedPolicy.state_directory $savedManifest.release_id -PrepareOnly:$PrepareOnly) {
+   if(Test-UpdateCanRefresh $savedPolicy.state_directory $savedManifest.release_id -PrepareOnly:$PrepareOnly -RetainSelectedRepair:$selectedRepair) {
     # Preparation has not crossed durable staging or deployment intent.
     # Refresh observations automatically: a normal restart since PrepareOnly
     # must not strand the operator with a stale native process/session binding.
@@ -213,9 +234,13 @@ try {
   $entry=@($candidateManifest.members|Where-Object {$_.name -ceq 'Release-Step.ps1'})
   if($entry.Count -ne 1){throw 'Preparation adapter missing'}
   $null=Read-Bytes $preflight $entry[0].sha256 2MB
-  & $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $preflight -Action Preflight -ExpectedBindingsSHA256 $prepared.bindings_sha256 | Out-Host
-  if($LASTEXITCODE -ne 0){throw ('Preparation compatibility checks failed; bot remains running. Evidence: '+$work)}
-  Write-Record $active @{directory=$work;release_id=$prepared.release_id}
+  if($RepairPhase1Permissions){
+   $prepared=Select-Phase1PermissionRepair $prepared $work
+  } else {
+   & $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $preflight -Action Preflight -ExpectedBindingsSHA256 $prepared.bindings_sha256 | Out-Host
+   if($LASTEXITCODE -ne 0){throw ('Preparation compatibility checks failed; bot remains running. Evidence: '+$work)}
+   Write-Record $active @{directory=$work;release_id=$prepared.release_id}
+  }
   Write-Host ('Prepared automatically in '+[math]::Round($clock.Elapsed.TotalSeconds,1)+' seconds. Target '+$target)
  }
  if($PrepareOnly){Write-Host ('Package ready: '+$prepared.manifest+'. Run this same script without -PrepareOnly to deploy.');return}
