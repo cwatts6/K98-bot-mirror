@@ -370,7 +370,9 @@ def portable_contract(monkeypatch):
     metadata, identity = fixture()
     sources = [dict(name="dbo.Fixture", type="U", path="fixture.sql", sha256="a" * 64)]
     monkeypatch.setattr(dal, "APPLICATION_SCHEMA_SOURCE_HASH", digest(sources).hex())
-    monkeypatch.setattr(dal, "application_activation_scope", lambda: ["dbo.Fixture"])
+    monkeypatch.setattr(
+        dal, "application_activation_scope", lambda *, phase1=False: ["dbo.Fixture"]
+    )
     observed = dict(
         version=2,
         target=dict(

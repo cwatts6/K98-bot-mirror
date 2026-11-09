@@ -159,8 +159,10 @@ no executable SQL, permissions, object scope, limits, ownership or deployment
 decision changed. The legacy expected metadata digest was re-derived because it
 includes the fixed migration receipt checksum; application and coordination
 contracts remain unchanged. The one-file Git line-ending rule preserves the
-same authenticated migration bytes on Windows. The two test-fixture callables
+same authenticated migration bytes on Windows. The three test-fixture callables
 now accept the new optional scope argument without changing their assertions.
+The older MGE descriptor test retains historical admission checks and verifies
+the current approved Phase 1 descriptor separately.
 These mechanical packaging/test-fixture corrections do not require another
 discovery scan. Retain their bounded delta proofs with the completed scans.
 
@@ -178,3 +180,10 @@ format those retained strings or weaken their fingerprints to silence whitespace
 
 No merge, production updater installation, restart, import, report, provider
 export or incident clearing is authorised by source publication or this record.
+
+Final regression reconciliation covers all 13,341 collected cases: 12,216 passed
+and 1,125 intentionally skipped across the retained runs, with 33 overlapping
+cases agreeing. All nine earlier failures were rerun successfully in a 116-test
+follow-up. The completion run passed 1,025 tests with 117 skips. This is complete
+case coverage across runs, not one uninterrupted run. Final mirror release,
+numeric and snapshot checks passed 183 tests; lint passed for all changed Python.
