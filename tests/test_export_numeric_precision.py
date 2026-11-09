@@ -64,9 +64,7 @@ class Connection:
         self.closed = True
 
 
-@pytest.mark.parametrize(
-    "value", [0, -(2**63), 2**31, 2**53 - 1, 2**53, 2**53 + 1, 2**63 - 1]
-)
+@pytest.mark.parametrize("value", [0, -(2**63), 2**31, 2**53 - 1, 2**53, 2**53 + 1, 2**63 - 1])
 def test_nullable_sql_int_is_exact_before_sheet_conversion(value):
     frame = sql_output_frame([(1, value), (2, None)], ["GovernorID", "Power"])
     assert int(frame["Power"].iloc[0]) == value
@@ -102,10 +100,7 @@ def test_sql_capture_and_direct_reader_preserve_values_and_close(monkeypatch, tm
 
 
 def test_decimal_blanks_boolean_and_dates_remain_explicit():
-    assert (
-        gm._coerce_cell_for_sheet(Decimal("12.34567890123456789"))
-        == "12.34567890123456789"
-    )
+    assert gm._coerce_cell_for_sheet(Decimal("12.34567890123456789")) == "12.34567890123456789"
     assert gm._coerce_cell_for_sheet(Decimal("2.50")) == "2.50"
     assert gm._coerce_cell_for_sheet(True) is True
     assert gm._coerce_cell_for_sheet(pd.NA) == ""
@@ -140,9 +135,7 @@ def test_direct_export_uses_raw_text_and_tuple_rows(monkeypatch):
 
 
 def test_unsafe_approximate_value_stops_before_direct_clear(monkeypatch):
-    ws = SimpleNamespace(
-        clear=lambda: pytest.fail("Invalid numeric input cleared provider output")
-    )
+    ws = SimpleNamespace(clear=lambda: pytest.fail("Invalid numeric input cleared provider output"))
     with pytest.raises(ValueError, match="approximate"):
         gm.export_dataframe_to_sheet(ws, sql_output_frame([(float(2**54),)], ["Power"]))
 
@@ -183,9 +176,7 @@ def test_direct_reader_failure_closes_both_handles():
     cursor.fetchall = lambda: (_ for _ in ()).throw(ValueError("read failed"))
     connection = Connection(cursor)
     with pytest.raises(ValueError, match="read failed"):
-        read_export_frame(
-            SimpleNamespace(raw_connection=lambda: connection), "reviewed"
-        )
+        read_export_frame(SimpleNamespace(raw_connection=lambda: connection), "reviewed")
     assert cursor.closed and connection.closed
 
 
@@ -195,7 +186,5 @@ def test_direct_reader_preserves_read_error_when_cleanup_also_fails():
     cursor.close = lambda: (_ for _ in ()).throw(RuntimeError("later close failure"))
     connection = Connection(cursor)
     with pytest.raises(ValueError, match="first read failure"):
-        read_export_frame(
-            SimpleNamespace(raw_connection=lambda: connection), "reviewed"
-        )
+        read_export_frame(SimpleNamespace(raw_connection=lambda: connection), "reviewed")
     assert connection.closed

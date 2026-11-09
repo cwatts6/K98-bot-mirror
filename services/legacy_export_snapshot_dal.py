@@ -34,9 +34,7 @@ def _diagnostic_counter(value):
     return value if type(value) is int and 0 <= value <= 2**63 - 1 else None
 
 
-def _log_admission_refusal(
-    identifier, stage, reason, *, resource=None, queue=None, ticket=None
-):
+def _log_admission_refusal(identifier, stage, reason, *, resource=None, queue=None, ticket=None):
     """Bounded read-time facts, never commit proof or arbitrary database prose."""
     if not admission_diagnostics_enabled.get():
         return
@@ -64,9 +62,7 @@ def _log_admission_refusal(
             ),
             active_job_id=_diagnostic_uuid(resource.get("ActiveJobID")),
             active_preparation_id=_diagnostic_uuid(resource.get("ActivePreparationID")),
-            active_output_operation_id=_diagnostic_uuid(
-                resource.get("ActiveOutputOperationID")
-            ),
+            active_output_operation_id=_diagnostic_uuid(resource.get("ActiveOutputOperationID")),
             owner_id=_diagnostic_uuid(resource.get("OwnerID")),
             fence=_diagnostic_counter(resource.get("Fence")),
             version=_diagnostic_counter(resource.get("Version")),
@@ -76,9 +72,7 @@ def _log_admission_refusal(
         kind = queue.get("QueuedKind")
         record.update(
             older_ticket=_diagnostic_counter(queue.get("Ticket")),
-            older_kind=(
-                kind if kind in {"job", "preparation", "output_operation"} else None
-            ),
+            older_kind=(kind if kind in {"job", "preparation", "output_operation"} else None),
             older_id=_diagnostic_uuid(queue.get("QueuedID")),
         )
     logger.info(
@@ -111,9 +105,7 @@ class LegacySnapshotDAL:
         self.connect = connect
         self.output_operations = output_operations
         if execution_evidence and not output_operations:
-            raise ValueError(
-                "Execution evidence requires output-operation-aware preparation."
-            )
+            raise ValueError("Execution evidence requires output-operation-aware preparation.")
         self.execution_evidence = execution_evidence
         self.legacy_sql_contract = None
         self.application_sql_contract = None
@@ -140,14 +132,10 @@ class LegacySnapshotDAL:
         if self.execution_evidence:
             from services.export_execution_dal import ExportExecutionDAL
 
-            ExportExecutionDAL.assert_no_active_stream(
-                cursor, account, probe_only=probe_only
-            )
+            ExportExecutionDAL.assert_no_active_stream(cursor, account, probe_only=probe_only)
 
     @retry_coordination
-    def request(
-        self, *, account, consumer, kvk_no, request, storage_owner, actor, reason
-    ):
+    def request(self, *, account, consumer, kvk_no, request, storage_owner, actor, reason):
         if consumer not in {"all_kvk", "scan_data", "config"}:
             raise ValueError("Unknown preparation consumer.")
         if (consumer == "all_kvk" and (type(kvk_no) is not int or kvk_no <= 0)) or (
@@ -157,8 +145,7 @@ class LegacySnapshotDAL:
         import re
 
         if any(
-            not re.fullmatch(r"[A-Za-z0-9_.@:-]{1,128}", item)
-            for item in (account, storage_owner)
+            not re.fullmatch(r"[A-Za-z0-9_.@:-]{1,128}", item) for item in (account, storage_owner)
         ):
             raise ValueError("Canonical account and storage owner required.")
         if not actor or len(actor) > 128 or not reason or len(reason) > 1024:
@@ -213,9 +200,7 @@ class LegacySnapshotDAL:
 
     def read(self, identifier):
         with transaction(self.connect) as cursor:
-            cursor.execute(
-                "SELECT * FROM dbo.ExportPreparation WHERE PreparationID=?", identifier
-            )
+            cursor.execute("SELECT * FROM dbo.ExportPreparation WHERE PreparationID=?", identifier)
             result = one(cursor)
             if not result:
                 raise SourceConflict("Preparation is unavailable.")
@@ -268,9 +253,7 @@ class LegacySnapshotDAL:
             raise ValueError("Canonical preparation stage/resources required.")
         if stage == "preflight" and resource_keys[0] != "account:" + account:
             raise ValueError("Account admission required before provider preflight.")
-        if stage == "writing" and any(
-            not k.startswith("sql_snapshot:") for k in resource_keys
-        ):
+        if stage == "writing" and any(not k.startswith("sql_snapshot:") for k in resource_keys):
             raise ValueError("SQL stage cannot retain provider resources.")
         with transaction(self.connect) as cursor:
             _mutex(cursor, "account:" + account)
@@ -310,11 +293,7 @@ class LegacySnapshotDAL:
                     _log_admission_refusal(
                         identifier,
                         stage,
-                        (
-                            "resource_blocked"
-                            if resource["BlockedReason"]
-                            else "resource_owned"
-                        ),
+                        ("resource_blocked" if resource["BlockedReason"] else "resource_owned"),
                         resource=resource,
                     )
                     return None
@@ -475,11 +454,7 @@ class LegacySnapshotDAL:
                 rv = _cas(
                     cursor,
                     "UPDATE dbo.ExportResource SET ActivePreparationID=?,OwnerID=?,Fence=?,Version=Version+1 OUTPUT inserted.Version WHERE ResourceKey=? AND Version=? AND ActiveJobID IS NULL AND ActivePreparationID IS NULL AND BlockedReason IS NULL"
-                    + (
-                        " AND ActiveOutputOperationID IS NULL"
-                        if self.output_operations
-                        else ""
-                    ),
+                    + (" AND ActiveOutputOperationID IS NULL" if self.output_operations else ""),
                     identifier,
                     owner,
                     fence,
@@ -487,9 +462,7 @@ class LegacySnapshotDAL:
                     resource["Version"],
                 )["Version"]
                 claimed.append((key, rv))
-            return PreparationClaim(
-                identifier, account, owner, fence, version, tuple(claimed)
-            )
+            return PreparationClaim(identifier, account, owner, fence, version, tuple(claimed))
 
     def _authorize(self, cursor, claim):
         _mutex(cursor, "account:" + claim.account)
@@ -617,9 +590,7 @@ class LegacySnapshotDAL:
                         )
                     )
                 ):
-                    raise SourceConflict(
-                        "Committed generation evidence cannot be replaced."
-                    )
+                    raise SourceConflict("Committed generation evidence cannot be replaced.")
             version = _cas(
                 cursor,
                 "UPDATE dbo.ExportPreparation SET State=?,GenerationJson=COALESCE(CAST(? AS nvarchar(max)),GenerationJson),Version=Version+1,UpdatedUTC=SYSUTCDATETIME() OUTPUT inserted.Version WHERE PreparationID=? AND OwnerID=? AND Fence=? AND Version=? AND State=?",
@@ -683,10 +654,7 @@ class LegacySnapshotDAL:
     def captured(self, claim, receipt):
         with transaction(self.connect) as cursor:
             row = self._authorize(cursor, claim)
-            if (
-                row["State"] != "committed"
-                or row["StorageOwner"] != receipt.storage_owner
-            ):
+            if row["State"] != "committed" or row["StorageOwner"] != receipt.storage_owner:
                 raise SourceConflict("Capture is not the committed owned generation.")
             _cas(
                 cursor,
@@ -720,9 +688,7 @@ class LegacySnapshotDAL:
                 )
 
                 verify_legacy_installation_contract(
-                    legacy_installation_snapshot(
-                        cursor, self.legacy_sql_contract["source"]
-                    ),
+                    legacy_installation_snapshot(cursor, self.legacy_sql_contract["source"]),
                     self.legacy_sql_contract,
                     profile=self.sql_profile,
                 )
@@ -737,9 +703,7 @@ class LegacySnapshotDAL:
                     )
 
                     verify_application_installation_contract(
-                        application_snapshot_for_contract(
-                            cursor, self.application_sql_contract
-                        ),
+                        application_snapshot_for_contract(cursor, self.application_sql_contract),
                         self.application_sql_contract,
                     )
                 yield claim
@@ -777,9 +741,7 @@ class LegacySnapshotDAL:
         )
         if self.application_sql_contract is not None:
             verify_application_installation_contract(
-                application_snapshot_for_contract(
-                    cursor, self.application_sql_contract
-                ),
+                application_snapshot_for_contract(cursor, self.application_sql_contract),
                 self.application_sql_contract,
             )
 
@@ -794,9 +756,7 @@ class LegacySnapshotDAL:
         cursor.execute("IF @@TRANCOUNT=0 BEGIN TRANSACTION;")
         row = self._authorize(cursor, claim)
         if row["State"] != "writing":
-            raise SourceConflict(
-                "Only this exact writing claim may enter its transaction."
-            )
+            raise SourceConflict("Only this exact writing claim may enter its transaction.")
 
     @staticmethod
     def capture_result_sets(cursor, names):
@@ -821,9 +781,7 @@ class LegacySnapshotDAL:
             if not cursor.nextset():
                 break
         if len(result) != len(names):
-            raise SnapshotUnavailable(
-                "Missing export result set, including empty headers."
-            )
+            raise SnapshotUnavailable("Missing export result set, including empty headers.")
         return tuple(result)
 
     @staticmethod
@@ -837,9 +795,7 @@ class LegacySnapshotDAL:
         try:
             if scope["consumer"] == "all_kvk":
                 cursor.execute("EXEC KVK.sp_KVK_Get_Exports @KVK_NO=?", scope["kvk_no"])
-                raw = LegacySnapshotDAL.capture_result_sets(
-                    cursor, gm.KVK_EXPORT_SECTION_NAMES
-                )
+                raw = LegacySnapshotDAL.capture_result_sets(cursor, gm.KVK_EXPORT_SECTION_NAMES)
                 frames = [sql_output_frame(s.rows, s.columns) for s in raw]
                 return gm.plan_legacy_outputs(scope, frames=frames)
             results = []
@@ -851,15 +807,11 @@ class LegacySnapshotDAL:
                 # This is reviewed operator configuration, never a command query.
                 # Validate its exact table/projection against the checked-in plan.
                 if export["query"] not in allowed:
-                    raise SourceConflict(
-                        "Scan query is not in the reviewed export configuration."
-                    )
+                    raise SourceConflict("Scan query is not in the reviewed export configuration.")
                 cursor.execute(export["query"])
                 columns = tuple(c[0] for c in cursor.description)
                 results.append(
-                    OutputSection(
-                        str(index), columns, tuple(tuple(r) for r in cursor.fetchall())
-                    )
+                    OutputSection(str(index), columns, tuple(tuple(r) for r in cursor.fetchall()))
                 )
             return gm.plan_legacy_outputs(
                 scope, frames=[sql_output_frame(s.rows, s.columns) for s in results]
