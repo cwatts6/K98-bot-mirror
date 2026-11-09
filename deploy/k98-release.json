@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "profile": "p02_phase1_v1",
+  "bot_predecessors": [
+    "6cb5d8ed532a8b1e34ad58ed230daa74d5ba77a3"
+  ],
+  "sql_commit": "87f2eabc6587576c0ccba266ada407fb9db768e2",
+  "migrations": [
+    {
+      "id": "20261109_001_p02_phase1_sql_exports",
+      "sha256": "520b58c1b25d80bd28f32324d99b5fede0d6191ddab93ac93469ed5c1f6e4041"
+    }
+  ],
+  "contract_transition": "p02_phase1_sql_names_numbers_v1"
+}
