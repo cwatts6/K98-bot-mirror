@@ -1,0 +1,753 @@
+--- /mnt/data/crystaltech_paths.v1.json	2026-08-25 11:40:23.167881466 +0000
++++ /mnt/data/crystaltech_paths.v1.proposed.json	2026-08-25 11:50:16.908811413 +0000
+@@ -1,7 +1,7 @@
+ {
+   "schema_version": "1.0",
+   "meta": {
+-    "updated_at_utc": "2025-10-07T17:58:03Z",
++    "updated_at_utc": "2026-08-25T11:35:18Z",
+     "effective_from_kvk": 14,
+     "uid_namespacing": "path_id__<generated>",
+     "includes_removed": true
+@@ -64,7 +64,7 @@
+       "display": {
+         "en-GB": "F2P / Low Spend — Infantry"
+       },
+-	  "troop_type": "infantry",
++      "troop_type": "infantry",
+       "includes": [],
+       "steps": [
+         {
+@@ -244,7 +244,7 @@
+             "en-GB": "Research Centre Upgrade"
+           },
+           "target_level": 25,
+-          "crystal_cost": 900000,
++          "crystal_cost": 718780,
+           "image": "research_center.png"
+         },
+         {
+@@ -258,6 +258,16 @@
+           "image": "mounted_combat_techniques.png"
+         },
+         {
++          "step_uid": "f2p_low_infantry__qb_ii_lv5",
++          "type": "research",
++          "name": {
++            "en-GB": "Quenched Blades II"
++          },
++          "target_level": 5,
++          "crystal_cost": 1199970,
++          "image": "quenched_blades.png"
++        },
++        {
+           "step_uid": "f2p_low_infantry__cultural_exchange_lv12",
+           "type": "research",
+           "name": {
+@@ -281,23 +291,13 @@
+           "step_uid": "f2p_low_infantry__karaku_reports_lv15",
+           "type": "research",
+           "name": {
+-            "en-GB": "karaku Reports"
++            "en-GB": "Karaku Reports"
+           },
+           "target_level": 15,
+           "crystal_cost": 1920000,
+           "image": "karaku_reports.png"
+         },
+         {
+-          "step_uid": "f2p_low_infantry__qb_ii_lv5",
+-          "type": "research",
+-          "name": {
+-            "en-GB": "Quenched Blades II"
+-          },
+-          "target_level": 5,
+-          "crystal_cost": 1199970,
+-          "image": "quenched_blades.png"
+-        },
+-        {
+           "step_uid": "f2p_low_infantry__starmetal_shields_lv10",
+           "type": "research",
+           "name": {
+@@ -308,16 +308,56 @@
+           "image": "starmetal_shields.png"
+         },
+         {
++          "step_uid": "f2p_low_infantry__swift_marching_ii_lv8",
++          "type": "research",
++          "name": {
++            "en-GB": "Swift Marching II"
++          },
++          "target_level": 8,
++          "crystal_cost": 512000,
++          "image": "swift_marching.png"
++        },
++        {
++          "step_uid": "f2p_low_infantry__cultural_exchange_lv15",
++          "type": "research",
++          "name": {
++            "en-GB": "Cultural Exchange"
++          },
++          "target_level": 15,
++          "crystal_cost": 672000,
++          "image": "cultural_exchange.png"
++        },
++        {
++          "step_uid": "f2p_low_infantry__larger_camps_lv5",
++          "type": "research",
++          "name": {
++            "en-GB": "Larger Camps"
++          },
++          "target_level": 5,
++          "crystal_cost": 840000,
++          "image": "larger_camps.png"
++        },
++        {
+           "step_uid": "f2p_low_infantry__swift_marching_ii_lv10",
+           "type": "research",
+           "name": {
+             "en-GB": "Swift Marching II"
+           },
+           "target_level": 10,
+-          "crystal_cost": 672000,
++          "crystal_cost": 142000,
+           "image": "swift_marching.png"
+         },
+         {
++          "step_uid": "f2p_low_infantry__special_concoction_i_lv10",
++          "type": "research",
++          "name": {
++            "en-GB": "Special Concoction I"
++          },
++          "target_level": 10,
++          "crystal_cost": 3578000,
++          "image": "special_concoctions.png"
++        },
++        {
+           "step_uid": "f2p_low_infantry__improved_bows_ii_lv5",
+           "type": "research",
+           "name": {
+@@ -368,26 +408,6 @@
+           "image": "starmetal_barding.png"
+         },
+         {
+-          "step_uid": "f2p_low_infantry__larger_camps_lv5",
+-          "type": "research",
+-          "name": {
+-            "en-GB": "Larger Camps"
+-          },
+-          "target_level": 5,
+-          "crystal_cost": 840000,
+-          "image": "larger_camps.png"
+-        },
+-        {
+-          "step_uid": "f2p_low_infantry__special_concoction_i_lv10",
+-          "type": "research",
+-          "name": {
+-            "en-GB": "Special Concoction I"
+-          },
+-          "target_level": 10,
+-          "crystal_cost": 3560000,
+-          "image": "special_concoctions.png"
+-        },
+-        {
+           "step_uid": "f2p_low_infantry__emergency_support_lv10",
+           "type": "research",
+           "name": {
+@@ -441,20 +461,40 @@
+           "step_uid": "f2p_low_infantry__special_concoction_ii_lv2",
+           "type": "research",
+           "name": {
+-            "en-GB": "Special Concoction I"
++            "en-GB": "Special Concoction II"
+           },
+           "target_level": 2,
+           "crystal_cost": 100000,
+           "image": "special_concoctions.png"
+         },
+         {
++          "step_uid": "f2p_low_infantry__swift_marching_iii_lv10",
++          "type": "research",
++          "name": {
++            "en-GB": "Swift Marching III"
++          },
++          "target_level": 10,
++          "crystal_cost": 1000000,
++          "image": "swift_marching.png"
++        },
++        {
++          "step_uid": "f2p_low_infantry__special_concoction_ii_lv3",
++          "type": "research",
++          "name": {
++            "en-GB": "Special Concoction II"
++          },
++          "target_level": 3,
++          "crystal_cost": 80000,
++          "image": "special_concoctions.png"
++        },
++        {
+           "step_uid": "f2p_low_infantry__infantry_expert_lv2",
+           "type": "research",
+           "name": {
+             "en-GB": "Infantry Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 100000,
++          "crystal_cost": 150000,
+           "image": "infantry_expert.png"
+         }
+       ]
+@@ -465,7 +505,7 @@
+       "display": {
+         "en-GB": "F2P / Low Spend — Archer"
+       },
+-	  "troop_type": "archer",
++      "troop_type": "archer",
+       "includes": [],
+       "steps": [
+         {
+@@ -635,7 +675,7 @@
+             "en-GB": "Call to Arms II"
+           },
+           "target_level": 8,
+-          "crystal_cost": 833340,
++          "crystal_cost": 2303940,
+           "image": "call_to_arms.png"
+         },
+         {
+@@ -645,7 +685,7 @@
+             "en-GB": "Research Centre Upgrade"
+           },
+           "target_level": 25,
+-          "crystal_cost": 900000,
++          "crystal_cost": 718780,
+           "image": "research_center.png"
+         },
+         {
+@@ -659,6 +699,16 @@
+           "image": "swift_steeds.png"
+         },
+         {
++          "step_uid": "f2p_low_archer__improved_bows_ii_lv5",
++          "type": "research",
++          "name": {
++            "en-GB": "Improved Bows II"
++          },
++          "target_level": 5,
++          "crystal_cost": 1199970,
++          "image": "improved_bows.png"
++        },
++        {
+           "step_uid": "f2p_low_archer__cultural_exchange_lv12",
+           "type": "research",
+           "name": {
+@@ -682,23 +732,13 @@
+           "step_uid": "f2p_low_archer__karaku_reports_lv15",
+           "type": "research",
+           "name": {
+-            "en-GB": "karaku Reports"
++            "en-GB": "Karaku Reports"
+           },
+           "target_level": 15,
+           "crystal_cost": 1920000,
+           "image": "karaku_reports.png"
+         },
+         {
+-          "step_uid": "f2p_low_archer__improved_bows_ii_lv5",
+-          "type": "research",
+-          "name": {
+-            "en-GB": "Improved Bows II"
+-          },
+-          "target_level": 5,
+-          "crystal_cost": 1199970,
+-          "image": "improved_bows.png"
+-        },
+-        {
+           "step_uid": "f2p_low_archer__starmetal_bracers_lv10",
+           "type": "research",
+           "name": {
+@@ -725,7 +765,7 @@
+             "en-GB": "Quenched Blades II"
+           },
+           "target_level": 5,
+-          "crystal_cost": 1199970,
++          "crystal_cost": 1200000,
+           "image": "quenched_blades.png"
+         },
+         {
+@@ -769,6 +809,16 @@
+           "image": "starmetal_barding.png"
+         },
+         {
++          "step_uid": "f2p_low_archer__cultural_exchange_lv15",
++          "type": "research",
++          "name": {
++            "en-GB": "Cultural Exchange"
++          },
++          "target_level": 15,
++          "crystal_cost": 672000,
++          "image": "cultural_exchange.png"
++        },
++        {
+           "step_uid": "f2p_low_archer__larger_camps_lv5",
+           "type": "research",
+           "name": {
+@@ -826,7 +876,7 @@
+           },
+           "target_level": 5,
+           "crystal_cost": 1200000,
+-          "image": "archers_focus.png"
++          "image": "iron_infantry.png"
+         },
+         {
+           "step_uid": "f2p_low_archer__swift_marching_iii_lv4",
+@@ -842,20 +892,40 @@
+           "step_uid": "f2p_low_archer__special_concoction_ii_lv2",
+           "type": "research",
+           "name": {
+-            "en-GB": "Special Concoction I"
++            "en-GB": "Special Concoction II"
+           },
+           "target_level": 2,
+           "crystal_cost": 100000,
+           "image": "special_concoctions.png"
+         },
+         {
++          "step_uid": "f2p_low_archer__fleet_of_foot_iii_lv10",
++          "type": "research",
++          "name": {
++            "en-GB": "Fleet of Foot III"
++          },
++          "target_level": 10,
++          "crystal_cost": 1000000,
++          "image": "fleet_of_foot.png"
++        },
++        {
++          "step_uid": "f2p_low_archer__special_concoction_ii_lv3",
++          "type": "research",
++          "name": {
++            "en-GB": "Special Concoction II"
++          },
++          "target_level": 3,
++          "crystal_cost": 80000,
++          "image": "special_concoctions.png"
++        },
++        {
+           "step_uid": "f2p_low_archer__archer_expert_lv2",
+           "type": "research",
+           "name": {
+             "en-GB": "Archer Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 125000,
++          "crystal_cost": 150000,
+           "image": "archer_expert.png"
+         }
+       ]
+@@ -866,7 +936,7 @@
+       "display": {
+         "en-GB": "F2P / Low Spend — Cavalry"
+       },
+-	  "troop_type": "cavalry",
++      "troop_type": "cavalry",
+       "includes": [],
+       "steps": [
+         {
+@@ -1056,7 +1126,7 @@
+             "en-GB": "Research Centre Upgrade"
+           },
+           "target_level": 25,
+-          "crystal_cost": 900000,
++          "crystal_cost": 713680,
+           "image": "research_center.png"
+         },
+         {
+@@ -1093,7 +1163,7 @@
+           "step_uid": "f2p_low_cavalry__karaku_reports_lv15",
+           "type": "research",
+           "name": {
+-            "en-GB": "karaku Reports"
++            "en-GB": "Karaku Reports"
+           },
+           "target_level": 15,
+           "crystal_cost": 1920000,
+@@ -1116,7 +1186,7 @@
+             "en-GB": "Swift Steeds II"
+           },
+           "target_level": 5,
+-          "crystal_cost": 288000,
++          "crystal_cost": 272000,
+           "image": "swift_steeds.png"
+         },
+         {
+@@ -1156,7 +1226,7 @@
+             "en-GB": "Quenched Blades II"
+           },
+           "target_level": 5,
+-          "crystal_cost": 1199970,
++          "crystal_cost": 1200000,
+           "image": "quenched_blades.png"
+         },
+         {
+@@ -1180,6 +1250,16 @@
+           "image": "swift_marching.png"
+         },
+         {
++          "step_uid": "f2p_low_cavalry__cultural_exchange_lv15",
++          "type": "research",
++          "name": {
++            "en-GB": "Cultural Exchange"
++          },
++          "target_level": 15,
++          "crystal_cost": 672000,
++          "image": "cultural_exchange.png"
++        },
++        {
+           "step_uid": "f2p_low_cavalry__larger_camps_lv5",
+           "type": "research",
+           "name": {
+@@ -1247,7 +1327,7 @@
+           },
+           "target_level": 5,
+           "crystal_cost": 1200000,
+-          "image": "archers_focus.png"
++          "image": "iron_infantry.png"
+         },
+         {
+           "step_uid": "f2p_low_cavalry__swift_marching_iii_lv4",
+@@ -1263,20 +1343,40 @@
+           "step_uid": "f2p_low_cavalry__special_concoction_ii_lv2",
+           "type": "research",
+           "name": {
+-            "en-GB": "Special Concoction I"
++            "en-GB": "Special Concoction II"
+           },
+           "target_level": 2,
+           "crystal_cost": 100000,
+           "image": "special_concoctions.png"
+         },
+         {
++          "step_uid": "f2p_low_cavalry__swift_steeds_iii_lv10",
++          "type": "research",
++          "name": {
++            "en-GB": "Swift Steeds III"
++          },
++          "target_level": 10,
++          "crystal_cost": 1288000,
++          "image": "swift_steeds.png"
++        },
++        {
++          "step_uid": "f2p_low_cavalry__special_concoction_ii_lv3",
++          "type": "research",
++          "name": {
++            "en-GB": "Special Concoction II"
++          },
++          "target_level": 3,
++          "crystal_cost": 80000,
++          "image": "special_concoctions.png"
++        },
++        {
+           "step_uid": "f2p_low_cavalry__cavalry_expert_lv2",
+           "type": "research",
+           "name": {
+             "en-GB": "Cavalry Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 100000,
++          "crystal_cost": 150000,
+           "image": "cavalry_expert.png"
+         }
+       ]
+@@ -1287,7 +1387,7 @@
+       "display": {
+         "en-GB": "F2P / Low Spend — Siege"
+       },
+-	  "troop_type": "siege",
++      "troop_type": "siege",
+       "includes": [],
+       "steps": [
+         {
+@@ -1324,11 +1424,11 @@
+           "step_uid": "f2p_low_siege__reinforced_axles_i_lv3",
+           "type": "research",
+           "name": {
+-            "en-GB": "Reinforced Axles II"
++            "en-GB": "Reinforced Axles I"
+           },
+           "target_level": 3,
+           "crystal_cost": 116040,
+-          "image": "fleet_of_foot.png"
++          "image": "reinforced_axles.png"
+         },
+         {
+           "step_uid": "f2p_low_siege__call_to_arms_i_lv1",
+@@ -1364,11 +1464,11 @@
+           "step_uid": "f2p_low_siege__reinforced_axles_i_lv5",
+           "type": "research",
+           "name": {
+-            "en-GB": "Reinforced Axles II"
++            "en-GB": "Reinforced Axles I"
+           },
+           "target_level": 5,
+           "crystal_cost": 165060,
+-          "image": "fleet_of_foot.png"
++          "image": "reinforced_axles.png"
+         },
+         {
+           "step_uid": "f2p_low_siege__call_to_arms_i_lv8",
+@@ -1487,7 +1587,7 @@
+             "en-GB": "Research Centre Upgrade"
+           },
+           "target_level": 25,
+-          "crystal_cost": 900000,
++          "crystal_cost": 706030,
+           "image": "research_center.png"
+         },
+         {
+@@ -1497,7 +1597,7 @@
+             "en-GB": "Swift Steeds I"
+           },
+           "target_level": 5,
+-          "crystal_cost": 240030,
++          "crystal_cost": 240000,
+           "image": "mounted_combat_techniques.png"
+         },
+         {
+@@ -1507,7 +1607,7 @@
+             "en-GB": "Improved Projectiles II"
+           },
+           "target_level": 5,
+-          "crystal_cost": 1199970,
++          "crystal_cost": 1200000,
+           "image": "improved_projectiles.png"
+         },
+         {
+@@ -1534,7 +1634,7 @@
+           "step_uid": "f2p_low_siege__karaku_reports_lv15",
+           "type": "research",
+           "name": {
+-            "en-GB": "karaku Reports"
++            "en-GB": "Karaku Reports"
+           },
+           "target_level": 15,
+           "crystal_cost": 1920000,
+@@ -1597,7 +1697,7 @@
+             "en-GB": "Quenched Blades II"
+           },
+           "target_level": 5,
+-          "crystal_cost": 1199970,
++          "crystal_cost": 1200000,
+           "image": "quenched_blades.png"
+         },
+         {
+@@ -1647,10 +1747,20 @@
+             "en-GB": "Swift Steeds II"
+           },
+           "target_level": 5,
+-          "crystal_cost": 288000,
++          "crystal_cost": 272000,
+           "image": "swift_steeds.png"
+         },
+         {
++          "step_uid": "f2p_low_siege__cultural_exchange_lv15",
++          "type": "research",
++          "name": {
++            "en-GB": "Cultural Exchange"
++          },
++          "target_level": 15,
++          "crystal_cost": 672000,
++          "image": "cultural_exchange.png"
++        },
++        {
+           "step_uid": "f2p_low_siege__larger_camps_lv5",
+           "type": "research",
+           "name": {
+@@ -1687,7 +1797,7 @@
+             "en-GB": "Siege Provisions"
+           },
+           "target_level": 10,
+-          "crystal_cost": 2205900,
++          "crystal_cost": 4800000,
+           "image": "siege_provisions.png"
+         },
+         {
+@@ -1697,7 +1807,7 @@
+             "en-GB": "Reinforced Axles III"
+           },
+           "target_level": 5,
+-          "crystal_cost": 98040,
++          "crystal_cost": 288000,
+           "image": "reinforced_axles.png"
+         },
+         {
+@@ -1738,7 +1848,7 @@
+           },
+           "target_level": 5,
+           "crystal_cost": 1200000,
+-          "image": "archers_focus.png"
++          "image": "iron_infantry.png"
+         },
+         {
+           "step_uid": "f2p_low_siege__swift_marching_iii_lv4",
+@@ -1754,20 +1864,40 @@
+           "step_uid": "f2p_low_siege__special_concoction_ii_lv2",
+           "type": "research",
+           "name": {
+-            "en-GB": "Special Concoction I"
++            "en-GB": "Special Concoction II"
+           },
+           "target_level": 2,
+           "crystal_cost": 100000,
+           "image": "special_concoctions.png"
+         },
+         {
+-          "step_uid": "f2p_low_siege__siege_expert_lv2",
++          "step_uid": "f2p_low_siege__reinforced_axles_iii_lv10",
++          "type": "research",
++          "name": {
++            "en-GB": "Reinforced Axles III"
++          },
++          "target_level": 10,
++          "crystal_cost": 1000000,
++          "image": "reinforced_axles.png"
++        },
++        {
++          "step_uid": "f2p_low_siege__special_concoction_ii_lv3",
++          "type": "research",
++          "name": {
++            "en-GB": "Special Concoction II"
++          },
++          "target_level": 3,
++          "crystal_cost": 80000,
++          "image": "special_concoctions.png"
++        },
++        {
++          "step_uid": "f2p_low_siege__siege_expert_lv4",
+           "type": "research",
+           "name": {
+             "en-GB": "Siege Expert"
+           },
+-          "target_level": 2,
+-          "crystal_cost": 100000,
++          "target_level": 4,
++          "crystal_cost": 510000,
+           "image": "siege_expert.png"
+         }
+       ]
+@@ -1778,7 +1908,7 @@
+       "display": {
+         "en-GB": "Mid / High Spend — Infantry"
+       },
+-	  "troop_type": "infantry",
++      "troop_type": "infantry",
+       "includes": [],
+       "steps": [
+         {
+@@ -2278,7 +2408,7 @@
+             "en-GB": "Infantry Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 125000,
++          "crystal_cost": 150000,
+           "image": "infantry_expert.png"
+         },
+         {
+@@ -2288,7 +2418,7 @@
+             "en-GB": "Archer Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 125000,
++          "crystal_cost": 150000,
+           "image": "archer_expert.png"
+         },
+         {
+@@ -2298,7 +2428,7 @@
+             "en-GB": "Cavalry Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 125000,
++          "crystal_cost": 150000,
+           "image": "cavalry_expert.png"
+         },
+         {
+@@ -2329,7 +2459,7 @@
+       "display": {
+         "en-GB": "Mid / High Spend — Archers"
+       },
+-	  "troop_type": "archer",
++      "troop_type": "archer",
+       "includes": [],
+       "steps": [
+         {
+@@ -2880,7 +3010,7 @@
+       "display": {
+         "en-GB": "Mid / High Spend — Cavalry"
+       },
+-	  "troop_type": "cavalry",
++      "troop_type": "cavalry",
+       "includes": [],
+       "steps": [
+         {
+@@ -3237,7 +3367,7 @@
+           "step_uid": "mid_high_cavalry__fleet_of_foot_ii_lv10",
+           "type": "research",
+           "name": {
+-            "en-GB": "Fleet of Foot III"
++            "en-GB": "Fleet of Foot II"
+           },
+           "target_level": 10,
+           "crystal_cost": 672000,
+@@ -3431,7 +3561,7 @@
+       "display": {
+         "en-GB": "Mid / High Spend — Siege"
+       },
+-	  "troop_type": "siege",
++      "troop_type": "siege",
+       "includes": [],
+       "steps": [
+         {
+@@ -3910,7 +4040,7 @@
+           "name": {
+             "en-GB": "Siege Provisions"
+           },
+-          "target_level": 5,
++          "target_level": 10,
+           "crystal_cost": 4800000,
+           "image": "siege_provisions.png"
+         },
+@@ -3920,7 +4050,7 @@
+           "name": {
+             "en-GB": "Reinforced Axles III"
+           },
+-          "target_level": 4,
++          "target_level": 10,
+           "crystal_cost": 1288000,
+           "image": "reinforced_axles.png"
+         },
+@@ -4011,7 +4141,7 @@
+             "en-GB": "Infantry Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 125000,
++          "crystal_cost": 150000,
+           "image": "infantry_expert.png"
+         },
+         {
+@@ -4021,7 +4151,7 @@
+             "en-GB": "Archer Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 125000,
++          "crystal_cost": 150000,
+           "image": "archer_expert.png"
+         },
+         {
+@@ -4031,7 +4161,7 @@
+             "en-GB": "Cavalry Expert"
+           },
+           "target_level": 2,
+-          "crystal_cost": 125000,
++          "crystal_cost": 150000,
+           "image": "cavalry_expert.png"
+         },
+         {
