@@ -1,4 +1,4 @@
-"""Real SQL locking/CAS with isolated global temp tables; no persistent DDL/DML."""
+"""Real SQL locking/CAS in a newly owned disposable snapshot-enabled database."""
 
 from copy import deepcopy
 import os
@@ -39,12 +39,12 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture(params=["scan_data", "all_kvk", "player_report"])
-def recovery(tmp_path, request):
+def recovery(tmp_path, request, snapshot_database):
     import pyodbc
 
     namespace = uuid4().hex
     names = {
-        "dbo." + name: "##Capture_" + namespace + "_" + name
+        "dbo." + name: "dbo.Capture_" + namespace + "_" + name
         for name in (
             "ExportJob",
             "ExportJobResource",
@@ -59,7 +59,7 @@ def recovery(tmp_path, request):
     if request.param in {"configuration_continuation", "player_report_continuation"}:
         names.update(
             {
-                name: "##Capture_" + namespace + "_" + name.split(".")[1]
+                name: "dbo.Capture_" + namespace + "_" + name.split(".")[1]
                 for name in (
                     "dbo.ExportReplacementVerification",
                     "dbo.ExportReplacementPlan",
@@ -81,11 +81,11 @@ def recovery(tmp_path, request):
                 )
             }
         )
-    cs = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE=master;Trusted_Connection=yes;TrustServerCertificate=yes"
+    cs = snapshot_database.connection_string
     procedures = {}
     if request.param in {"configuration_continuation", "player_report_continuation"}:
         procedures = {
-            "dbo." + name: "##Capture_" + namespace + "_" + name
+            "dbo." + name: "dbo.Capture_" + namespace + "_" + name
             for name in (
                 "usp_ExportExecutionStreamTransition",
                 "usp_ExportProviderRequestEventAppend",
@@ -132,7 +132,7 @@ def recovery(tmp_path, request):
             body = raw[raw.index("CREATE PROCEDURE") :].strip().removesuffix("GO").strip()
             assert body.count(ROLE_CHECK) == 1
             body = rewrite(body.replace(ROLE_CHECK, "IF 1=0", 1))
-            assert not re.search(r"\b(?:dbo|KVK)\.[A-Za-z_]", body)
+            assert not re.search(r"\b(?:dbo|KVK)\.(?!Capture_)[A-Za-z_]", body)
             owner.execute(body)
             created_procedures.append(procedures[source])
 

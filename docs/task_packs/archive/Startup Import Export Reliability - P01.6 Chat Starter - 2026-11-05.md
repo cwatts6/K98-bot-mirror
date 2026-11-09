@@ -1,3 +1,5 @@
+> **Archived at E104, 6 November 2026.** P01.6 is closed for its agreed scope. See [accepted closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md) and [active P02 handover](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Dated approvals, candidate status and commands below are historical evidence, not instructions to replay deployment or recovery.
+
 > **P01.6 implementation update, 5 November 2026.** Updated design, implementation and offline/disposable-local-SQL qualification are approved. The local candidate and current qualification verdict are in the [implementation receipt](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Implementation%20and%20Qualification%20-%202026-11-05.md). P01.6 is not deployed; P01.5 E100 closure and retained natural observations are unchanged. Earlier review-only approval wording below is historical.
 
 # P01.6 chat starter
@@ -12,7 +14,7 @@ Keep the handover's full principles: physical ownership survives async deadlines
 
 ## Navigation
 
-[P01.5 Closeout - 2026-11-05](archive/Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md); [P01.5 Natural Acceptance - 2026-11-05](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Natural%20Acceptance%20-%202026-11-05.md); [P01.6 Handover and Scope - 2026-11-05](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Handover%20and%20Scope%20-%202026-11-05.md); [Tracker - 2026-11-02](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md); [P01 Design - 2026-11-03](Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md); [Documentation Carry-forward - 2026-11-05](Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md).
+[P01.5 Closeout - 2026-11-05](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md); [P01.5 Natural Acceptance - 2026-11-05](../Startup%20Import%20Export%20Reliability%20-%20P01.5%20Natural%20Acceptance%20-%202026-11-05.md); [P01.6 Handover and Scope - 2026-11-05](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Handover%20and%20Scope%20-%202026-11-05.md); [Tracker - 2026-11-02](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md); [P01 Design - 2026-11-03](../Startup%20Import%20Export%20Reliability%20-%20P01%20Design%20-%202026-11-03.md); [Documentation Carry-forward - 2026-11-05](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md).
 
 ## P01.6 chat handoff
 

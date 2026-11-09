@@ -585,9 +585,13 @@ APPLICATION_ACTIVATION_SCOPE_HASH = (
 )
 
 
-def application_activation_scope():
-    scope = json.loads(read_contract_resource("s11_activation_scope.json"))
-    if digest(scope).hex() != APPLICATION_ACTIVATION_SCOPE_HASH:
+def application_activation_scope(*, phase1=False):
+    from services.export_phase1_contract import ACTIVATION_SCOPE_SHA256
+
+    resource = "p02_phase1_activation_scope.json" if phase1 else "s11_activation_scope.json"
+    expected = ACTIVATION_SCOPE_SHA256 if phase1 else APPLICATION_ACTIVATION_SCOPE_HASH
+    scope = json.loads(read_contract_resource(resource))
+    if digest(scope).hex() != expected:
         raise SourceConflict("Reviewed S11 activation dependency scope differs.")
     return scope["objects"]
 
@@ -708,15 +712,15 @@ def legacy_definition_hash(definition):
 
 
 def validate_legacy_permission_source(source):
-    from services.export_sql_direct_permissions import DIRECT_SOURCE_HASH
+    from services.export_sql_direct_permissions import DIRECT_SOURCE_HASH, PHASE1_SOURCE_HASH
 
     expected = (
-        DIRECT_SOURCE_HASH
+        {DIRECT_SOURCE_HASH, PHASE1_SOURCE_HASH}
         if isinstance(source, dict) and source.get("permission_model") == "direct_application_v1"
-        else LEGACY_PERMISSION_SOURCE_HASH
+        else {LEGACY_PERMISSION_SOURCE_HASH}
     )
     try:
-        if not isinstance(source, dict) or digest(source).hex() != expected:
+        if not isinstance(source, dict) or digest(source).hex() not in expected:
             raise SourceConflict("Exact reviewed legacy SQL source manifest required.")
     except (TypeError, ValueError, OverflowError) as exc:
         raise SourceConflict("Exact reviewed legacy SQL source manifest required.") from exc

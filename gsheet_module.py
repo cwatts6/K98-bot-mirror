@@ -38,6 +38,7 @@ from sqlalchemy import create_engine
 from urllib3.util.retry import Retry
 
 from constants import CONFIG_FILE, CREDENTIALS_FILE
+from core.export_numeric import MAX_EXACT_SHEET_INTEGER, sheet_integer, sql_output_frame
 from kvk.services.kvk_export_service import (
     KVK_EXPORT_SECTION_NAMES,
     KvkExportBindingError,
@@ -45,6 +46,7 @@ from kvk.services.kvk_export_service import (
     get_kvk_export_section_by_legacy_index,
     section_ref_to_name,
 )
+from services.export_output_dal import read_export_frame
 from services.export_provider_adapter import current_provider
 from services.legacy_export_snapshot_service import bound_runtime
 from sheet_importer import detect_transient_error
@@ -100,11 +102,15 @@ def _record_sheets_error(kind: str, exc: Exception) -> None:
         try:
             usage_event(f"gsheets_error_{kind}", 1)
         except Exception:
-            logger.warning("[GSHEETS_METRIC] failed to emit usage_event for %s: %s", kind, exc)
+            logger.warning(
+                "[GSHEETS_METRIC] failed to emit usage_event for %s: %s", kind, exc
+            )
     except Exception:
         # Fallback: log a structured warning so external log processors can pick it up
         logger.warning(
-            "[GSHEETS_METRIC] {kind}=1; exc=%s", str(exc), extra={"gsheets_error_kind": kind}
+            "[GSHEETS_METRIC] {kind}=1; exc=%s",
+            str(exc),
+            extra={"gsheets_error_kind": kind},
         )
 
 
@@ -135,7 +141,9 @@ def _build_sheets_with_timeout(
         raise_on_status=False,
         respect_retry_after_header=True,
     )
-    adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=10, pool_maxsize=20)
+    adapter = HTTPAdapter(
+        max_retries=retry_strategy, pool_connections=10, pool_maxsize=20
+    )
     session.mount("https://", adapter)
     session.mount("http://", adapter)
 
@@ -147,7 +155,9 @@ def _build_sheets_with_timeout(
         authed = AuthorizedSession(creds, session=session)
     except TypeError as e1:
         last_exc = e1
-        logger.debug("AuthorizedSession(..., session=...) failed: %s; trying positional", e1)
+        logger.debug(
+            "AuthorizedSession(..., session=...) failed: %s; trying positional", e1
+        )
         try:
             # try positional second argument
             authed = AuthorizedSession(creds, session)
@@ -186,7 +196,9 @@ def _build_sheets_with_timeout(
                         )
                 except Exception as e_final:
                     last_exc = e_final
-                    logger.exception("All attempts to construct AuthorizedSession failed")
+                    logger.exception(
+                        "All attempts to construct AuthorizedSession failed"
+                    )
                     raise last_exc from None
 
     # Ensure we have an AuthorizedSession instance or raise the last exception
@@ -194,10 +206,15 @@ def _build_sheets_with_timeout(
         raise last_exc or RuntimeError("Failed to construct AuthorizedSession")
 
     # Build discovery services; attach the AuthorizedSession for direct REST usage
-    sheets_service = google_build("sheets", "v4", credentials=creds, cache_discovery=False)
+    sheets_service = google_build(
+        "sheets", "v4", credentials=creds, cache_discovery=False
+    )
     sheets_service._authorized_session = authed
     sheets_service._request_timeout = t
-    sheets_service._transport_retry_strategy = {"max_retries": retries, "backoff_factor": bf}
+    sheets_service._transport_retry_strategy = {
+        "max_retries": retries,
+        "backoff_factor": bf,
+    }
 
     return sheets_service
 
@@ -225,7 +242,9 @@ def _extract_api_error_details(e: Exception) -> dict:
         if resp is not None:
             out["status_code"] = getattr(resp, "status_code", None)
             try:
-                out["headers"] = dict(resp.headers) if getattr(resp, "headers", None) else {}
+                out["headers"] = (
+                    dict(resp.headers) if getattr(resp, "headers", None) else {}
+                )
             except Exception:
                 out["headers"] = None
             try:
@@ -503,10 +522,12 @@ def _dfs_from_proc(engine, proc_sql: str, params: tuple = ()):
         cursor: pyodbc.Cursor = raw_conn.cursor()
         cursor.execute(proc_sql, params)
         while True:
-            cols = [col[0] for col in cursor.description] if cursor.description else None
+            cols = (
+                [col[0] for col in cursor.description] if cursor.description else None
+            )
             if cols:
                 rows = cursor.fetchall()
-                df = pd.DataFrame.from_records(rows, columns=cols)
+                df = sql_output_frame(rows, cols)
                 dfs.append(df)
             if not cursor.nextset():
                 break
@@ -526,18 +547,23 @@ def _dfs_from_proc(engine, proc_sql: str, params: tuple = ()):
 # -------------------------
 # DataFrame helpers and conversion utilities
 # -------------------------
-def _stringify_datetimes_inplace(df: pd.DataFrame, fmt: str = "%Y-%m-%d %H:%M:%S") -> None:
+def _stringify_datetimes_inplace(
+    df: pd.DataFrame, fmt: str = "%Y-%m-%d %H:%M:%S"
+) -> None:
     if df is None or df.empty:
         return
     for col in list(df.columns):
         s = df[col]
         if ptypes.is_datetime64_any_dtype(s) or (
-            getattr(s, "name", "") and getattr(s.dtype, "name", "").startswith("datetime64[")
+            getattr(s, "name", "")
+            and getattr(s.dtype, "name", "").startswith("datetime64[")
         ):
             df[col] = pd.to_datetime(s, errors="coerce").dt.strftime(fmt).fillna("")
             continue
         if s.dtype == object:
-            if not s.map(lambda v: isinstance(v, (pd.Timestamp, _dt.datetime, _dt.date))).any():
+            if not s.map(
+                lambda v: isinstance(v, (pd.Timestamp, _dt.datetime, _dt.date))
+            ).any():
                 continue
 
             def _to_str(v):
@@ -550,7 +576,9 @@ def _stringify_datetimes_inplace(df: pd.DataFrame, fmt: str = "%Y-%m-%d %H:%M:%S
             df[col] = s.map(_to_str)
 
 
-def _drop_cols_case_insensitive(df: pd.DataFrame, drop_names: list[str]) -> pd.DataFrame:
+def _drop_cols_case_insensitive(
+    df: pd.DataFrame, drop_names: list[str]
+) -> pd.DataFrame:
     if df is None:
         return df
     drop_set = {str(d).strip().lower() for d in (drop_names or [])}
@@ -623,23 +651,23 @@ def _coerce_cell_for_sheet(v: Any) -> Any:
     if isinstance(v, (pd.Timestamp, _dt.datetime, _dt.date)):
         return v
 
-    # Numpy scalars -> Python scalars
-    if isinstance(v, (np.integer,)):
-        return int(v)
-    if isinstance(v, (np.floating,)):
+    if isinstance(v, (bool, np.bool_)):
+        return bool(v)
+    if isinstance(v, (int, np.integer)):
+        return sheet_integer(v)
+    if isinstance(v, Decimal):
+        if not v.is_finite():
+            raise ValueError("Non-finite decimal cannot be exported.")
+        return format(v, "f")
+    if isinstance(v, (float, np.floating)):
         fv = float(v)
-        if np.isfinite(fv) and fv.is_integer():
-            return int(fv)
-        return fv
-
-    # Python numerics
-    if isinstance(v, (int,)):
-        return v
-    if isinstance(v, (float,)):
-        if not (v != v):  # check NaN
-            if v.is_integer():
-                return int(v)
-        return v
+        if not np.isfinite(fv):
+            raise ValueError("Non-finite number cannot be exported.")
+        if abs(fv) > MAX_EXACT_SHEET_INTEGER:
+            raise ValueError(
+                "Large approximate number requires an exact SQL integer or decimal."
+            )
+        return int(fv) if fv.is_integer() else fv
 
     # Everything else: keep as-is (strings, etc.)
     return v
@@ -674,7 +702,9 @@ def _detect_integer_like_columns(df: pd.DataFrame) -> list[int]:
     return idxs
 
 
-def _normalize_headers(df: pd.DataFrame, rename_map: dict[str, list[str]]) -> pd.DataFrame:
+def _normalize_headers(
+    df: pd.DataFrame, rename_map: dict[str, list[str]]
+) -> pd.DataFrame:
     """
     Normalise headers and rename columns using a map of desired_name -> [alt1, alt2...].
     Behavior matches the previous implementation in proc_config_import:
@@ -731,7 +761,9 @@ def _coerce_date_uk(df: pd.DataFrame, cols: list[str]):
         parsed = pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
         mask = parsed.isna() & s.notna()
         if mask.any():
-            parsed.loc[mask] = pd.to_datetime(s[mask], format="%d/%m/%y", errors="coerce")
+            parsed.loc[mask] = pd.to_datetime(
+                s[mask], format="%d/%m/%y", errors="coerce"
+            )
         # Keep same shape as before: .dt.date (may be NaT -> NaN)
         df[c] = parsed.dt.date
 
@@ -758,7 +790,9 @@ def _prepare_kvk_export_df(df: pd.DataFrame, kvk_no: int) -> pd.DataFrame:
 # -------------------------
 # gspread convenience helpers
 # -------------------------
-def _get_or_create_ws(ss: gspread.Spreadsheet, title: str, cols: int = 26) -> gspread.Worksheet:
+def _get_or_create_ws(
+    ss: gspread.Spreadsheet, title: str, cols: int = 26
+) -> gspread.Worksheet:
     """
     Return a worksheet by title; create if not found.
     Normalizes titles for fallback search and tolerates race-create.
@@ -803,14 +837,6 @@ def export_dataframe_to_sheet(
     if capture is not None:
         capture(df, format_columns)
         return
-    # clear then update
-    _retry_gspread_call(
-        lambda: ws.clear(),
-        action_desc=f"sheet.clear:{getattr(ws, 'title', '')}",
-        correlation_id=correlation_id,
-    )
-    time.sleep(random.uniform(0.1, 0.6))
-
     # Work on a copy
     df_local = df.copy()
 
@@ -824,8 +850,16 @@ def export_dataframe_to_sheet(
     # Header
     values: list[list[Any]] = [list(df_local.columns)]
     # Rows
-    for _, row in df_local.iterrows():
-        values.append([_coerce_cell_for_sheet(v) for v in row.tolist()])
+    for row in df_local.itertuples(index=False, name=None):
+        values.append([_coerce_cell_for_sheet(v) for v in row])
+
+    # clear then update
+    _retry_gspread_call(
+        lambda: ws.clear(),
+        action_desc=f"sheet.clear:{getattr(ws, 'title', '')}",
+        correlation_id=correlation_id,
+    )
+    time.sleep(random.uniform(0.1, 0.6))
 
     # Prefer Sheets API batch update if available
     try:
@@ -952,7 +986,9 @@ def export_dataframe_to_sheet(
     # Apply number formats if we have service and columns to format
     if service and int_format_indexes:
         try:
-            set_number_format(service, ws.spreadsheet.id, ws.id, int_format_indexes, pattern="0")
+            set_number_format(
+                service, ws.spreadsheet.id, ws.id, int_format_indexes, pattern="0"
+            )
         except Exception:
             logger.exception(
                 "[GSHEET] set_number_format failed for %s/%s",
@@ -1018,7 +1054,8 @@ def sort_worksheet_multi(
                         "endColumnIndex": total_cols,
                     },
                     "sortSpecs": [
-                        {"dimensionIndex": idx, "sortOrder": order} for idx, order in sort_specs
+                        {"dimensionIndex": idx, "sortOrder": order}
+                        for idx, order in sort_specs
                     ],
                 }
             }
@@ -1073,7 +1110,9 @@ def _sort_kvk_export_sheet(
         return
 
     dkp_idx = _find_col_index_case_insensitive(df_to_write, ["dkp", "dkp_score"])
-    last_scan_idx = _find_col_index_case_insensitive(df_to_write, ["last_scan_id", "lastscanid"])
+    last_scan_idx = _find_col_index_case_insensitive(
+        df_to_write, ["last_scan_id", "lastscanid"]
+    )
 
     if dkp_idx is None:
         return
@@ -1126,14 +1165,19 @@ def transfer_and_sort(
     sort_order: str = "ASCENDING",
     format_columns: list[int] | None = None,
 ):
-    from services.legacy_export_snapshot_service import SnapshotUnavailable, _writer_runtime
+    from services.legacy_export_snapshot_service import (
+        SnapshotUnavailable,
+        _writer_runtime,
+    )
 
     if _writer_runtime() is not None:
-        raise SnapshotUnavailable("Direct mutable-table export requires an immutable captured job.")
+        raise SnapshotUnavailable(
+            "Direct mutable-table export requires an immutable captured job."
+        )
     correlation_id = str(uuid.uuid4())
     start_total = time.time()
 
-    df = pd.read_sql(query, engine)
+    df = read_export_frame(engine, query)
     if date_cols:
         for col in date_cols:
             if col in df.columns:
@@ -1185,7 +1229,10 @@ def transfer_and_sort(
                                 "endColumnIndex": total_cols,
                             },
                             "sortSpecs": [
-                                {"dimensionIndex": sort_column_index, "sortOrder": sort_order}
+                                {
+                                    "dimensionIndex": sort_column_index,
+                                    "sortOrder": sort_order,
+                                }
                             ],
                         }
                     }
@@ -1225,7 +1272,9 @@ def validate_export_config(config):
                 f"Export job at index {i} is missing required fields: {', '.join(missing)}"
             )
         if "dates" in job and not isinstance(job["dates"], list):
-            raise ValueError(f"Export job at index {i} has 'dates' but it's not a list.")
+            raise ValueError(
+                f"Export job at index {i} has 'dates' but it's not a list."
+            )
 
 
 # -------------------------
@@ -1247,7 +1296,13 @@ def run_all_exports(
     runtime = _writer_runtime()
     if runtime is None:
         return _render_run_all_exports(
-            server, database, username, password, credentials_file, notify_channel, bot_loop
+            server,
+            database,
+            username,
+            password,
+            credentials_file,
+            notify_channel,
+            bot_loop,
         )
     from services.export_submission import ExportSubmission
 
@@ -1258,7 +1313,9 @@ def run_all_exports(
         # Persist before enqueue; after a lost acknowledgment the observer can read
         # this exact preparation's JobID without submitting another export.
         try:
-            notification_store().patch(notification_run_id, preparation_id=preparation_id)
+            notification_store().patch(
+                notification_run_id, preparation_id=preparation_id
+            )
         except Exception as exc:
             from services.processing_notification_service import event
 
@@ -1270,7 +1327,9 @@ def run_all_exports(
                 error=exc,
             )
             raise
-    job_id = runtime.submit(consumer="scan_data", kvk_no=None, preparation_id=preparation_id)
+    job_id = runtime.submit(
+        consumer="scan_data", kvk_no=None, preparation_id=preparation_id
+    )
     return ExportSubmission(job_id, preparation_id)
 
 
@@ -1316,7 +1375,9 @@ def _render_run_all_exports(
         for attempt in range(1, retries + 1):
             try:
                 safe_kwargs = {
-                    k: v for k, v in kwargs.items() if k not in ("notify_channel", "bot_loop")
+                    k: v
+                    for k, v in kwargs.items()
+                    if k not in ("notify_channel", "bot_loop")
                 }
                 transfer_and_sort(*args, **safe_kwargs)
                 msg = f"[OK] {sheet_name} > {tab_name}"
@@ -1371,7 +1432,9 @@ def _render_run_all_exports(
                     delay = _pagination_miss_delay()
                 else:
                     delay = _full_jitter_sleep(attempt, base_delay, 60.0)
-                _append_log(f"[INFO] sleeping {delay:.2f}s before retry {attempt + 1}/{retries}")
+                _append_log(
+                    f"[INFO] sleeping {delay:.2f}s before retry {attempt + 1}/{retries}"
+                )
                 time.sleep(delay)
                 continue
             else:
@@ -1390,11 +1453,15 @@ def _render_run_all_exports(
                                 color=_discord.Color.red(),
                             )
                             embed.add_field(
-                                name="Error", value=f"```{str(e)[:1000]}```", inline=False
+                                name="Error",
+                                value=f"```{str(e)[:1000]}```",
+                                inline=False,
                             )
                             tb_text = tb if tb else "no traceback"
                             embed.add_field(
-                                name="Traceback", value=f"```{tb_text[-1000:]}```", inline=False
+                                name="Traceback",
+                                value=f"```{tb_text[-1000:]}```",
+                                inline=False,
                             )
                             embed.set_footer(
                                 text=f"gsheet_module.py export failure | gspread={GSPREAD_VERSION} google-client={GOOGLE_API_CLIENT_VERSION}"
@@ -1623,9 +1690,7 @@ def get_sheet_values(
     cred_path = credentials_file
     try:
         if cred_path is None:
-            cred_path = (
-                CREDENTIALS_FILE  # CREDENTIALS_FILE is expected to be available in this module
-            )
+            cred_path = CREDENTIALS_FILE  # CREDENTIALS_FILE is expected to be available in this module
     except Exception:
         # If CREDENTIALS_FILE not present in this module, require explicit credentials_file
         pass
@@ -1673,7 +1738,9 @@ def get_sheet_values(
         rows = res.get("values", []) or []
 
         if not rows:
-            logger.info("[GSHEET] Empty range: sheet=%s range=%s", spreadsheet_id, range_a1)
+            logger.info(
+                "[GSHEET] Empty range: sheet=%s range=%s", spreadsheet_id, range_a1
+            )
 
         return rows
 
@@ -1684,7 +1751,10 @@ def get_sheet_values(
             logger.debug("Failed to record fetch_values error", exc_info=True)
 
         logger.error(
-            "[GSHEET] Failed to fetch values sheet=%s range=%s: %s", spreadsheet_id, range_a1, e
+            "[GSHEET] Failed to fetch values sheet=%s range=%s: %s",
+            spreadsheet_id,
+            range_a1,
+            e,
         )
         logger.debug("Exception details for sheet fetch", exc_info=True)
         return None
@@ -1701,12 +1771,17 @@ def get_drive_service(credentials_file: str, timeout: int | None = None):
         return recorded_clients()[1]
     _reject_uncoordinated_credentials()
     creds = Credentials.from_service_account_file(
-        credentials_file, scopes=["https://www.googleapis.com/auth/drive.metadata.readonly"]
+        credentials_file,
+        scopes=["https://www.googleapis.com/auth/drive.metadata.readonly"],
     )
     service = _build_sheets_with_timeout(creds, timeout=timeout)
-    drive_service = google_build("drive", "v3", credentials=creds, cache_discovery=False)
+    drive_service = google_build(
+        "drive", "v3", credentials=creds, cache_discovery=False
+    )
     drive_service._authorized_session = getattr(service, "_authorized_session", None)
-    drive_service._request_timeout = getattr(service, "_request_timeout", DEFAULT_SHEETS_TIMEOUT)
+    drive_service._request_timeout = getattr(
+        service, "_request_timeout", DEFAULT_SHEETS_TIMEOUT
+    )
     return drive_service
 
 
@@ -1717,7 +1792,9 @@ def get_spreadsheet_modified_time(drive_service, spreadsheet_id: str) -> str | N
             resp = _safe_execute(req, retries=3)
         except Exception:
             resp = (
-                _safe_execute(req) if current_provider() is not None else req.execute(num_retries=0)
+                _safe_execute(req)
+                if current_provider() is not None
+                else req.execute(num_retries=0)
             )
         return resp.get("modifiedTime")
     except Exception as exc:
@@ -1742,12 +1819,17 @@ def _reject_uncoordinated_credentials():
     from services.legacy_export_snapshot_service import SnapshotUnavailable
 
     if bot_config.EXPORT_COORDINATION_ENABLED:
-        raise SnapshotUnavailable("S11 provider access requires a recorded authority scope.")
+        raise SnapshotUnavailable(
+            "S11 provider access requires a recorded authority scope."
+        )
 
 
 @bound_runtime
 def check_basic_gsheets_access(
-    credentials_file: str, sheet_id: str, max_retries: int = 2, retry_backoff_sec: float = 1.0
+    credentials_file: str,
+    sheet_id: str,
+    max_retries: int = 2,
+    retry_backoff_sec: float = 1.0,
 ):
     from services.legacy_export_snapshot_service import (
         ConfigurationAdmissionDeferred,
@@ -1770,7 +1852,9 @@ def check_basic_gsheets_access(
                 sheets, _ = recorded_clients()
                 stage = "request"
                 current_provider().execute(
-                    sheets.spreadsheets().get(spreadsheetId=sheet_id, fields="spreadsheetId")
+                    sheets.spreadsheets().get(
+                        spreadsheetId=sheet_id, fields="spreadsheetId"
+                    )
                 )
                 stage = "closure"
 
@@ -1781,7 +1865,10 @@ def check_basic_gsheets_access(
             )
         except ConfigurationAdmissionDeferred:
             logger.info("[HEALTH][S11] Probe deferred: account admission unavailable")
-            return None, "S11 probe deferred; account busy or retained work requires reconciliation"
+            return (
+                None,
+                "S11 probe deferred; account busy or retained work requires reconciliation",
+            )
         except Exception as exc:
             from services.export_contention import CoordinationLockRefused
 
@@ -1796,10 +1883,16 @@ def check_basic_gsheets_access(
                     "S11 probe waiting for coordination admission; no provider request started",
                 )
             error_type = type(exc).__name__
-            if len(error_type) > 64 or not error_type.isascii() or not error_type.isidentifier():
+            if (
+                len(error_type) > 64
+                or not error_type.isascii()
+                or not error_type.isidentifier()
+            ):
                 error_type = "Exception"
             logger.warning(
-                "[HEALTH][S11] Probe unresolved stage=%s error_type=%s", stage, error_type
+                "[HEALTH][S11] Probe unresolved stage=%s error_type=%s",
+                stage,
+                error_type,
             )
             # The owned preparation retains uncertainty. Health polling must not
             # fall back to the copied legacy key or retry an unresolved action.
@@ -1880,7 +1973,9 @@ def run_kvk_export_test(
     if not all((create_primary, export_pass4, export_altar, export_pass7)):
         from services.legacy_export_snapshot_service import SnapshotUnavailable
 
-        raise SnapshotUnavailable("Partial manual output has no complete captured plan.")
+        raise SnapshotUnavailable(
+            "Partial manual output has no complete captured plan."
+        )
     runtime.validate_destination(kvk_no=kvk_no, sheet_name=sheet_name)
     job_id = runtime.submit(consumer="all_kvk", kvk_no=kvk_no)
     return {"queued": True, "job_id": job_id, "confirmed": False}
@@ -1925,7 +2020,8 @@ def _render_run_kvk_export_test(
         # Write the normal primary sheet (KVK LIST)
         try:
             ss = _retry_gspread_call(
-                lambda: client.open(sheet_name), action_desc=f"open_spreadsheet:{sheet_name}"
+                lambda: client.open(sheet_name),
+                action_desc=f"open_spreadsheet:{sheet_name}",
             )
         except SpreadsheetNotFound:
             ss = _retry_gspread_call(
@@ -1940,7 +2036,9 @@ def _render_run_kvk_export_test(
             df_local.replace([float("inf"), float("-inf")], pd.NA, inplace=True)
             _stringify_datetimes_inplace(df_local)
             if df_local is None or df_local.empty:
-                df_to_write = _prepare_kvk_export_df(pd.DataFrame(columns=df_local.columns), kvk_no)
+                df_to_write = _prepare_kvk_export_df(
+                    pd.DataFrame(columns=df_local.columns), kvk_no
+                )
                 ws = _get_or_create_ws(ss, tab, cols=max(1, len(df_to_write.columns)))
                 export_dataframe_to_sheet(
                     ws,
@@ -2142,7 +2240,10 @@ def _render_run_kvk_proc_exports(
         ws = _get_or_create_ws(ss, tab, cols=len(df_to_write.columns))
 
         export_dataframe_to_sheet(
-            ws, df_to_write, service=service, format_columns=_KVK_FORMAT_NUMBERS.get(tab, [])
+            ws,
+            df_to_write,
+            service=service,
+            format_columns=_KVK_FORMAT_NUMBERS.get(tab, []),
         )
         _sort_kvk_export_sheet(service, ss.id, ws, df_to_write, sheet_name, tab)
 
@@ -2196,15 +2297,21 @@ def _aggregate_windowed_dfs(
     # Determine group keys
     if agg_type == "player":
         group_keys = [
-            k for k in ["governor_id", "name", "kingdom", "campid"] if k in df_filtered.columns
+            k
+            for k in ["governor_id", "name", "kingdom", "campid"]
+            if k in df_filtered.columns
         ]
     elif agg_type == "kingdom":
-        group_keys = [k for k in ["kingdom", "campid", "camp_name"] if k in df_filtered.columns]
+        group_keys = [
+            k for k in ["kingdom", "campid", "camp_name"] if k in df_filtered.columns
+        ]
     else:  # camp
         group_keys = [k for k in ["campid", "camp_name"] if k in df_filtered.columns]
 
     # Numeric columns to sum
-    numeric_cols = [c for c in df_filtered.columns if pd.api.types.is_numeric_dtype(df_filtered[c])]
+    numeric_cols = [
+        c for c in df_filtered.columns if pd.api.types.is_numeric_dtype(df_filtered[c])
+    ]
     # Exclude identifiers accidentally numeric (like campid/governor_id sometimes numeric we want to keep)
     numeric_cols = [c for c in numeric_cols if c not in group_keys]
 
@@ -2247,12 +2354,20 @@ def _aggregate_windowed_dfs(
                 if agg == "max":
                     summed[c] = df_filtered[c].max()
                 else:
-                    summed[c] = df_filtered[c].iat[0] if not df_filtered[c].empty else ""
+                    summed[c] = (
+                        df_filtered[c].iat[0] if not df_filtered[c].empty else ""
+                    )
             else:
-                summed[c] = df_filtered[c].astype(object).iat[0] if not df_filtered[c].empty else ""
+                summed[c] = (
+                    df_filtered[c].astype(object).iat[0]
+                    if not df_filtered[c].empty
+                    else ""
+                )
         return summed
 
-    grouped = df_filtered.groupby(group_keys, dropna=False, as_index=False).agg(agg_dict)
+    grouped = df_filtered.groupby(group_keys, dropna=False, as_index=False).agg(
+        agg_dict
+    )
     # Add a WindowName column to indicate this is an aggregate across windows
     if "WindowName" in grouped.columns:
         grouped["WindowName"] = "ALL_WINDOWS"
@@ -2268,7 +2383,9 @@ def _safe_send_embed(
     if not notify_channel or not bot_loop:
         return
     try:
-        asyncio.run_coroutine_threadsafe(notify_channel.send(embed=embed, view=view), bot_loop)
+        asyncio.run_coroutine_threadsafe(
+            notify_channel.send(embed=embed, view=view), bot_loop
+        )
     except Exception:
         logger.exception("Failed to schedule embed send")
 
@@ -2289,7 +2406,9 @@ async def _send_embed_with_buttons_async(
                 try:
                     view.add_item(
                         discord.ui.Button(
-                            label=str(label)[:100], url=str(url), style=discord.ButtonStyle.link
+                            label=str(label)[:100],
+                            url=str(url),
+                            style=discord.ButtonStyle.link,
                         )
                     )
                 except Exception:
@@ -2301,7 +2420,10 @@ async def _send_embed_with_buttons_async(
 
 
 def _safe_send_embed_with_buttons(
-    notify_channel, bot_loop, embed: discord.Embed, buttons: list[tuple[str, str]] | None = None
+    notify_channel,
+    bot_loop,
+    embed: discord.Embed,
+    buttons: list[tuple[str, str]] | None = None,
 ):
     """
     Thread-safe scheduling helper that will create the View and Buttons on the bot loop.
@@ -2311,7 +2433,8 @@ def _safe_send_embed_with_buttons(
         return
     try:
         asyncio.run_coroutine_threadsafe(
-            _send_embed_with_buttons_async(notify_channel, embed, buttons=buttons), bot_loop
+            _send_embed_with_buttons_async(notify_channel, embed, buttons=buttons),
+            bot_loop,
         )
     except Exception:
         logger.exception("Failed to schedule embed-with-buttons send")
@@ -2339,10 +2462,15 @@ def create_additional_kvk_spreadsheets(
     This function does NOT send Discord notifications by itself unless notify_channel and bot_loop are provided;
     it will still return metadata so callers (or tests) can assert on results.
     """
-    from services.legacy_export_snapshot_service import SnapshotUnavailable, _writer_runtime
+    from services.legacy_export_snapshot_service import (
+        SnapshotUnavailable,
+        _writer_runtime,
+    )
 
     if not _capture_plan and _writer_runtime() is not None:
-        raise SnapshotUnavailable("Additional exports require the complete captured job.")
+        raise SnapshotUnavailable(
+            "Additional exports require the complete captured job."
+        )
     results = {}
     export_sections = dfs if isinstance(dfs, dict) else bind_kvk_export_sections(dfs)
 
@@ -2393,7 +2521,9 @@ def create_additional_kvk_spreadsheets(
             except Exception:
                 if _capture_plan:
                     raise
-                logger.exception("Error while evaluating spec %s for %s", spec, target_ss_name)
+                logger.exception(
+                    "Error while evaluating spec %s for %s", spec, target_ss_name
+                )
             has_data = not (df_candidate is None or df_candidate.empty)
             to_write_results.append((spec, df_candidate, has_data))
 
@@ -2401,7 +2531,8 @@ def create_additional_kvk_spreadsheets(
         any_has_data = any(has_data for (_, _, has_data) in to_write_results)
         if not any_has_data:
             logger.info(
-                "Skipping creation of %s because no tabs had data to write.", target_ss_name
+                "Skipping creation of %s because no tabs had data to write.",
+                target_ss_name,
             )
             return {
                 "created": False,
@@ -2429,7 +2560,9 @@ def create_additional_kvk_spreadsheets(
         except Exception as e:
             if _capture_plan:
                 raise
-            logger.exception("Could not open/create spreadsheet %s: %s", target_ss_name, e)
+            logger.exception(
+                "Could not open/create spreadsheet %s: %s", target_ss_name, e
+            )
             return {
                 "created": False,
                 "reason": "create_failed",
@@ -2443,7 +2576,9 @@ def create_additional_kvk_spreadsheets(
         if not spreadsheet_id:
             # gspread sometimes stores raw properties under _properties
             try:
-                spreadsheet_id = getattr(target_ss, "_properties", {}).get("spreadsheetId")
+                spreadsheet_id = getattr(target_ss, "_properties", {}).get(
+                    "spreadsheetId"
+                )
             except Exception:
                 if _capture_plan:
                     raise
@@ -2499,14 +2634,25 @@ def create_additional_kvk_spreadsheets(
                     )
                     # Determine format columns from original mappings where relevant
                     format_cols = []
-                    section_name = section_ref_to_name(spec.get("section", spec.get("src_idx")))
-                    if spec.get("agg_type") == "player" or section_name == "KVK_Player_Windowed":
+                    section_name = section_ref_to_name(
+                        spec.get("section", spec.get("src_idx"))
+                    )
+                    if (
+                        spec.get("agg_type") == "player"
+                        or section_name == "KVK_Player_Windowed"
+                    ):
                         format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Player_Windowed", [])
                     elif (
-                        spec.get("agg_type") == "kingdom" or section_name == "KVK_Kingdom_Windowed"
+                        spec.get("agg_type") == "kingdom"
+                        or section_name == "KVK_Kingdom_Windowed"
                     ):
-                        format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Kingdom_Windowed", [])
-                    elif spec.get("agg_type") == "camp" or section_name == "KVK_Camp_Windowed":
+                        format_cols = _KVK_FORMAT_NUMBERS.get(
+                            "KVK_Kingdom_Windowed", []
+                        )
+                    elif (
+                        spec.get("agg_type") == "camp"
+                        or section_name == "KVK_Camp_Windowed"
+                    ):
                         format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Camp_Windowed", [])
                     else:
                         format_cols = []
@@ -2538,7 +2684,12 @@ def create_additional_kvk_spreadsheets(
                         ws, df_to_write, service=service, format_columns=format_cols
                     )
                     _sort_kvk_export_sheet(
-                        service, target_ss.id, ws, df_to_write, target_ss_name, target_tab
+                        service,
+                        target_ss.id,
+                        ws,
+                        df_to_write,
+                        target_ss_name,
+                        target_tab,
                     )
                     written.append(target_tab)
                     logger.info(
@@ -2551,7 +2702,9 @@ def create_additional_kvk_spreadsheets(
                 except Exception:
                     if _capture_plan:
                         raise
-                    logger.exception("Failed to write tab %s in %s", target_tab, target_ss_name)
+                    logger.exception(
+                        "Failed to write tab %s in %s", target_tab, target_ss_name
+                    )
                     skipped.append(target_tab)
             else:
                 skipped.append(target_tab)
@@ -2822,7 +2975,9 @@ def create_additional_kvk_spreadsheets(
         has_3rd_altar_player = False
 
     if has_3rd_altar_player:
-        third_altar_result = _create_and_write("KVK_3RD_ALTAR_ALL_PLAYER_OUTPUT", third_altar_specs)
+        third_altar_result = _create_and_write(
+            "KVK_3RD_ALTAR_ALL_PLAYER_OUTPUT", third_altar_specs
+        )
     else:
         third_altar_result = {
             "created": False,
@@ -3079,7 +3234,9 @@ def create_additional_kvk_spreadsheets(
         has_greatzig_player = False
 
     if has_greatzig_player:
-        greatzig_result = _create_and_write("KVK_GREATZIG_ALL_PLAYER_OUTPUT", greatzig_specs)
+        greatzig_result = _create_and_write(
+            "KVK_GREATZIG_ALL_PLAYER_OUTPUT", greatzig_specs
+        )
     else:
         greatzig_result = {
             "created": False,
@@ -3214,9 +3371,13 @@ def create_additional_kvk_spreadsheets(
                     "camp": "KVK_Camp_Full",
                 }[agg_type]
             )
-        return _aggregate_windowed_dfs(export_sections, windows_order, src_idx, agg_type)
+        return _aggregate_windowed_dfs(
+            export_sections, windows_order, src_idx, agg_type
+        )
 
-    def _build_comparison_df(src_idx: int | str, agg_type: str, metric: str) -> pd.DataFrame:
+    def _build_comparison_df(
+        src_idx: int | str, agg_type: str, metric: str
+    ) -> pd.DataFrame:
         """
         Build a comparison DataFrame for a given src_idx (3=player,4=kingdom,5=camp),
         agg_type matching "player"|"kingdom"|"camp", and metric column name.
@@ -3230,13 +3391,17 @@ def create_additional_kvk_spreadsheets(
         # Determine group keys consistent with _aggregate_windowed_dfs
         if agg_type == "player":
             group_keys = [
-                k for k in ["governor_id", "name", "kingdom", "campid"] if k in df_src.columns
+                k
+                for k in ["governor_id", "name", "kingdom", "campid"]
+                if k in df_src.columns
             ]
             # include camp_name if present for convenience
             if "camp_name" in df_src.columns and "camp_name" not in group_keys:
                 group_keys.append("camp_name")
         elif agg_type == "kingdom":
-            group_keys = [k for k in ["kingdom", "campid", "camp_name"] if k in df_src.columns]
+            group_keys = [
+                k for k in ["kingdom", "campid", "camp_name"] if k in df_src.columns
+            ]
         else:
             group_keys = [k for k in ["campid", "camp_name"] if k in df_src.columns]
 
@@ -3311,9 +3476,12 @@ def create_additional_kvk_spreadsheets(
                 agg_sel, on=[c for c in group_keys if c in agg_sel.columns], how="left"
             )
             if _capture_plan and (
-                len(merged) != len(pivot_reset) or merged[f"Overall {metric}"].isna().any()
+                len(merged) != len(pivot_reset)
+                or merged[f"Overall {metric}"].isna().any()
             ):
-                raise SnapshotUnavailable("Full comparison counterparts are missing or ambiguous.")
+                raise SnapshotUnavailable(
+                    "Full comparison counterparts are missing or ambiguous."
+                )
         else:
             # no overall info; add Overall column with zeros
             if _capture_plan:
@@ -3349,16 +3517,31 @@ def create_additional_kvk_spreadsheets(
     # Build all comparison tabs (one spreadsheet "ALL_WINDOW_COMPARISON")
     comparison_tabs = [
         {"tab_name": "CAMP_DKP", "src_idx": 5, "agg_type": "camp", "metric": "dkp"},
-        {"tab_name": "KINGDOM_DKP", "src_idx": 4, "agg_type": "kingdom", "metric": "dkp"},
+        {
+            "tab_name": "KINGDOM_DKP",
+            "src_idx": 4,
+            "agg_type": "kingdom",
+            "metric": "dkp",
+        },
         {"tab_name": "PLAYER_DKP", "src_idx": 3, "agg_type": "player", "metric": "dkp"},
-        {"tab_name": "CAMP_KP_GAIN", "src_idx": 5, "agg_type": "camp", "metric": "kp_gain"},
+        {
+            "tab_name": "CAMP_KP_GAIN",
+            "src_idx": 5,
+            "agg_type": "camp",
+            "metric": "kp_gain",
+        },
         {
             "tab_name": "KINGDOM_KP_GAIN",
             "src_idx": 4,
             "agg_type": "kingdom",
             "metric": "kp_gain",
         },
-        {"tab_name": "PLAYER_KP_GAIN", "src_idx": 3, "agg_type": "player", "metric": "kp_gain"},
+        {
+            "tab_name": "PLAYER_KP_GAIN",
+            "src_idx": 3,
+            "agg_type": "player",
+            "metric": "kp_gain",
+        },
         {
             "tab_name": "CAMP_KILLS_GAIN",
             "src_idx": 5,
@@ -3377,7 +3560,12 @@ def create_additional_kvk_spreadsheets(
             "agg_type": "player",
             "metric": "kills_gain",
         },
-        {"tab_name": "CAMP_T5_KILLS", "src_idx": 5, "agg_type": "camp", "metric": "t5_kills"},
+        {
+            "tab_name": "CAMP_T5_KILLS",
+            "src_idx": 5,
+            "agg_type": "camp",
+            "metric": "t5_kills",
+        },
         {
             "tab_name": "KINGDOM_T5_KILLS",
             "src_idx": 4,
@@ -3390,7 +3578,12 @@ def create_additional_kvk_spreadsheets(
             "agg_type": "player",
             "metric": "t5_kills",
         },
-        {"tab_name": "CAMP_T4_KILLS", "src_idx": 5, "agg_type": "camp", "metric": "t4_kills"},
+        {
+            "tab_name": "CAMP_T4_KILLS",
+            "src_idx": 5,
+            "agg_type": "camp",
+            "metric": "t4_kills",
+        },
         {
             "tab_name": "KINGDOM_T4_KILLS",
             "src_idx": 4,
@@ -3404,16 +3597,36 @@ def create_additional_kvk_spreadsheets(
             "metric": "t4_kills",
         },
         {"tab_name": "CAMP_DEADS", "src_idx": 5, "agg_type": "camp", "metric": "deads"},
-        {"tab_name": "KINGDOM_DEADS", "src_idx": 4, "agg_type": "kingdom", "metric": "deads"},
-        {"tab_name": "PLAYER_DEADS", "src_idx": 3, "agg_type": "player", "metric": "deads"},
-        {"tab_name": "CAMP_KP_LOSS", "src_idx": 5, "agg_type": "camp", "metric": "kp_loss"},
+        {
+            "tab_name": "KINGDOM_DEADS",
+            "src_idx": 4,
+            "agg_type": "kingdom",
+            "metric": "deads",
+        },
+        {
+            "tab_name": "PLAYER_DEADS",
+            "src_idx": 3,
+            "agg_type": "player",
+            "metric": "deads",
+        },
+        {
+            "tab_name": "CAMP_KP_LOSS",
+            "src_idx": 5,
+            "agg_type": "camp",
+            "metric": "kp_loss",
+        },
         {
             "tab_name": "KINGDOM_KP_LOSS",
             "src_idx": 4,
             "agg_type": "kingdom",
             "metric": "kp_loss",
         },
-        {"tab_name": "PLAYER_KP_LOSS", "src_idx": 3, "agg_type": "player", "metric": "kp_loss"},
+        {
+            "tab_name": "PLAYER_KP_LOSS",
+            "src_idx": 3,
+            "agg_type": "player",
+            "metric": "kp_loss",
+        },
         {
             "tab_name": "CAMP_HEALED_TROOPS",
             "src_idx": 5,
@@ -3450,7 +3663,9 @@ def create_additional_kvk_spreadsheets(
 
     any_comp_has_data = any(has_data for (_, _, has_data) in comp_to_write)
     if not any_comp_has_data:
-        logger.info("Skipping creation of ALL_WINDOW_COMPARISON because no comparison data exists.")
+        logger.info(
+            "Skipping creation of ALL_WINDOW_COMPARISON because no comparison data exists."
+        )
         results["ALL_WINDOW_COMPARISON"] = {
             "created": False,
             "reason": "no_data",
@@ -3501,11 +3716,15 @@ def create_additional_kvk_spreadsheets(
                 target_tab = t["tab_name"]
                 if not has_data:
                     skipped.append(target_tab)
-                    logger.info("Skipping comparison tab %s because no data.", target_tab)
+                    logger.info(
+                        "Skipping comparison tab %s because no data.", target_tab
+                    )
                     continue
                 try:
                     df_to_write = df_comp.copy()
-                    df_to_write.replace([float("inf"), float("-inf")], pd.NA, inplace=True)
+                    df_to_write.replace(
+                        [float("inf"), float("-inf")], pd.NA, inplace=True
+                    )
                     _stringify_datetimes_inplace(df_to_write)
                     df_to_write = _prepare_kvk_export_df(df_to_write, kvk_no)
 
@@ -3518,7 +3737,9 @@ def create_additional_kvk_spreadsheets(
                     if t["agg_type"] == "player":
                         format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Player_Windowed", [])
                     elif t["agg_type"] == "kingdom":
-                        format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Kingdom_Windowed", [])
+                        format_cols = _KVK_FORMAT_NUMBERS.get(
+                            "KVK_Kingdom_Windowed", []
+                        )
                     elif t["agg_type"] == "camp":
                         format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Camp_Windowed", [])
                     if t["metric"] not in format_cols:
@@ -3561,7 +3782,9 @@ def create_additional_kvk_spreadsheets(
                 if spreadsheet_id:
                     title_to_id = {ws.title: ws.id for ws in target_ss.worksheets()}
                     desired_titles = [t["tab_name"] for t in comparison_tabs]
-                    _reorder_sheet_tabs(service, spreadsheet_id, title_to_id, desired_titles)
+                    _reorder_sheet_tabs(
+                        service, spreadsheet_id, title_to_id, desired_titles
+                    )
             except Exception:
                 if _capture_plan:
                     raise
@@ -3590,9 +3813,13 @@ def create_additional_kvk_spreadsheets(
     # Optionally send a single consolidated notification embed with buttons (if notify_channel/bot_loop provided)
     if notify_channel and bot_loop:
         try:
-            created_items = [(name, meta) for name, meta in results.items() if meta.get("created")]
+            created_items = [
+                (name, meta) for name, meta in results.items() if meta.get("created")
+            ]
             skipped_items = [
-                (name, meta) for name, meta in results.items() if not meta.get("created")
+                (name, meta)
+                for name, meta in results.items()
+                if not meta.get("created")
             ]
 
             if created_items:
@@ -3621,16 +3848,22 @@ def create_additional_kvk_spreadsheets(
                 for name, meta in skipped_items:
                     reason = meta.get("reason", "no_data")
                     skipped_msgs.append(f"{name} ({reason})")
-                embed.add_field(name="Skipped", value=", ".join(skipped_msgs), inline=False)
+                embed.add_field(
+                    name="Skipped", value=", ".join(skipped_msgs), inline=False
+                )
 
             # Optionally include written / skipped tabs summary per created sheet (concise)
             details_lines = []
             for name, meta in created_items:
                 wt = meta.get("written_tabs") or []
                 st = meta.get("skipped_tabs") or []
-                details_lines.append(f"{name}: wrote {len(wt)} tab(s), skipped {len(st)} tab(s)")
+                details_lines.append(
+                    f"{name}: wrote {len(wt)} tab(s), skipped {len(st)} tab(s)"
+                )
             if details_lines:
-                embed.add_field(name="Details", value="\n".join(details_lines), inline=False)
+                embed.add_field(
+                    name="Details", value="\n".join(details_lines), inline=False
+                )
 
             # Build simple buttons metadata (label, url) and schedule send on bot loop,
             # creating the actual discord.ui.View on the event loop to avoid cross-thread UI issues.
@@ -3647,14 +3880,20 @@ def create_additional_kvk_spreadsheets(
                 if _capture_plan:
                     raise
                 # Ensure nothing breaks the notification path; buttons optional
-                logger.exception("Failed to collect button metadata for created additional sheets")
+                logger.exception(
+                    "Failed to collect button metadata for created additional sheets"
+                )
 
             # schedule send on bot loop, creating view there
-            _safe_send_embed_with_buttons(notify_channel, bot_loop, embed, buttons=buttons)
+            _safe_send_embed_with_buttons(
+                notify_channel, bot_loop, embed, buttons=buttons
+            )
         except Exception:
             if _capture_plan:
                 raise
-            logger.exception("Failed sending consolidated notification for additional spreadsheets")
+            logger.exception(
+                "Failed sending consolidated notification for additional spreadsheets"
+            )
 
     return results
 
@@ -3707,7 +3946,13 @@ def _render_run_kvk_proc_exports_with_alerts(
     for attempt in range(1, retries + 1):
         try:
             ok = run_kvk_proc_exports(
-                server, database, username, password, kvk_no, sheet_name, credentials_file
+                server,
+                database,
+                username,
+                password,
+                kvk_no,
+                sheet_name,
+                credentials_file,
             )
             if ok:
                 # After successful creation of primary sheet, also create the PASS4 + 1st Altar + PASS7 spreadsheets.
@@ -3733,7 +3978,9 @@ def _render_run_kvk_proc_exports_with_alerts(
                     return True
                 except Exception as second_exc:
                     # log and optionally alert about failure creating the additional outputs but do not treat as overall proc failure
-                    logger.exception("Failed to create additional KVK spreadsheets: %s", second_exc)
+                    logger.exception(
+                        "Failed to create additional KVK spreadsheets: %s", second_exc
+                    )
                     if notify_channel and bot_loop:
                         try:
                             embed = discord.Embed(
@@ -3813,7 +4060,10 @@ def plan_legacy_outputs(scope, *, frames):
     """
     from types import SimpleNamespace
 
-    from services.legacy_export_snapshot_service import OutputSection, SnapshotUnavailable
+    from services.legacy_export_snapshot_service import (
+        OutputSection,
+        SnapshotUnavailable,
+    )
 
     registered_ids = tuple(scope["spreadsheets"].values())
     if len(registered_ids) != len(set(registered_ids)):
@@ -3826,7 +4076,9 @@ def plan_legacy_outputs(scope, *, frames):
     class Sheet:
         def __init__(self, title):
             if title not in scope["spreadsheets"]:
-                raise SnapshotUnavailable("Missing registered legacy destination: " + title)
+                raise SnapshotUnavailable(
+                    "Missing registered legacy destination: " + title
+                )
             self.id = scope["spreadsheets"][title]
             self.title = title
             self.url = "https://docs.google.com/spreadsheets/d/" + self.id
@@ -3834,7 +4086,9 @@ def plan_legacy_outputs(scope, *, frames):
 
         def worksheet(self, title):
             if title in scope.get("preserved_tabs", {}).get(self.id, []):
-                raise SnapshotUnavailable("Report output cannot overwrite a configuration tab.")
+                raise SnapshotUnavailable(
+                    "Report output cannot overwrite a configuration tab."
+                )
             if title not in self.tabs:
                 known = scope.get("grid_ids", {}).get(self.id, {})
                 from services.export_legacy_grid_identity import legacy_grid_identity
@@ -3864,7 +4118,9 @@ def plan_legacy_outputs(scope, *, frames):
                     lookup = {str(c).casefold(): i for i, c in enumerate(df.columns)}
                     for column in formats or ():
                         index = (
-                            column if type(column) is int else lookup.get(str(column).casefold())
+                            column
+                            if type(column) is int
+                            else lookup.get(str(column).casefold())
                         )
                         if index is not None and 0 <= index < len(df.columns):
                             indexes.add(index)
@@ -3880,7 +4136,10 @@ def plan_legacy_outputs(scope, *, frames):
                                     },
                                     "cell": {
                                         "userEnteredFormat": {
-                                            "numberFormat": {"type": "NUMBER", "pattern": "0"}
+                                            "numberFormat": {
+                                                "type": "NUMBER",
+                                                "pattern": "0",
+                                            }
                                         }
                                     },
                                     "fields": "userEnteredFormat.numberFormat",
@@ -3940,12 +4199,16 @@ def plan_legacy_outputs(scope, *, frames):
         for name in _KVK_TABS_IN_ORDER:
             df = _prepare_kvk_export_df(sections[name].copy(deep=True), scope["kvk_no"])
             ws = primary.worksheet(name)
-            export_dataframe_to_sheet(ws, df, format_columns=_KVK_FORMAT_NUMBERS.get(name, []))
+            export_dataframe_to_sheet(
+                ws, df, format_columns=_KVK_FORMAT_NUMBERS.get(name, [])
+            )
             _sort_kvk_export_sheet(service, primary.id, ws, df, primary.title, name)
         result = create_additional_kvk_spreadsheets(
             sections, client, service, scope["kvk_no"], _capture_plan=True
         )
-        if any(value.get("reason") not in (None, "no_data") for value in result.values()):
+        if any(
+            value.get("reason") not in (None, "no_data") for value in result.values()
+        ):
             raise SnapshotUnavailable("Additional legacy output planning failed.")
     else:
         for export, df in zip(scope["exports"], frames, strict=True):
@@ -3964,16 +4227,22 @@ def plan_legacy_outputs(scope, *, frames):
                     kind="stable",
                 )
             ws = client.open(export["sheet"]).worksheet(export["tab"])
-            export_dataframe_to_sheet(ws, df, format_columns=export.get("format_numbers", []))
+            export_dataframe_to_sheet(
+                ws, df, format_columns=export.get("format_numbers", [])
+            )
     if len(tables) != len(outputs):
         raise SnapshotUnavailable("Duplicate planned output tab.")
-    planned = dict(scope, outputs=outputs, destinations=sorted({o["file_id"] for o in outputs}))
+    planned = dict(
+        scope, outputs=outputs, destinations=sorted({o["file_id"] for o in outputs})
+    )
     if scope["consumer"] == "all_kvk":
         planned["additional_outputs"] = result
     return (
         tuple(
             OutputSection(
-                name, columns, tuple(tuple(_raw_snapshot_cell(v) for v in row) for row in values)
+                name,
+                columns,
+                tuple(tuple(_raw_snapshot_cell(v) for v in row) for row in values),
             )
             for name, (columns, values) in tables.items()
         ),

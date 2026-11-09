@@ -6,9 +6,9 @@ import hashlib
 import json
 import re
 
-from core.sql_observation import observation
+from core.recovery_sql_snapshot import recovery_snapshot
 from kvk.dal.new_source_import_dal import SourceBusy, SourceConflict, one, rows, transaction
-from services.export_coordination_dal import _cas, _mutex, identity
+from services.export_coordination_dal import _cas, _mutex, coordination_lock_name, identity
 
 
 class ImportExecutionActive(SourceBusy):
@@ -85,19 +85,20 @@ class StatsImportOutcomeDAL:
             return one(cursor)
 
     @staticmethod
-    def _snapshot(cursor, preparation_id):
+    def _snapshot(cursor, preparation_id, *, passive=False):
+        hints = "" if passive else " WITH (UPDLOCK,HOLDLOCK)"
         cursor.execute(
-            "SELECT * FROM dbo.ExportPreparation WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=?",
+            f"SELECT * FROM dbo.ExportPreparation{hints} WHERE PreparationID=?",
             preparation_id,
         )
         prep = one(cursor)
         cursor.execute(
-            "SELECT * FROM dbo.StatsImportExecution WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=?",
+            f"SELECT * FROM dbo.StatsImportExecution{hints} WHERE PreparationID=?",
             preparation_id,
         )
         execution = one(cursor)
         cursor.execute(
-            "SELECT * FROM dbo.ExportResource WITH (UPDLOCK,HOLDLOCK) WHERE ActivePreparationID=? ORDER BY ResourceKey",
+            f"SELECT * FROM dbo.ExportResource{hints} WHERE ActivePreparationID=? ORDER BY ResourceKey",
             preparation_id,
         )
         resources = rows(cursor)
@@ -163,11 +164,10 @@ class StatsImportOutcomeDAL:
 
     def inspect(self, preparation_id):
         preparation_id = identity(preparation_id)
-        with observation(), transaction(self.connect) as cursor:
-            self._observe_idle(cursor, self.account)
-            self._idle(cursor, preparation_id)
-            prep, execution, resources = self._snapshot(cursor, preparation_id)
+        with recovery_snapshot(self.connect) as cursor:
+            prep, execution, resources = self._snapshot(cursor, preparation_id, passive=True)
             self._scope(prep)
+            self._observe_available(cursor, self.account, preparation_id)
             explanation = None
             try:
                 action = self.action(prep, execution, resources)
@@ -184,24 +184,23 @@ class StatsImportOutcomeDAL:
             )
 
     @staticmethod
-    def _observe_idle(cursor, account):
-        """Admit recovery reads before any row locks, including checkpoint gaps.
+    def _observe_available(cursor, account, preparation_id=None):
+        """Conservatively hide actions while known work is active, without a lock.
 
-        The global producer guard spans SQL completion through capture. The
-        account mutex also serializes admission/teardown before that guard exists.
-        Every acquisition is nonblocking: observers never retain row locks while
-        waiting for a producer or a different account's shared snapshot resource.
+        Grantability is only a hint at this instant, never physical-closure proof.
+        Every action must reacquire its existing guards and validate current rows.
         """
-        cursor.execute("SET LOCK_TIMEOUT 0;")
-        cursor.execute(
-            "DECLARE @r int; EXEC @r=sys.sp_getapplock "
-            "@Resource=N'k98-legacy-output-snapshot',@LockMode='Exclusive',"
-            "@LockOwner='Transaction',@LockTimeout=0; SELECT @r AS LockResult"
-        )
-        result = one(cursor)
-        if not result or result["LockResult"] < 0:
-            raise ImportExecutionActive("A SQL producer or capture is still active.")
-        _mutex(cursor, "account:" + account)
+        resources = ("k98-legacy-output-snapshot", coordination_lock_name("account:" + account))
+        if preparation_id is not None:
+            resources += ("S11:stats-import:" + identity(preparation_id),)
+        for resource in resources:
+            cursor.execute(
+                "SELECT APPLOCK_TEST('public',?,'Exclusive','Session') AS Available",
+                resource,
+            )
+            result = one(cursor)
+            if not result or result["Available"] != 1:
+                raise ImportExecutionActive("A SQL producer or capture is still active.")
 
     @staticmethod
     def capture_completed(prep, execution, resources):

@@ -33,7 +33,7 @@ class StatsReportContinuation:
                 explanation=(
                     "All three reporting transactions have durable receipts. Continue to output capture; this does not prove cache freshness or spreadsheet delivery."
                     if complete
-                    else "The import is committed. Reporting receipts identify the remaining transactions; the import will not run again."
+                    else "The import is committed. Saved receipts identify the remaining reports. Continuation must first recheck the current inputs, configuration and writer guards; the import will not run again."
                 ),
                 actions=actions,
                 recovery_links=[
@@ -68,7 +68,7 @@ class StatsReportContinuation:
         if not same and state["token"] != action["EvidenceHash"]:
             return "not_applied"
         self.dal.run(source_id, action["EvidenceHash"], action["ActionID"])
-        # Independent readback on a new guarded connection, including the original
+        # Independent readback on a new consistent snapshot, including the original
         # import's completed receipt. Never resolve from the call's return alone.
         verified = self.dal.inspect(source_id)
         return "verified" if verified["complete"] else None

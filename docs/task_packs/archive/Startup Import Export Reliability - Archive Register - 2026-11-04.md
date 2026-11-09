@@ -1,3 +1,5 @@
+> **Current E104:** [P01.6 accepted closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md); next [P02](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Older navigation below is historical.
+
 > **Current E95:** P01.4 delivered/deployed with natural checks tracked in [the active register](../Startup%20Import%20Export%20Reliability%20-%20P01.4%20Natural%20Acceptance%20-%202026-11-05.md). Next: [P01.5](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Handover%20and%20Scope%20-%202026-11-05.md). Earlier navigation/status below is historical.
 
 # Startup, import and export reliability: archive register
@@ -85,4 +87,17 @@ Five delivered P01.5 scope/starter/design/qualification/release packets and the 
 - [Startup Import Export Reliability - P01.5 Delivered Documentation Carry-forward - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md)
 - [Startup Import Export Reliability - P01.5 Closeout - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md)
 
-Active programme documents, P01.4/P01.5 natural registers, P01.6 scope/starter and the [new carry-forward manifest](../Startup%20Import%20Export%20Reliability%20-%20Documentation%20Carry-forward%20-%202026-11-05.md) remain active. Before copies and move/hash/link receipts: `.codex_artifacts/p015-closeout-p016-20261105/`.
+Active programme documents, P01.4/P01.5 natural registers, P01.6 scope/starter and the [new carry-forward manifest](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md) remain active. Before copies and move/hash/link receipts: `.codex_artifacts/p015-closeout-p016-20261105/`.
+
+## E104: P01.6 completed records archived, 6 November 2026
+
+- [Startup Import Export Reliability - P01.6 Chat Starter - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Chat%20Starter%20-%202026-11-05.md) (from `docs/task_packs/Startup Import Export Reliability - P01.6 Chat Starter - 2026-11-05.md`).
+- [Startup Import Export Reliability - P01.6 Handover and Scope - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Handover%20and%20Scope%20-%202026-11-05.md) (from `docs/task_packs/Startup Import Export Reliability - P01.6 Handover and Scope - 2026-11-05.md`).
+- [Startup Import Export Reliability - P01.6 Source Review and Design - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Source%20Review%20and%20Design%20-%202026-11-05.md) (from `docs/task_packs/Startup Import Export Reliability - P01.6 Source Review and Design - 2026-11-05.md`).
+- [Startup Import Export Reliability - P01.6 Implementation and Qualification - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Implementation%20and%20Qualification%20-%202026-11-05.md) (from `docs/task_packs/Startup Import Export Reliability - P01.6 Implementation and Qualification - 2026-11-05.md`).
+- [Startup Import Export Reliability - P01.6 PR Review and Deployment Plan - 2026-11-06.md](Startup%20Import%20Export%20Reliability%20-%20P01.6%20PR%20Review%20and%20Deployment%20Plan%20-%202026-11-06.md) (from `docs/task_packs/Startup Import Export Reliability - P01.6 PR Review and Deployment Plan - 2026-11-06.md`).
+- [P016 - Application Startup Contract Correction - 2026-11-06.md](P016%20-%20Application%20Startup%20Contract%20Correction%20-%202026-11-06.md) (from `docs/task_packs/P016 - Application Startup Contract Correction - 2026-11-06.md`).
+- [P016 Render Scheduling Correction - 2026-11-06.md](P016%20Render%20Scheduling%20Correction%20-%202026-11-06.md) (from `docs/task_packs/P016 Render Scheduling Correction - 2026-11-06.md`).
+- [Startup Import Export Reliability - P01.6 Delivered Documentation Carry-forward - 2026-11-05.md](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Delivered%20Documentation%20Carry-forward%20-%202026-11-05.md) (from `docs/task_packs/Startup Import Export Reliability - Documentation Carry-forward - 2026-11-05.md`).
+
+The [P01.6 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md) is also archived. Active P01.4/P01.5 natural registers and shared P01/programme contracts remain active because they retain later-package acceptance obligations. Before-edit copies, exact move inventory and validation are private under `.codex_artifacts/p016-closeout-p02-20261106/`. No evidence or runtime data was discarded.

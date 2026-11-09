@@ -11,7 +11,7 @@ from scripts import prepare_k98_update as updater
 
 def test_all_66_historical_transitions_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 67
+    assert len(entries) == 69
     assert hashlib.sha256(json.dumps(entries[:66], sort_keys=True).encode()).hexdigest() == (
         "1d31dce46f54023a020f8e34373deaf2084356747f20200190794d629a155f78"
     )

@@ -1,6 +1,6 @@
 """Discover and fence retained all-KVK captures using their atomic producer checkpoint."""
 
-from core.sql_observation import observation
+from core.recovery_sql_snapshot import recovery_snapshot
 from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
 from services.export_coordination_dal import identity
 from services.stats_import_outcome_dal import StatsImportOutcomeDAL
@@ -24,14 +24,15 @@ class AllKvkCaptureRecoveryDAL:
             raise SourceConflict("Exact runtime account, storage and all-KVK capture required.")
 
     @staticmethod
-    def _snapshot(cursor, preparation_id):
+    def _snapshot(cursor, preparation_id, *, passive=False):
+        hints = "" if passive else " WITH (UPDLOCK,HOLDLOCK)"
         cursor.execute(
-            "SELECT * FROM dbo.ExportPreparation WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=?",
+            f"SELECT * FROM dbo.ExportPreparation{hints} WHERE PreparationID=?",
             preparation_id,
         )
         prep = one(cursor)
         cursor.execute(
-            "SELECT * FROM dbo.ExportResource WITH (UPDLOCK,HOLDLOCK) "
+            f"SELECT * FROM dbo.ExportResource{hints} "
             "WHERE ActivePreparationID=? ORDER BY ResourceKey",
             preparation_id,
         )
@@ -71,12 +72,12 @@ class AllKvkCaptureRecoveryDAL:
         return "resume_capture"
 
     def inspect(self, preparation_id):
-        with observation(), transaction(self.connect) as cursor:
-            # Conflicts with every legacy producer/capture session, including work
-            # still running after a client timeout. Age is only a discovery hint.
-            StatsImportOutcomeDAL._observe_idle(cursor, self.account)
-            prep, execution, resources = self._snapshot(cursor, identity(preparation_id))
+        with recovery_snapshot(self.connect) as cursor:
+            prep, execution, resources = self._snapshot(
+                cursor, identity(preparation_id), passive=True
+            )
             self._scope(prep)
+            StatsImportOutcomeDAL._observe_available(cursor, self.account)
             explanation = None
             try:
                 action = self.action(prep, execution, resources)

@@ -28,8 +28,43 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
-def before_p016_render_hash(root, path):
+def before_phase1_hash(root, path):
+    """Authenticate Phase 1, then expose the immutable P02.1 reference image.
+
+    P02.1 was not installed. Phase 1 is a complete 25-member transition from
+    the same original predecessor, not an admission of partial new helpers.
+    Historical test bridges never change installed updater policy.
+    """
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path not in prepare_k98_update.P02_PHASE1_SQL_EXPORT_PATHS:
+        return actual
+    entries = prepare_k98_update.reviewed_transitions()
+    successor = next(t for t in entries if t["id"] == "p02_phase1_sql_exports_v1")
+    member = next(m for m in successor["members"] if m["path"] == path)
+    assert actual == member["after_sha256"], path
+    if path in prepare_k98_update.P021_OBSERVER_SNAPSHOT_PATHS:
+        reference = next(t for t in entries if t["id"] == "p021_observer_snapshots_v1")
+        return next(m["after_sha256"] for m in reference["members"] if m["path"] == path)
+    return member["before_sha256"]
+
+
+def before_p021_hash(root, path):
+    """Authenticate this complete successor before checking immutable history."""
+    actual = before_phase1_hash(root, path)
+    if path not in prepare_k98_update.P021_OBSERVER_SNAPSHOT_PATHS:
+        return actual
+    successor = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "p021_observer_snapshots_v1"
+    )
+    member = next(m for m in successor["members"] if m["path"] == path)
+    assert actual == member["after_sha256"], path
+    return member["before_sha256"]
+
+
+def before_p016_render_hash(root, path):
+    actual = before_p021_hash(root, path)
     if path not in prepare_k98_update.P016_PERSONAL_STATS_PATHS:
         return actual
     render_successor = next(

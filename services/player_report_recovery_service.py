@@ -176,7 +176,7 @@ class PlayerReportRecoveryAdapter(AllKvkCaptureRecoveryAdapter):
                 explanation=(
                     "The failed report attempt is closed and its exact reservation is released. Existing imported data is preserved. This does not claim the report or cache is current."
                     if closed
-                    else "The atomic report contract and SQL locks show this attempt has no committed report. Existing imports and previous reports are preserved."
+                    else "The saved atomic contract has no committed report checkpoint. Closing this attempt must first exclude live execution and recheck current evidence. Existing imports and previous reports are preserved."
                 ),
                 actions=(
                     {}

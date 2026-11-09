@@ -5,6 +5,12 @@ import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_contract_resources import read_contract_resource
+from services.export_phase1_contract import (
+    LEGACY_SOURCE_SHA256 as PHASE1_SOURCE_HASH,
+    MIGRATION_ID as PHASE1_MIGRATION,
+    PROFILE_SHA256 as PHASE1_CHECKSUM,
+    phase1_contract,
+)
 
 DIRECT_SOURCE_HASH = "64f673aec3794b37443fa5500453ef427625b1d5fa80366ef5e5e40e13fc1880"
 DIRECT_MIGRATION = "20261003_001_export_legacy_direct_permissions"
@@ -74,6 +80,9 @@ def validate_contract(approved):
         "metadata_hash",
         "recovery_installation",
     }
+    phase1 = phase1_contract(approved)
+    if phase1:
+        fields.add("phase1_installation")
     amended = isinstance(approved, dict) and "module_amendment" in approved
     if amended:
         fields.add("module_amendment")
@@ -98,7 +107,8 @@ def validate_contract(approved):
             not re.fullmatch(r"[0-9a-f]{64}", str(approved[k]))
             for k in ("migration_hash", "metadata_hash")
         )
-        or digest(approved["source"]).hex() != DIRECT_SOURCE_HASH
+        or digest(approved["source"]).hex()
+        != (PHASE1_SOURCE_HASH if phase1 else DIRECT_SOURCE_HASH)
         or approved.get("recovery_installation") != P0_RECEIPT_MIGRATION
         or (
             amended
@@ -241,6 +251,14 @@ def queries(base, source):
             P0_RECEIPT_MIGRATION,
         ),
     )
+    if digest(source).hex() == PHASE1_SOURCE_HASH:
+        query, parameters = result["migration"]
+        if query.count("IN (?,?,?,?,?,?)") != 1:
+            raise SourceConflict("Exact Phase 1 migration reader required.")
+        result["migration"] = (
+            query.replace("IN (?,?,?,?,?,?)", "IN (?,?,?,?,?,?,?)"),
+            (*parameters, PHASE1_MIGRATION),
+        )
     return result
 
 
@@ -435,6 +453,10 @@ def verify(observed, approved, *, profile):
                 ChecksumSha256=FILE_VISIBILITY_CHECKSUM,
                 Status="Applied",
             )
+        )
+    if phase1_contract(approved):
+        expected_migrations.append(
+            dict(MigrationId=PHASE1_MIGRATION, ChecksumSha256=PHASE1_CHECKSUM, Status="Applied")
         )
     if not _exact(observed["migration"], expected_migrations):
         raise SourceConflict("Exact direct-permission migration receipt required.")

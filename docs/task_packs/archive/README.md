@@ -1,3 +1,5 @@
+> **6 November 2026:** P01.6 completed records are archived; see [closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md), [archive register](Startup%20Import%20Export%20Reliability%20-%20Archive%20Register%20-%202026-11-04.md) and [active P02 handover](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Open natural acceptance and programme contracts remain active.
+
 # Archived Task Packs
 
 ## S10E completed instructions archived — 2026-09-15

@@ -261,6 +261,10 @@ def _job(cursor, job_id):
     return row
 
 
+def coordination_lock_name(key):
+    return "k98-export:" + hashlib.sha256(key.encode()).hexdigest()
+
+
 def _mutex(cursor, key, *, wait_ms=0, owner="Transaction"):
     if (
         type(wait_ms) is not int
@@ -276,7 +280,7 @@ def _mutex(cursor, key, *, wait_ms=0, owner="Transaction"):
             "IF @r<0 BEGIN DECLARE @m nvarchar(2048)=CONCAT("
             "'K98_COORDINATION_LOCK result=',@r,' session=',@@SPID,"
             "' xact=',XACT_STATE(),' count=',@@TRANCOUNT); THROW 51400,@m,1; END;",
-            "k98-export:" + resource_hash,
+            coordination_lock_name(key),
         )
     except Exception as original:
         # Classify only the exact diagnostic emitted above, never error 51400

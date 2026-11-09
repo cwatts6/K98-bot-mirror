@@ -30,6 +30,7 @@ if REPO_ROOT not in sys.path:
     # Insert at front so local package modules shadow installed packages with same names.
     sys.path.insert(0, REPO_ROOT)
 
+from tests.sql_snapshot_fixture import snapshot_database as snapshot_database
 
 # ----------------------------
 # Optional: lightweight fake heavy deps (opt-in)

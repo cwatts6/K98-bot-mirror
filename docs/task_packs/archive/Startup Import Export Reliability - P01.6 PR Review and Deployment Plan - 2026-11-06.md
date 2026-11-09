@@ -1,3 +1,5 @@
+> **Archived at E104, 6 November 2026.** P01.6 is closed for its agreed scope. See [accepted closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md) and [active P02 handover](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Dated approvals, candidate status and commands below are historical evidence, not instructions to replay deployment or recovery.
+
 # P01.6 Bot and SQL release: review, deployment and validation
 
 6 November 2026. The operator approved PR preparation, review fixes, publication and merge of the Bot mirror/private promotion and SQL companion. Production deployment remains separate. The final handoff binds the merged revisions and package hashes; this plan does not claim that merging installed anything.
@@ -74,4 +76,4 @@ Use local qualification for deliberately blocked SQL, cancellation races, invali
 
 The synthetic index benefit has a measured cost: about 15.2 MiB for 134,715 rows and approximately 18% insert latency / 10% extra log bytes in rolled-back trials. The eight-worker control showed progress but no throughput gain. Representative production read/write cost remains open. P01.4/P01.5 natural observations, P02 shared connection/contention work, P03 retained continuation, P04 convergence and P05 wider confirmation retain their owners.
 
-Follow the [Promotion Guide](../reference/Promotion%20Guide.md) and [Windows ownership contract](../reference/Windows%20ownership%20and%20access%20contract.md). Final hosted checks, review disposition, merge identities, updater package evidence and actual-host readiness are recorded in the release handoff; do not interpret an unfilled gate as permission to bypass it.
+Follow the [Promotion Guide](../../reference/Promotion%20Guide.md) and [Windows ownership contract](../../reference/Windows%20ownership%20and%20access%20contract.md). Final hosted checks, review disposition, merge identities, updater package evidence and actual-host readiness are recorded in the release handoff; do not interpret an unfilled gate as permission to bypass it.

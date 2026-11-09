@@ -472,7 +472,7 @@ def test_shared_client_requires_explicit_model_and_both_incarnations():
 
 
 @pytest.mark.parametrize(
-    "damage", [None, "old_version", "principal", "supervisor_sql", "manual_pair"]
+    "damage", [None, "old_version", "principal", "supervisor_sql", "manual_pair", "snapshot_off"]
 )
 def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     monkeypatch, tmp_path, damage
@@ -548,6 +548,7 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     monkeypatch.setattr(dal, "legacy_installation_snapshot", Mock())
     monkeypatch.setattr(dal, "application_installation_snapshot", Mock())
     connection = Mock()
+    connection.cursor.return_value.fetchone.return_value = (0 if damage == "snapshot_off" else 1,)
     connector = Mock(return_value=connection)
     monkeypatch.setattr(admin, "configured_connection", connector)
     monkeypatch.setattr(
@@ -567,7 +568,15 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     bundle_factory = Mock()
     monkeypatch.setattr(runtime, "ExportRuntime", bundle_factory)
     monkeypatch.setattr(store, "ExportSnapshotStore", Mock())
-    if damage and damage != "manual_pair":
+    if damage == "snapshot_off":
+        with pytest.raises(RuntimeError, match="SNAPSHOT"):
+            runtime._prepare_configured_runtime()
+        bundle_factory.assert_not_called()
+        client_factory.assert_not_called()
+        runtime.verify_legacy_installation_contract.assert_called_once()
+        runtime.verify_application_installation_contract.assert_called_once()
+        connection.close.assert_called_once()
+    elif damage and damage != "manual_pair":
         with pytest.raises(SourceConflict):
             runtime._prepare_configured_runtime()
         bundle_factory.assert_not_called()

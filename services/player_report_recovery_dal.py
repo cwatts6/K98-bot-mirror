@@ -54,10 +54,13 @@ class PlayerReportRecoveryDAL(AllKvkCaptureRecoveryDAL):
         return request
 
     @staticmethod
-    def _snapshot(cursor, preparation_id):
-        prep, _, resources = AllKvkCaptureRecoveryDAL._snapshot(cursor, preparation_id)
+    def _snapshot(cursor, preparation_id, *, passive=False):
+        prep, _, resources = AllKvkCaptureRecoveryDAL._snapshot(
+            cursor, preparation_id, passive=passive
+        )
+        hints = "" if passive else " WITH (UPDLOCK,HOLDLOCK)"
         cursor.execute(
-            "SELECT * FROM dbo.StatsImportExecution WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=?",
+            f"SELECT * FROM dbo.StatsImportExecution{hints} WHERE PreparationID=?",
             preparation_id,
         )
         return prep, one(cursor), resources

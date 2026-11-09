@@ -616,6 +616,43 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P021_OBSERVER_SNAPSHOT_PATHS = frozenset(
+    {
+        "core/recovery_sql_snapshot.py",
+        "services/all_kvk_capture_recovery_dal.py",
+        "services/configuration_producer_recovery.py",
+        "services/export_contention.py",
+        "services/export_coordination_dal.py",
+        "services/export_runtime_composition.py",
+        "services/historical_import_recovery_dal.py",
+        "services/import_recovery_service.py",
+        "services/legacy_export_snapshot_dal.py",
+        "services/legacy_snapshot_admission.py",
+        "services/player_report_recovery_dal.py",
+        "services/player_report_recovery_service.py",
+        "services/stats_import_outcome_dal.py",
+        "services/stats_report_continuation.py",
+        "services/stats_report_continuation_dal.py",
+    }
+)
+
+
+P02_PHASE1_SQL_EXPORT_PATHS = P021_OBSERVER_SNAPSHOT_PATHS | frozenset(
+    {
+        "core/export_numeric.py",
+        "services/export_output_dal.py",
+        "gsheet_module.py",
+        "services/export_execution_dal.py",
+        "services/export_sql_direct_permissions.py",
+        "services/export_contract_resources.py",
+        "services/export_phase1_contract.py",
+        "deploy/p02_phase1_activation_scope.json",
+        "deploy/p02_phase1_application_sources.json",
+        "deploy/p02_phase1_legacy_source.json",
+    }
+)
+
+
 P016_PERSONAL_STATS_TRANSITIONS = frozenset(
     {"p016_personal_stats_ownership_v1", "p016_personal_stats_render_submission_v1"}
 )
@@ -893,13 +930,13 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    # Fixed P01.5 successor plus Windows newlines; still a bounded installed file.
-    if len(raw) > 172032:
+    # Fixed Phase 1 successor plus Windows newlines; still a bounded installed file.
+    if len(raw) > 177152:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 67:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 69:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -919,6 +956,8 @@ def reviewed_transitions():
                 )
             )
         )
+        if item["id"] == "p02_phase1_sql_exports_v1":
+            member_limit = len(P02_PHASE1_SQL_EXPORT_PATHS)
         if item["id"] == "p015_calendar_ownership_v1":
             member_limit = len(P015_CALENDAR_PATHS)
         if item["id"] in P016_PERSONAL_STATS_TRANSITIONS:
@@ -1001,6 +1040,12 @@ def reviewed_transitions():
             fixed_p015 = item["id"] == "p015_calendar_ownership_v1" and path in P015_CALENDAR_PATHS
             fixed_p016 = (
                 item["id"] in P016_PERSONAL_STATS_TRANSITIONS and path in P016_PERSONAL_STATS_PATHS
+            )
+            fixed_p021 = (
+                item["id"] == "p021_observer_snapshots_v1" and path in P021_OBSERVER_SNAPSHOT_PATHS
+            )
+            fixed_p02_phase1 = (
+                item["id"] == "p02_phase1_sql_exports_v1" and path in P02_PHASE1_SQL_EXPORT_PATHS
             )
             fixed_p014 = (
                 item["id"] == "p014_upload_outcomes_optional_io_v1" and path in P014_UPLOAD_PATHS
@@ -1127,6 +1172,8 @@ def reviewed_transitions():
                     or fixed_p012a
                     or fixed_p015
                     or fixed_p016
+                    or fixed_p021
+                    or fixed_p02_phase1
                     or fixed_p014
                     or fixed_p013
                     or fixed_p011
@@ -1154,7 +1201,18 @@ def reviewed_transitions():
                     or fixed_configuration_pipeline
                     or fixed_rollover_timing
                 )
-                or not path.endswith(".py")
+                or not (
+                    path.endswith(".py")
+                    or (
+                        fixed_p02_phase1
+                        and path
+                        in {
+                            "deploy/p02_phase1_activation_scope.json",
+                            "deploy/p02_phase1_application_sources.json",
+                            "deploy/p02_phase1_legacy_source.json",
+                        }
+                    )
+                )
                 or path in paths
             ):
                 raise ValueError("Unique export protocol source member required.")
@@ -1272,6 +1330,10 @@ def reviewed_transitions():
             raise ValueError("Complete fixed P01.5 calendar transition required.")
         if item["id"] in P016_PERSONAL_STATS_TRANSITIONS and paths != P016_PERSONAL_STATS_PATHS:
             raise ValueError("Complete fixed P01.6 personal-stats transition required.")
+        if item["id"] == "p021_observer_snapshots_v1" and paths != P021_OBSERVER_SNAPSHOT_PATHS:
+            raise ValueError("Complete fixed P02.1 observer-snapshot transition required.")
+        if item["id"] == "p02_phase1_sql_exports_v1" and paths != P02_PHASE1_SQL_EXPORT_PATHS:
+            raise ValueError("Complete fixed P02 Phase 1 SQL/export transition required.")
         if item["id"] == "p014_upload_outcomes_optional_io_v1" and paths != P014_UPLOAD_PATHS:
             raise ValueError("Complete fixed P01.4 upload transition required.")
         if item["id"] == "p013_passive_health_v1" and paths != P013_PASSIVE_HEALTH_PATHS:
@@ -1416,6 +1478,160 @@ def combined_description(raw, before):
     return value
 
 
+# Fixed Phase 1 expectations derived independently from retained production
+# before-images and the qualified native SQL after-images. Live observations
+# never become expected fingerprints. The SQL commit must be explicitly pinned
+# in the reviewed descriptor; profile and script bytes remain fixed here.
+PHASE1_MIGRATION = "20261109_001_p02_phase1_sql_exports"
+PHASE1_PROFILE_HASH = "520b58c1b25d80bd28f32324d99b5fede0d6191ddab93ac93469ed5c1f6e4041"
+PHASE1_SCRIPT_HASH = "6cc6cb23b0af1123d7c86b4e47c2485880aee0cbfc097b2b5306a746da8a23fb"
+PHASE1_PREDECESSOR = "6cb5d8ed532a8b1e34ad58ed230daa74d5ba77a3"
+PHASE1_SQL_COMMIT = "87f2eabc6587576c0ccba266ada407fb9db768e2"
+PHASE1_CONTRACT_TRANSITION = "p02_phase1_sql_names_numbers_v1"
+PHASE1_CONTRACT_PINS = {
+    "legacy_sql_contract": {
+        "before": "25c283718f421fcc5fcfbf9c41c4438791a11446955abd86f381c099cbc7ae8c",
+        "after": "f95a82fecfe47593f823d7108ec5243b7a4f3bfe991082a7cd6f6947fd6c84cd",
+    },
+    "application_sql_contract": {
+        "before": "b2e93a617114ca73abd6f1290d108a7199f4e00b120df2ec464bccf6022e0366",
+        "after": "820351b6c09660881a5513145c6c8e4e583e5d87090ba28b9cb2d864aeddf62b",
+    },
+}
+PHASE1_CONTRACT_UPDATES = {
+    "legacy_sql_contract": {
+        "metadata_hash": "bee7701b059cd1c6ff86c2fa86647bd7f59307d9f093d0abbe96ab726ac181ed",
+        "phase1_installation": "20261109_001_p02_phase1_sql_exports",
+    },
+    "application_sql_contract": {
+        "metadata_hash": "b5296198aa762c3c83fb9b4ac5ab22e7e6c9c6640b1344ee1e8bc8e373d410c8",
+        "permissions_hash": "dcecd8ebe0a7e560db9a5e6eca0239ca945cc8b2251a1522ee4a4fcffc9482c8",
+        "review_id": "0c95e9d1-83bf-5fa0-ab08-471c8a8c6d0d",
+        "scope_hash": "e815147d0cea676248de87b50b39ced161151b86d10bd094993ae224ab58e816",
+        "phase1_installation": "20261109_001_p02_phase1_sql_exports",
+    },
+}
+PHASE1_SOURCE_FILES = {
+    "legacy_sql_contract": ("source", "deploy/p02_phase1_legacy_source.json"),
+    "application_sql_contract": ("sources", "deploy/p02_phase1_application_sources.json"),
+}
+PHASE1_OBJECTS = frozenset(
+    [
+        "dbo.CREATE_DASH",
+        "dbo.CREATE_DASH2",
+        "dbo.D12D",
+        "dbo.D3D",
+        "dbo.D6D",
+        "dbo.DEADSSUMMARY",
+        "dbo.DEADSSUMMARY_PROC",
+        "dbo.GOVERNOR_NAMES_PROC",
+        "dbo.HEALEDSUMMARY_PROC",
+        "dbo.HEALEDSUMMARY_PROC_OPT",
+        "dbo.K12D",
+        "dbo.K3D",
+        "dbo.K412D",
+        "dbo.K43D",
+        "dbo.K46D",
+        "dbo.K512D",
+        "dbo.K53D",
+        "dbo.K56D",
+        "dbo.K6D",
+        "dbo.KILL4SUMMARY",
+        "dbo.KILL5SUMMARY",
+        "dbo.KILLPOINTSSUMMARY",
+        "dbo.KILLPOINTSSUMMARY_PROC",
+        "dbo.KILLPOINTS_D12D",
+        "dbo.KILLPOINTS_D3D",
+        "dbo.KILLPOINTS_D6D",
+        "dbo.KILLPOINTS_LATEST",
+        "dbo.KILLSSUMMARY_PROC",
+        "dbo.KILLSUMMARY",
+        "dbo.KT4SUMMARY_PROC",
+        "dbo.KT5SUMMARY_PROC",
+        "dbo.LATEST",
+        "dbo.LATEST_POWER",
+        "dbo.LATEST_T4&T5_KILLS",
+        "dbo.LATEST_T4_KILLS",
+        "dbo.LATEST_T5_KILLS",
+        "dbo.P12D",
+        "dbo.P3D",
+        "dbo.P6D",
+        "dbo.POWERSUMMARY",
+        "dbo.POWERSUMMARY_PROC",
+        "dbo.RANGEDSUMMARY_PROC",
+        "dbo.SP_Stats_for_Upload",
+        "dbo.SUMMARY_CHANGE_EXPORT",
+        "dbo.SUMMARY_PROC",
+        "dbo.UPDATE_ALL",
+        "dbo.UPDATE_RALLY_DATA",
+        "dbo.sp_ExcelOutput_ByKVK",
+        "dbo.sp_Rebuild_ExcelForDashboard",
+        "dbo.sp_Rebuild_RALLY_EXPORT",
+        "dbo.sp_RefreshInactiveGovernors",
+        "dbo.sp_TARGETS_MASTER",
+        "dbo.usp_ApplyReportGovernorNames",
+        "dbo.usp_S11CompleteStatsReportsCore",
+        "dbo.v_PlayerAccounts_Migrate",
+        "dbo.v_ReportGovernorNames",
+        "dbo.v_TARGETS_FOR_UPLOAD",
+    ]
+)
+
+
+def validate_phase1_description(value):
+    if (
+        value.get("version") != 3
+        or value.get("profile") != "p02_phase1_v1"
+        or value.get("sql_commit") != PHASE1_SQL_COMMIT
+        or value.get("contract_transition") != PHASE1_CONTRACT_TRANSITION
+        or value.get("bot_predecessors") != [PHASE1_PREDECESSOR]
+        or value.get("migrations") != [dict(id=PHASE1_MIGRATION, sha256=PHASE1_PROFILE_HASH)]
+    ):
+        raise ValueError("Exact complete Phase 1 combined release required.")
+
+
+def check_phase1_release_binding(before, target, changes, read_blob):
+    """The new runtime contract cannot be adopted as a source-only update."""
+    marker = "services/export_phase1_contract.py"
+    if marker not in changes or read_blob(before, marker) is not None:
+        return
+    raw = read_blob(target, RELEASE_DESCRIPTION)
+    if raw is None or raw == read_blob(before, RELEASE_DESCRIPTION):
+        raise ValueError("Phase 1 requires a changed, bound combined SQL descriptor.")
+    description = combined_description(raw, before)
+    validate_phase1_description(description)
+    if not P02_PHASE1_SQL_EXPORT_PATHS <= set(changes):
+        raise ValueError("Complete Phase 1 source family required with its SQL release.")
+
+
+def phase1_contract_transition(previous, description, read_blob, target):
+    """Change only the sealed old/new contracts; preserve coordination rights."""
+    validate_phase1_description(description)
+    bot = previous["bot-template.json"]
+    result = {
+        "sql_contract": {
+            "before": deepcopy(bot["sql_contract"]),
+            "after": deepcopy(bot["sql_contract"]),
+        }
+    }
+    for key, pins in PHASE1_CONTRACT_PINS.items():
+        before = bot[key]
+        if sha256(encode(before)) != pins["before"]:
+            raise ValueError("Phase 1 predecessor startup contract differs: " + key)
+        after = deepcopy(before)
+        after.update(PHASE1_CONTRACT_UPDATES[key])
+        if key in PHASE1_SOURCE_FILES:
+            field, path = PHASE1_SOURCE_FILES[key]
+            raw = read_blob(target, path)
+            if raw is None or len(raw) > 1024 * 1024:
+                raise ValueError("Bounded Phase 1 contract source required: " + path)
+            after[field] = json.loads(raw)
+        if sha256(encode(after)) != pins["after"]:
+            raise ValueError("Phase 1 successor startup contract differs: " + key)
+        result[key] = dict(before=deepcopy(before), after=after)
+    return dict(contracts=result)
+
+
 def validate_combined_description(raw):
     """Validate committed metadata without claiming installed compatibility."""
     if len(raw) > 65536:
@@ -1428,6 +1644,9 @@ def validate_combined_description(raw):
         if value != MGE_PORTABLE_APPLICATION_RELEASE:
             raise ValueError("Portable MGE contract requires the exact reviewed release.")
         fields.add("application_contract_transition")
+    elif value["version"] == 3:
+        validate_phase1_description(value)
+        fields.add("contract_transition")
     elif value["version"] != 1:
         raise ValueError("Unsupported combined descriptor version; no drain requested.")
     if set(value) != fields:
@@ -1436,8 +1655,11 @@ def validate_combined_description(raw):
         "module_grants_v1",
         "additive_tables_v1",
         "mge_finalisation_v1",
+        "p02_phase1_v1",
     }:
         raise ValueError("Unsupported combined SQL profile; no drain requested.")
+    if value["profile"] == "p02_phase1_v1":
+        validate_phase1_description(value)
     predecessors = value["bot_predecessors"]
     if (
         not isinstance(predecessors, list)
@@ -1548,6 +1770,9 @@ def combined_payload(description, read_sql_blob, *, protected_objects=(), protec
             else ()
         )
     )
+    if description["profile"] == "p02_phase1_v1":
+        validate_phase1_description(description)
+        sql_tools += ("SqlDeploy.Phase1Release.ps1", "SqlDeploy.RecoveryRelease.ps1")
     for name in sql_tools:
         raw = read_sql_blob("deploy/" + name)
         if not raw or len(raw) > 2 * 1024 * 1024:
@@ -1562,6 +1787,21 @@ def combined_payload(description, read_sql_blob, *, protected_objects=(), protec
         if not raw or len(raw) > 1024 * 1024 or sha256(raw) != migration["sha256"]:
             raise ValueError(f"SQL profile differs from reviewed description: {name}")
         p = json.loads(raw)
+        if description["profile"] == "p02_phase1_v1":
+            if sha256(raw) != PHASE1_PROFILE_HASH:
+                raise ValueError("Fixed Phase 1 profile bytes required.")
+            objects = {x["name"].casefold() for x in p["images"]}
+            if objects != {x.casefold() for x in PHASE1_OBJECTS} or objects & protected_objects:
+                raise ValueError("Repeated, incomplete or protected Phase 1 object family.")
+            member = PHASE1_MIGRATION + ".sql"
+            content = read_sql_blob("migrations/" + member)
+            if not content or sha256(content) != PHASE1_SCRIPT_HASH:
+                raise ValueError("Fixed qualified Phase 1 SQL batch required.")
+            files[member] = content
+            files[name] = raw
+            profiles.append(dict(id=migration["id"], file=name, sha256=sha256(raw)))
+            modules.update(objects)
+            continue
         if description["profile"] == "mge_finalisation_v1":
             validate_mge_profile(p, migration["id"])
             objects = {
@@ -1872,6 +2112,7 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     admitted = {r["path"] for r in coordinated["sources"]} if coordinated else set()
     check_transition_inventory(changes, read_blob, before, target, admitted=admitted)
     check_mge_release_binding(before, target, changes, read_blob)
+    check_phase1_release_binding(before, target, changes, read_blob)
     check_source_only(
         [p for p in changes if p not in admitted],
         tool_copies=tool_sources,
@@ -2232,6 +2473,14 @@ def prepare_update(
             scope = set(scope) - MGE_APPLICATION_PARENTS
         protected = set(INSTALLATION_OBJECTS) | set(scope)
         protected.update(m["name"] for m in bot["legacy_sql_contract"]["source"]["modules"])
+        if description["profile"] == "p02_phase1_v1":
+            mge_contracts = phase1_contract_transition(
+                previous, description, read_blob, config["target"]
+            )
+            fixed = {name.casefold() for name in PHASE1_OBJECTS}
+            if fixed & {name.casefold() for name in INSTALLATION_OBJECTS}:
+                raise ValueError("Phase 1 cannot amend coordination installation objects.")
+            protected = {name for name in protected if name.casefold() not in fixed}
         principals = {
             bot[k]["principal"]
             for k in ("sql_contract", "legacy_sql_contract", "application_sql_contract")

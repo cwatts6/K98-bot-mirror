@@ -133,8 +133,8 @@ class ConfigurationProducerRecovery(PlayerReportRecoveryAdapter):
                 ]
         elif self.cancel_action in evidence["actions"]:
             evidence["explanation"] = (
-                "The typed atomic contract and SQL locks verify that this attempt did not "
-                "commit configuration changes or target publication. Review the closure below."
+                "The saved atomic contract has no committed configuration checkpoint. "
+                "Closing this attempt must first exclude live execution and recheck current evidence."
             )
             evidence["actions"][self.cancel_action].update(
                 check="Confirm this rolled-back configuration attempt should be closed. The prior configuration and targets remain; no new import or cache refresh is claimed.",

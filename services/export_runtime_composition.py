@@ -1016,6 +1016,9 @@ def _prepare_configured_runtime():
                 application_snapshot_for_contract(cursor, config["application_sql_contract"]),
                 config["application_sql_contract"],
             )
+            from core.recovery_sql_snapshot import require_recovery_snapshot_isolation
+
+            require_recovery_snapshot_isolation(cursor)
         finally:
             cursor.close()
     finally:
@@ -1603,6 +1606,13 @@ def verify_installation_contract(observed, approved):
 
 def validate_application_installation_contract(approved):
     from services.export_execution_dal import APPLICATION_SCHEMA_SOURCE_HASH
+    from services.export_phase1_contract import (
+        ACTIVATION_SCOPE_SHA256,
+        APPLICATION_SOURCE_SHA256,
+        phase1_contract,
+    )
+
+    phase1 = phase1_contract(approved)
 
     fields = {
         "version",
@@ -1615,11 +1625,16 @@ def validate_application_installation_contract(approved):
         "permissions_hash",
         "review_id",
     }
+    if phase1:
+        fields.add("phase1_installation")
+        if approved.get("version") != 3:
+            raise SourceConflict("Phase 1 requires the portable application schema contract.")
     if isinstance(approved, dict) and approved.get("version") in (2, 3):
         from services.export_execution_dal import APPLICATION_ACTIVATION_SCOPE_HASH
 
         fields.add("scope_hash")
-        if approved.get("scope_hash") != APPLICATION_ACTIVATION_SCOPE_HASH:
+        expected_scope = ACTIVATION_SCOPE_SHA256 if phase1 else APPLICATION_ACTIVATION_SCOPE_HASH
+        if approved.get("scope_hash") != expected_scope:
             raise SourceConflict("Exact reviewed S11 activation dependency scope required.")
     if isinstance(approved, dict) and approved.get("version") == 3:
         from services.export_schema_fingerprint import FORMAT
@@ -1642,14 +1657,17 @@ def validate_application_installation_contract(approved):
             for k in ("metadata_hash", "permissions_hash")
         )
         or not isinstance(approved["sources"], list)
-        or digest(approved["sources"]).hex() != APPLICATION_SCHEMA_SOURCE_HASH
+        or digest(approved["sources"]).hex()
+        != (APPLICATION_SOURCE_SHA256 if phase1 else APPLICATION_SCHEMA_SOURCE_HASH)
     ):
         raise SourceConflict("Complete independently reviewed application SQL contract required.")
     uuid_text(approved["review_id"])
     if approved["version"] in (2, 3):
         from services.export_execution_dal import application_activation_scope
 
-        if not set(application_activation_scope()) <= {s["name"] for s in approved["sources"]}:
+        if not set(application_activation_scope(phase1=phase1)) <= {
+            s["name"] for s in approved["sources"]
+        }:
             raise SourceConflict("Activation dependency scope is outside reviewed SQL sources.")
     names = {s["name"] for s in approved["sources"]}
     modules = {s["name"] for s in approved["sources"] if s["type"] in {"P", "FN", "IF", "TF"}}
@@ -1683,8 +1701,9 @@ def application_contract_scope(approved):
     if approved["version"] == 1:
         return None
     from services.export_execution_dal import application_activation_scope
+    from services.export_phase1_contract import phase1_contract
 
-    scope = application_activation_scope()
+    scope = application_activation_scope(phase1=phase1_contract(approved))
     if any(not set(row["producer_modules"]) <= set(scope) for row in approved["dynamic_objects"]):
         raise SourceConflict("Dynamic producers must belong to the activation dependency scope.")
     return sorted(scope + [row["name"] for row in approved["dynamic_objects"]])

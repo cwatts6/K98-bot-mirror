@@ -1,4 +1,4 @@
-> **Archived at E100, 5 November 2026.** Delivered or superseded P01.5 record. Preserve the dated evidence below; earlier next-action/approval statements are historical. Current authority: [P01.5 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md) and [P01.6 handover](../Startup%20Import%20Export%20Reliability%20-%20P01.6%20Handover%20and%20Scope%20-%202026-11-05.md).
+> **Archived at E100, 5 November 2026.** Delivered or superseded P01.5 record. Preserve the dated evidence below; earlier next-action/approval statements are historical. Current authority: [P01.5 closeout](Startup%20Import%20Export%20Reliability%20-%20P01.5%20Closeout%20-%202026-11-05.md) and [P01.6 handover](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Handover%20and%20Scope%20-%202026-11-05.md).
 
 # P01.5 PR review and deployment plan
 

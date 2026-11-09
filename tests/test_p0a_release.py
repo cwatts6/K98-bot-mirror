@@ -269,7 +269,12 @@ def test_reviewed_source_inventory_matches_current_runtime():
     # introduced after P0a join the complete bundle's final-image check below.
     # Never learn expected hashes from the live checkout.
     for transition in updater.reviewed_transitions():
-        if transition["id"] in {"p1_monitoring_reliability_v1", "p1_mge_lifecycle_v1"}:
+        if transition["id"] in {
+            "p1_monitoring_reliability_v1",
+            "p1_mge_lifecycle_v1",
+            "p021_observer_snapshots_v1",
+            "p02_phase1_sql_exports_v1",
+        }:
             continue  # Authenticated separately before the historical assertion below.
         members = transition["members"]
         if any(m["path"] in expected for m in members) and all(

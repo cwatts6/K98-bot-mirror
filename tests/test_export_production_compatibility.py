@@ -40,6 +40,80 @@ def historical_source_bytes(module, raw, outcome_source):
     Neither historical manifests nor runtime allowlists are rewritten.
     """
     name = module["name"]
+    # Phase 1 source is authenticated before checking the original immutable
+    # permission forms. This test reference does not extend runtime allowlists
+    # or authorize installing the new SQL under an old signing profile.
+    # Authenticate the additive names stage before reconstructing the frozen
+    # numeric stage. This is a test-only historical chain, never a runtime grant.
+    names_predecessor = False
+    names_path = SQL_ROOT / "qualification/p02_report_names/reviewed_sources.json"
+    if names_path.is_file():
+        names_bytes = names_path.read_bytes()
+        assert hashlib.sha256(names_bytes).hexdigest() == (
+            "fef6497466e14efbef05b72db19cb86530768dea0bfeff6cf9439d6205fc3934"
+        ), "Shared names historical reference drift"
+        names = json.loads(names_bytes)
+        entry = names.get(Path(module["path"]).name)
+        if entry is not None:
+            normalized = raw.decode("utf-8-sig").replace("\r\n", "\n")
+            assert (
+                normalized == entry["after"]
+                and hashlib.sha256(normalized.encode()).hexdigest() == entry["afterSHA256"]
+            ), "Phase 1 source drift: shared names"
+            before = entry["before"]
+            assert (
+                before is not None
+                and hashlib.sha256(before.encode()).hexdigest() == entry["beforeSHA256"]
+            ), "Shared names predecessor drift"
+            raw = before.encode()
+            names_predecessor = True
+            # Older immutable manifests retain byte-exact BOM/line endings.
+            # Only encoding variants of the authenticated predecessor qualify.
+            variants = {
+                prefix + body
+                for prefix in (b"", b"\xef\xbb\xbf")
+                for body in (raw, before.replace("\n", "\r\n").encode())
+            }
+            matches = [
+                body
+                for body in variants
+                if hashlib.sha256(body).hexdigest() == module["source_sha256"]
+            ]
+            if matches:
+                assert len(matches) == 1
+                raw = matches[0]
+    reference_path = SQL_ROOT / "qualification/p02_phase1/released_sources.json"
+    if reference_path.is_file():
+        reference_bytes = reference_path.read_bytes()
+        assert hashlib.sha256(reference_bytes).hexdigest() == (
+            "b159bf7f836c739a3def745c136c78f9ffbcae427d04414c710fdbcda2fdb4a2"
+        ), "Phase 1 historical reference drift"
+        references = {m["name"]: m for m in json.loads(reference_bytes)["modules"]}
+        if name in references:
+            reference = references[name]
+            assert reference["path"] == module["path"]
+            if names_predecessor:
+                # The frozen governor-name candidate retains its UTF-8 BOM.
+                variants = {raw, b"\xef\xbb\xbf" + raw}
+                matches = [
+                    body
+                    for body in variants
+                    if hashlib.sha256(body.replace(b"\r\n", b"\n")).hexdigest()
+                    == reference["candidateNormalizedSHA256"]
+                ]
+                assert len(matches) == 1, "Phase 1 source drift"
+                raw = matches[0]
+            assert hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest() == (
+                reference["candidateNormalizedSHA256"]
+            ), "Phase 1 source drift"
+            candidate_body = re.sub(r"\ACREATE\b", "ALTER", source_definition(raw))
+            assert hashlib.sha256(candidate_body.encode()).hexdigest() == (
+                reference["candidateBodySHA256"]
+            ), "Phase 1 body drift"
+            raw = reference["originalSource"].encode("utf-8")
+            assert hashlib.sha256(raw).hexdigest() == (
+                reference["originalSourceSHA256"]
+            ), "Phase 1 original source drift"
     if name == "dbo.UPDATE_ALL2":
         validate_legacy_permission_source(outcome_source)
         current = next(m for m in outcome_source["modules"] if m["name"] == name)
@@ -264,7 +338,7 @@ def test_amendment_reconstruction_rejects_changed_forward_image(permission_sourc
     assert before in raw
     with pytest.raises(
         AssertionError,
-        match=r"Outcome source drift|File visibility definition drift|Atomic configuration source drift",
+        match=r"Outcome source drift|File visibility definition drift|Atomic configuration source drift|Phase 1 source drift: shared names",
     ):
         historical_source_bytes(module, raw.replace(before, after, 1), outcome)
 
@@ -387,3 +461,45 @@ def test_historical_conduct_layout_keeps_stats_candidate_projection_aligned():
     assert re.search(
         r"INSERT INTO dbo.STATS_FOR_UPLOAD\s+SELECT \*\s+FROM #StatsForUploadCandidate", procedure
     )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "dbo.DEADSSUMMARY_PROC",
+        "dbo.GOVERNOR_NAMES_PROC",
+        "dbo.HEALEDSUMMARY_PROC",
+        "dbo.KILLPOINTSSUMMARY_PROC",
+        "dbo.KILLSSUMMARY_PROC",
+        "dbo.KT4SUMMARY_PROC",
+        "dbo.KT5SUMMARY_PROC",
+        "dbo.POWERSUMMARY_PROC",
+        "dbo.RANGEDSUMMARY_PROC",
+    ],
+)
+def test_phase1_history_reference_rejects_unreviewed_source(permission_sources, name):
+    if not (SQL_ROOT / "qualification/p02_phase1/released_sources.json").is_file():
+        pytest.skip("Phase 1 source reference is not available in this SQL checkout")
+    manifest, outcome = permission_sources
+    module = next(m for m in manifest["modules"] if m["name"] == name)
+    raw = (SQL_ROOT / module["path"]).read_bytes()
+    with pytest.raises(AssertionError, match="Phase 1 source drift"):
+        historical_source_bytes(module, b"-- unreviewed prefix\n" + raw, outcome)
+
+
+def test_shared_names_reference_rejects_modified_bundle(permission_sources, monkeypatch):
+    manifest, outcome = permission_sources
+    names_path = SQL_ROOT / "qualification/p02_report_names/reviewed_sources.json"
+    if not names_path.is_file():
+        pytest.skip("Shared names source reference unavailable")
+    module = next(m for m in manifest["modules"] if m["name"] == "dbo.POWERSUMMARY_PROC")
+    raw = (SQL_ROOT / module["path"]).read_bytes()
+    original = Path.read_bytes
+
+    def read(path):
+        result = original(path)
+        return result + b" " if path == names_path else result
+
+    monkeypatch.setattr(Path, "read_bytes", read)
+    with pytest.raises(AssertionError, match="Shared names historical reference drift"):
+        historical_source_bytes(module, raw, outcome)

@@ -1,4 +1,4 @@
-"""Real SQL interleavings on unique temp tables, never business tables or procedures."""
+"""Real SQL interleavings in a new isolated database, never retained business data."""
 
 import os
 from pathlib import Path
@@ -21,26 +21,25 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def database():
+def database(snapshot_database):
     import pyodbc
 
     def native():
         cn = pyodbc.connect(
-            r"DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\K98DEV;"
-            "DATABASE=master;Trusted_Connection=yes;Encrypt=yes;TrustServerCertificate=yes;",
+            snapshot_database.connection_string,
             autocommit=True,
             timeout=5,
         )
         cn.timeout = 5
         server, db = cn.execute("SELECT @@SERVERNAME,DB_NAME()").fetchone()
-        assert server.lower() == r"9sx2vf4\k98dev" and db == "master"
+        assert server.lower() == r"9sx2vf4\k98dev" and db == snapshot_database.name
         cn.execute("SET LOCK_TIMEOUT 100")
         return cn
 
     root = native()
     nonce = uuid4().hex[:12]
     names = {
-        name: "##checkpoint_" + nonce + "_" + name
+        name: "dbo.checkpoint_" + nonce + "_" + name
         for name in ("ExportPreparation", "ExportResource", "StatsImportExecution")
     }
     prep, owner = str(uuid4()), str(uuid4())
@@ -89,6 +88,21 @@ def database():
         def autocommit(self):
             return self.cn.autocommit
 
+        @autocommit.setter
+        def autocommit(self, value):
+            self.cn.autocommit = value
+
+        @property
+        def timeout(self):
+            return self.cn.timeout
+
+        @timeout.setter
+        def timeout(self, value):
+            self.cn.timeout = value
+
+        def set_attr(self, key, value):
+            self.cn.set_attr(key, value)
+
         def cursor(self):
             return Cursor(self.cn.cursor())
 
@@ -131,6 +145,7 @@ def database():
             filename,
         )
         yield dict(
+            name=snapshot_database.name,
             root=root,
             names=names,
             native=native,
@@ -168,6 +183,8 @@ def checkpoint(db):
 )
 def test_writer_guard_excludes_every_observer_through_checkpoint_gap(database, observer_type):
     db = database
+    if observer_type is AllKvkCaptureRecoveryDAL:
+        db["root"].execute(f"UPDATE {db['names']['ExportPreparation']} SET ConsumerKind='all_kvk'")
     holder = db["native"]()
     holder.execute(
         "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource='k98-legacy-output-snapshot',@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; IF @r<0 THROW 50000,'Test guard unavailable',1;"
@@ -178,6 +195,10 @@ def test_writer_guard_excludes_every_observer_through_checkpoint_gap(database, o
             observer.inspect(db["claim"].preparation_id)
         assert all(c.closed for c in db["sessions"])
         # The exact SQL execution guard is free, but the capture guard still owns work.
+        if observer_type is AllKvkCaptureRecoveryDAL:
+            db["root"].execute(
+                f"UPDATE {db['names']['ExportPreparation']} SET ConsumerKind='scan_data'"
+            )
         assert checkpoint(db).version == 2
     finally:
         holder.execute(
@@ -186,9 +207,9 @@ def test_writer_guard_excludes_every_observer_through_checkpoint_gap(database, o
         holder.close()
 
 
-def test_observer_first_serializes_checkpoint_without_opposed_row_wait(database):
+def test_observer_first_allows_checkpoint_before_observer_finishes(database):
     db = database
-    entered, release, refused = threading.Event(), threading.Event(), threading.Event()
+    entered, release, completed = threading.Event(), threading.Event(), threading.Event()
     outcomes = []
 
     def pause(query):
@@ -199,7 +220,7 @@ def test_observer_first_serializes_checkpoint_without_opposed_row_wait(database)
             entered.set()
             assert release.wait(5)
 
-    db["hooks"].update(row=pause, error=refused.set)
+    db["hooks"].update(row=pause)
 
     def observe():
         try:
@@ -216,6 +237,8 @@ def test_observer_first_serializes_checkpoint_without_opposed_row_wait(database)
             outcomes.append(checkpoint(db))
         except BaseException as error:
             outcomes.append(error)
+        finally:
+            completed.set()
 
     observer = threading.Thread(target=observe, name="observer")
     writer = threading.Thread(target=write)
@@ -223,7 +246,7 @@ def test_observer_first_serializes_checkpoint_without_opposed_row_wait(database)
     try:
         assert entered.wait(5)
         writer.start()
-        assert refused.wait(5)
+        assert completed.wait(5)
     finally:
         release.set()
         observer.join(8)
@@ -303,7 +326,7 @@ def test_diagnostic_sampler_attributes_waiter_and_holder_without_sql_text(databa
     # Same diagnostic query, scoped to the local temporary-table fixture and one second.
     sql = (
         script.read_text()
-        .replace("DB_NAME() <> N'ROK_TRACKER'", "DB_NAME() <> N'master'")
+        .replace("DB_NAME() <> N'ROK_TRACKER'", f"DB_NAME() <> N'{db['name']}'")
         .replace("DATEADD(second, 15, @Started)", "DATEADD(second, 1, @Started)")
     )
     holder, waiter = db["native"](), db["native"]()

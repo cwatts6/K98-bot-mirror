@@ -3,7 +3,8 @@
 import json
 from uuid import UUID
 
-from kvk.dal.new_source_import_dal import SourceConflict, digest, rows, transaction
+from core.recovery_sql_snapshot import recovery_snapshot
+from kvk.dal.new_source_import_dal import SourceConflict, digest, rows
 from services.export_coordination_dal import _cas, _mutex, bounded_json, identity
 from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 
@@ -12,11 +13,12 @@ class HistoricalImportRecoveryDAL:
     def __init__(self, outcomes):
         self.outcomes = outcomes
 
-    def _snapshot(self, cursor, source_id):
-        prep, execution, resources = self.outcomes._snapshot(cursor, source_id)
+    def _snapshot(self, cursor, source_id, *, passive=False):
+        prep, execution, resources = self.outcomes._snapshot(cursor, source_id, passive=passive)
         self.outcomes._scope(prep)
+        hints = "" if passive else " WITH (UPDLOCK,HOLDLOCK)"
         cursor.execute(
-            "SELECT StreamID,State,Version FROM dbo.ExportExecutionStream WITH (UPDLOCK,HOLDLOCK) WHERE PreparationID=? ORDER BY StreamID",
+            f"SELECT StreamID,State,Version FROM dbo.ExportExecutionStream{hints} WHERE PreparationID=? ORDER BY StreamID",
             source_id,
         )
         streams = rows(cursor)
@@ -32,9 +34,10 @@ class HistoricalImportRecoveryDAL:
 
     def inspect(self, source_id):
         source_id = identity(source_id)
-        with transaction(self.outcomes.connect) as cursor:
-            self.outcomes._idle(cursor, source_id)
-            return self._snapshot(cursor, source_id)
+        with recovery_snapshot(self.outcomes.connect) as cursor:
+            result = self._snapshot(cursor, source_id, passive=True)
+            self.outcomes._observe_available(cursor, self.outcomes.account, source_id)
+            return result
 
     def retire(self, source_id, token, actor, reason, verify, evidence_token):
         if (

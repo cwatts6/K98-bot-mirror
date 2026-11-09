@@ -1,3 +1,5 @@
+> **P01.6 operational checkpoint, 6 November 2026:** [accepted closeout](../task_packs/archive/Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md). Bot `6cb5d8ed` and the reviewed SQL rewrite/index are deployed. All installation, legacy and application SQL contracts must be verified before drain and at successor readiness; Discord online alone is insufficient. Retain physical-worker drain, exact updater transitions and fresh changed-path/ancestor custody checks. [P02](../task_packs/Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md) begins review/design; no replay, restart or incident clearance is authorized by this documentation.
+
 # Diagnostics Runbook
 
 ## P01.3 candidate: passive health presentation — 4 November 2026

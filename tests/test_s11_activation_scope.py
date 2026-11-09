@@ -38,7 +38,9 @@ def scoped_fixture(monkeypatch):
         dict(name="dbo.archive", type="U", path="archive.sql", sha256="b" * 64)
     )
     monkeypatch.setattr(dal, "APPLICATION_SCHEMA_SOURCE_HASH", digest(approved["sources"]).hex())
-    monkeypatch.setattr(dal, "application_activation_scope", lambda: ["dbo.fixture"])
+    monkeypatch.setattr(
+        dal, "application_activation_scope", lambda *, phase1=False: ["dbo.fixture"]
+    )
     approved.update(version=2, scope_hash=dal.APPLICATION_ACTIVATION_SCOPE_HASH)
     return observed, approved
 
@@ -66,7 +68,9 @@ def test_scoped_contract_rejects_caller_scope_and_omitted_sources(monkeypatch):
         application_contract_scope(approved | {"scope_hash": "0" * 64})
     with pytest.raises(SourceConflict):
         application_contract_scope(approved | {"objects": []})
-    monkeypatch.setattr(dal, "application_activation_scope", lambda: ["dbo.missing"])
+    monkeypatch.setattr(
+        dal, "application_activation_scope", lambda *, phase1=False: ["dbo.missing"]
+    )
     with pytest.raises(SourceConflict):
         application_contract_scope(approved)
 

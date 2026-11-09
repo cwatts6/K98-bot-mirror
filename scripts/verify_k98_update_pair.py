@@ -87,6 +87,7 @@ def p016_application_transition(before, bot):
 # Fixed reviewed inventory: services/kvk and their metadata resources only.
 # core and root configuration retain the authenticated application's .env root.
 CONTRACT_ARCHIVE_MEMBERS = (
+    "deploy/p02_phase1_activation_scope.json",
     "deploy/s11_activation_scope.json",
     "deploy/s11_application_grants.json",
     "kvk/__init__.py",
@@ -115,6 +116,7 @@ CONTRACT_ARCHIVE_MEMBERS = (
     "services/export_execution_authority.py",
     "services/export_execution_dal.py",
     "services/export_execution_protocol.py",
+    "services/export_phase1_contract.py",
     "services/export_publication_metrics.py",
     "services/export_request_budget.py",
     "services/export_runtime_composition.py",

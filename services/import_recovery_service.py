@@ -279,7 +279,8 @@ class ImportRecoveryAdapter:
                 action["Reason"],
             )
             return None
-        # inspect checks exact account/storage and obtains the SQL execution lock.
+        # inspect checks exact account/storage in one committed metadata snapshot.
+        # Its non-owning activity probes are not authorization to settle anything.
         preview = self.dal.inspect(source_id)
         receipt = preview["execution"] or {}
         if receipt.get("Resolution") == action["ActionKind"]:
@@ -287,10 +288,8 @@ class ImportRecoveryAdapter:
             # settlement by the automatic observer also establishes this postcondition.
             return "verified"
         if preview["token"] != action["EvidenceHash"]:
-            # inspect() locks the exact receipt/preparation/resource rows. A changed
-            # version-bound token with no matching atomic settlement proves this
-            # old intent cannot now apply: settle() will reject its original token.
-            # An in-flight settlement holds those same row locks until its commit.
+            # A changed committed version-bound token means this old intent cannot
+            # now apply: settle() locks current rows and rejects the original token.
             return "not_applied"
         # This one adapter can safely resume the SAME SQL settlement: settle()
         # locks and compares the original evidence, and writes its resolution and

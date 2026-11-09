@@ -30,7 +30,7 @@ def reports(recovery):
     schema = Path(os.environ["K98_CAPTURE_SQL_SCHEMA"])
     namespace = uuid4().hex
     names = {
-        "dbo." + name: "##Report_" + namespace + "_" + name
+        "dbo." + name: "dbo.Report_" + namespace + "_" + name
         for name in (
             "StatsImportReportContinuation",
             "ProcConfig",
@@ -124,7 +124,7 @@ def reports(recovery):
         raw = (schema / "dbo.usp_S11CompleteStatsReportsCore.StoredProcedure.sql").read_text(
             encoding="utf-8-sig"
         )
-        compile_name = "##ReportCompile_" + namespace
+        compile_name = "dbo.ReportCompile_" + namespace
         body = raw[raw.index("CREATE OR ALTER PROCEDURE") :].replace(
             "dbo.usp_S11CompleteStatsReportsCore", compile_name, 1
         )
@@ -176,7 +176,7 @@ def reports(recovery):
         end = body.index("\n    END TRY", start)
         body = body[:start] + body[end:]
         body = body[body.index("CREATE OR ALTER PROCEDURE") :]
-        assert not re.search(r"\b(?:dbo|KVK)\.[A-Za-z_]", rewrite(body))
+        assert not re.search(r"\b(?:dbo|KVK)\.(?!(?:Report|Capture)_)[A-Za-z_]", rewrite(body))
         r.owner.execute(rewrite(body))
         procedures.append(names["dbo.usp_S11CompleteStatsReportsCore"])
         wrapper = (schema / "dbo.usp_S11CompleteStatsReports.StoredProcedure.sql").read_text(
@@ -417,6 +417,7 @@ def restricted_reports(reports):
     cs = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\\K98DEV;DATABASE="
     cs += database + ";Trusted_Connection=yes;TrustServerCertificate=yes"
     r.owner.execute("CREATE DATABASE [" + database + "]")
+    r.owner.execute("ALTER DATABASE [" + database + "] SET ALLOW_SNAPSHOT_ISOLATION ON")
     owner = pyodbc.connect(cs, autocommit=True, timeout=5)
     tables = (
         "ExportJob",
@@ -442,13 +443,22 @@ def restricted_reports(reports):
         "usp_S11CompleteStatsReports",
     )
     try:
+        source_database = r.owner.execute("SELECT DB_NAME()").fetchval()
+        assert re.fullmatch(r"K98_P021_Disposable_[0-9a-f]{32}", source_database)
         for table in tables:
-            owner.execute("SELECT * INTO dbo." + table + " FROM " + r.rewrite("dbo." + table))
+            owner.execute(
+                "SELECT * INTO dbo."
+                + table
+                + " FROM ["
+                + source_database
+                + "]."
+                + r.rewrite("dbo." + table)
+            )
         for procedure in procedures:
             name = r.rewrite("dbo." + procedure)
             definition = r.owner.execute(
-                "SELECT definition FROM tempdb.sys.sql_modules WHERE object_id=OBJECT_ID(?)",
-                "tempdb.." + name,
+                "SELECT definition FROM sys.sql_modules WHERE object_id=OBJECT_ID(?)",
+                name,
             ).fetchval()
             for item in (*procedures, *tables):
                 definition = definition.replace(r.rewrite("dbo." + item), "dbo." + item)
@@ -477,6 +487,7 @@ def restricted_reports(reports):
                 self.inner.timeout = 15
                 self.inner.execute("EXECUTE AS USER='S11_ExportApplication'")
                 self.inner.execute("SET LOCK_TIMEOUT 1000")
+                self.inner.autocommit = False
 
             @property
             def timeout(self):
@@ -530,7 +541,6 @@ def restricted_reports(reports):
         owner.close()
         # Only the database created above, on the fixed local test instance.
         assert re.fullmatch(r"K98RecoveryPermissionTest_[0-9a-f]{32}", database)
-        r.owner.execute("ALTER DATABASE [" + database + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE")
         r.owner.execute("DROP DATABASE [" + database + "]")
 
 

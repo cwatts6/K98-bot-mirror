@@ -50,6 +50,21 @@ class MetadataContention(RuntimeError):
 
 def sql_error_facts(error):
     """Never include driver prose, SQL values, credentials or filenames."""
+    from services.legacy_snapshot_admission import SnapshotAdmissionRefused
+
+    if isinstance(error, SnapshotAdmissionRefused):
+        return dict(
+            error_type=type(error).__name__,
+            sqlstate="42000",
+            native_errors=[51421],
+            applock_result=error.result,
+            sql_session_id=error.session,
+            xact_state=error.transaction_state,
+            transaction_count=error.transaction_count,
+            admission_elapsed_ms=error.elapsed_ms,
+            holder_identity="unknown",
+            physical_closure="not_established_by_refusal",
+        )
     if isinstance(error, MetadataContention):
         return dict(error.facts, transaction_released=True, phase_timings_ms=error.phase_timings_ms)
     args = getattr(error, "args", ())

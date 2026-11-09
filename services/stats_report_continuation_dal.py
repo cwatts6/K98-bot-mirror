@@ -3,6 +3,7 @@
 import hashlib
 import json
 
+from core.recovery_sql_snapshot import recovery_snapshot
 from kvk.dal.new_source_import_dal import SourceConflict, one, rows, transaction
 from services.export_coordination_dal import _cas, _mutex, identity
 from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
@@ -31,12 +32,14 @@ class StatsReportContinuationDAL:
             )
             return [identity(row["PreparationID"]) for row in rows(cursor)]
 
-    def _snapshot(self, cursor, source_id):
-        prep, execution, resources = self.outcomes._snapshot(cursor, identity(source_id))
+    def _snapshot(self, cursor, source_id, *, passive=False):
+        prep, execution, resources = self.outcomes._snapshot(
+            cursor, identity(source_id), passive=passive
+        )
         self.outcomes._scope(prep)
+        hints = "" if passive else " WITH (UPDLOCK,HOLDLOCK)"
         cursor.execute(
-            "SELECT * FROM dbo.StatsImportReportContinuation WITH (UPDLOCK,HOLDLOCK) "
-            "WHERE PreparationID=?",
+            f"SELECT * FROM dbo.StatsImportReportContinuation{hints} " "WHERE PreparationID=?",
             identity(source_id),
         )
         receipt = one(cursor)
@@ -49,7 +52,7 @@ class StatsReportContinuationDAL:
             raise SourceConflict("The committed import identity or disposition changed.")
         complete = receipt["CompletedStage"] == 3 and execution["State"] == "completed"
         explanation = None
-        if not complete:
+        if not complete and not passive:
             try:
                 cursor.execute(
                     "EXEC dbo.usp_S11ValidateStatsReportStage @PreparationID=?,@CompletedFileName=?",
@@ -78,16 +81,12 @@ class StatsReportContinuationDAL:
         )
 
     def inspect(self, source_id):
-        with self.guards.session(source_id) as connection:
-            cursor = connection.cursor()
-            try:
-                cursor.execute("BEGIN TRANSACTION")
-                result = self._snapshot(cursor, source_id)
-                cursor.execute("COMMIT TRANSACTION")
-                return result
-            finally:
-                cursor.execute("IF @@TRANCOUNT>0 ROLLBACK")
-                cursor.close()
+        # The SQL validator acquires KS4/writer locks. It remains mandatory in
+        # run(), under the real guards; a status preview must not execute it.
+        with recovery_snapshot(self.outcomes.connect) as cursor:
+            result = self._snapshot(cursor, source_id, passive=True)
+            self.outcomes._observe_available(cursor, self.outcomes.account, source_id)
+            return result
 
     def run(self, source_id, token, action_id):
         """Commit the exact intent, then skip every already committed stage.

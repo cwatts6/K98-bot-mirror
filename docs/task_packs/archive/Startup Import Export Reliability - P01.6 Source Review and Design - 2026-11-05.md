@@ -1,3 +1,5 @@
+> **Archived at E104, 6 November 2026.** P01.6 is closed for its agreed scope. See [accepted closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md) and [active P02 handover](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Dated approvals, candidate status and commands below are historical evidence, not instructions to replay deployment or recovery.
+
 # P01.6 source review, design and qualification packet
 
 **5 November 2026. Updated design, implementation and offline qualification approved by the operator, including creation/use of a disposable local development SQL database.** This packet retains the reviewed design and its original baseline evidence. Implementation includes the recommended passive Personal Stats Health line. Candidate results belong in the separate implementation receipt; this design packet alone does not claim completed qualification, publication, deployment or production acceptance. Earlier approval-pending wording below records the design-stage boundary and is superseded by this explicit authorization.

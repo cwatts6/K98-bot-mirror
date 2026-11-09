@@ -1,3 +1,5 @@
+> **Archived at E104, 6 November 2026.** P01.6 is closed for its agreed scope. See [accepted closeout](Startup%20Import%20Export%20Reliability%20-%20P01.6%20Closeout%20-%202026-11-06.md) and [active P02 handover](../Startup%20Import%20Export%20Reliability%20-%20P02%20Handover%20and%20Scope%20-%202026-11-06.md). Dated approvals, candidate status and commands below are historical evidence, not instructions to replay deployment or recovery.
+
 > **6 November release authority:** The operator subsequently approved PR preparation, review fixes, publication and merge for Bot and SQL. Production deployment remains separate. See the [release plan](Startup%20Import%20Export%20Reliability%20-%20P01.6%20PR%20Review%20and%20Deployment%20Plan%20-%202026-11-06.md); uncommitted/unpublished wording below records the prior qualification checkpoint.
 
 # P01.6 personal Stats: implementation and local qualification

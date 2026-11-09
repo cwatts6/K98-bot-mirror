@@ -1,5 +1,30 @@
 # Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 14 SUMMARY_PROC Responsibility and Performance Audit
 
+> **Approved rewrite implemented and locally qualified — 7 November 2026.** The approved SQL rewrite covers all eight metrics and the alternate healed entry point; 30 focused local SQL tests passed. Canonical SQL-repo `docs/p021-summary-implementation.md` records source, local-only install/rollback, output/state/permission parity and remaining qualification. Existing limits remain unchanged. Production activation, external cache-consumer clearance, signing/source pins and full rehearsal qualification remain separate. Older implementation-pending blocks below are historical.
+
+
+> **Complete retained evidence and rewrite proposal — 7 November 2026.** All 192 plans are complete and the 184 summary cost records are unchanged. SQL-repo `docs/p021-summary-optimisation-proposal.md` now defines the preferred temporary endpoint calculation, all eight metrics plus the alternate healed path, preserved report/state outputs, explicit intermediate-cache consumer/rollback conditions, alternatives and qualification. No further collector or diagnostic import is needed for this decision. Local rewrite implementation awaits approval; production activation, cache-table deletion, incident recovery and budget changes remain outside this proposal. Earlier evidence gaps below are historical.
+
+
+> **Statement attribution available — 7 November 2026.** Retained ON Query Store evidence attributes 118.841 of the 127.589 summary seconds to 32 history/window cache rebuilds. All 56 cache write pairs are captured, with parent/child definition hashes unchanged. Complete the bounded saved-plan and incoming-consumer reads before selecting the SQL rewrite; do not execute the previously proposed extra diagnostic import merely to collect costs already available. SQL-repo `docs/p021-summary-cost-evidence.md` records measured costs, caps, limitations and the next read-only collector. No summary implementation or budget change is approved by this update.
+
+
+> **Approved early audit — 7 November 2026.** The P02.1 isolated snapshot-enabled
+> rehearsal's SUMMARY_PROC stage took 127.589 seconds and observed version store
+> reached 1,843,712 KiB against the 524,288 KiB budget. The operator approved
+> bringing this existing audit forward, plus a separate deterministic historical-name
+> fix. The earlier 30-production-batch sample has not been manufactured or claimed.
+> Current source/dependency audit and bounded measurement proposal are in SQL-repo
+> `docs/p021-summary-audit.md`; name implementation/qualification is in
+> `docs/p021-deterministic-names.md` on `codex/p021-deterministic-names`.
+> The eight-child/56-cache write shape is confirmed, but per-statement costs remain
+> unattributed. Existing cached/Query Store evidence is the next read-only step;
+> a validated private collector is prepared. No summary rewrite, new full VM replay,
+> production change or higher budget is approved by this checkpoint. Historical
+> signing/source-pin integration remains an explicit release gate for the name fix.
+> The historical scope and observations below remain as dated evidence.
+
+
 > **Evidence-collection gate — 2026-09-01:** Do not tune, decompose, or repeatedly execute
 > `dbo.SUMMARY_PROC` in Production. Collect naturally occurring fallback evidence for 10–14 days
 > and at least 30 completed batches, whichever is later. The target formal audit date is
