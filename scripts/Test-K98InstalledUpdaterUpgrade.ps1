@@ -59,6 +59,8 @@ Write-UpgradeMember $candidate $work 'next.txt' ([Text.Encoding]::UTF8.GetBytes(
 Check (Test-Path -LiteralPath (Join-Path $work 'pending-fixture')) 'partial staging evidence lost'
 # Exercise the actual swap orchestration without accessing production paths.
 $body=$ast.EndBlock.Statements[-1].Extent.Text
+# AST extraction omits the script parameter block; retain its normal default.
+$Phase1PermissionRepair=$false
 $PreviousManifestSHA256='a'*64;$TargetManifestSHA256='b'*64
 $root='C:\ProgramData\K98\S11';$tool=Join-Path $root 'updater';$archive=Join-Path $root ('updater-before-'+$PreviousManifestSHA256);$updates=Join-Path $root 'updates'
 $work=Join-Path $root ('updater-upgrade-'+$TargetManifestSHA256);$candidate=Join-Path $work 'tool'
