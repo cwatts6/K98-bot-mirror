@@ -629,59 +629,22 @@ def read_json_safe(path: str, default: Any | None = None) -> Any:
 # New: centralized post-import stats maintenance
 # ---------------------------
 def run_post_import_stats_update(
-    server: str, database: str, username: str, password: str, timeout_seconds: int = 300
-) -> None:
-    try:
-        conn = get_conn_with_retries(meta={"operation": "post_import_stats"}, operational=True)
-    except Exception as e:
-        emit_telemetry_event(
-            {
-                "event": "post_import_stats",
-                "status": "conn_failed",
-                "error_type": type(e).__name__,
-                "error_args": getattr(e, "args", None),
-            }
-        )
-        logger.warning("[MAINT] Could not obtain DB connection for sp_updatestats: %s", e)
-        raise
+    server: str,
+    database: str,
+    username: str,
+    password: str,
+    timeout_seconds: int = 300,
+    *,
+    request_id=None,
+) -> dict:
+    """Run the explicit owned worker; return durable maintenance-only evidence."""
+    from services.maintenance_dal import run_maintenance
 
-    try:
-        try:
-            conn.autocommit = True  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        # pyodbc applies query timeouts to cursors created after this setting.
-        # Cursor.timeout is unsupported; silently ignoring it leaves SQL unbounded.
-        conn.timeout = timeout_seconds
-        cur = conn.cursor()
-        try:
-            cur.execute("EXEC [dbo].[usp_update_stats]")
-            # SQL errors can arrive in a later result set. Do not acknowledge
-            # maintenance until the driver has consumed the complete response.
-            while cur.nextset():
-                pass
-            emit_telemetry_event(
-                {"event": "post_import_stats", "status": "success", "database": database}
-            )
-            logger.info("[MAINT] sp_updatestats completed.")
-        except Exception as e:
-            emit_telemetry_event(
-                {
-                    "event": "post_import_stats",
-                    "status": "failure",
-                    "database": database,
-                    "error_type": type(e).__name__,
-                    "error_args": getattr(e, "args", None),
-                }
-            )
-            logger.warning("[MAINT] sp_updatestats failed (continuing): %s", e)
-            raise
-    finally:
-        try:
-            if conn:
-                conn.close()
-        except Exception:
-            pass
+    return run_maintenance(
+        lambda: get_conn_with_retries(meta={"operation": "post_import_stats"}, operational=True),
+        timeout_seconds=timeout_seconds,
+        request_id=request_id,
+    )
 
 
 def atomic_write_csv(
@@ -2154,26 +2117,19 @@ async def run_maintenance_with_isolation(
             username = (kwargs or {}).get("username")
             password = (kwargs or {}).get("password")
             try:
-                await run_blocking_in_thread(
+                from core.owned_work import drain_thread
+                from services.maintenance_service import result
+
+                receipt = await drain_thread(
                     run_post_import_stats_update,
                     server,
                     database,
                     username,
                     password,
-                    name=name or "run_post_import_stats_update",
-                    meta=meta,
-                    timeout=timeout,
+                    timeout_seconds=timeout if timeout is not None else 300,
                 )
-                emit_telemetry_event(
-                    {
-                        "event": "maintenance_run.complete",
-                        "command": str(command),
-                        "mode": "thread",
-                        "ok": True,
-                        "meta": meta,
-                    }
-                )
-                return True, "post_stats completed"
+                ok, receipt = result(receipt)
+                return ok, json.dumps(receipt, sort_keys=True)
             except Exception as exc:
                 emit_telemetry_event(
                     {

@@ -19,11 +19,14 @@ async def test_strict_maintenance_preserves_configured_timeout(monkeypatch, time
     import processing_pipeline
 
     calls = []
+    from tests.test_maintenance_dal import receipt
+
+    expected = receipt()
     monkeypatch.setattr(processing_pipeline, "POST_MAINT_TIMEOUT", timeout)
     monkeypatch.setattr(
         file_utils,
         "run_post_import_stats_update",
-        lambda *args, **kwargs: calls.append(kwargs["timeout_seconds"]),
+        lambda *args, **kwargs: calls.append(kwargs["timeout_seconds"]) or expected,
     )
 
     def fallback():
@@ -31,7 +34,7 @@ async def test_strict_maintenance_preserves_configured_timeout(monkeypatch, time
 
     assert await receipts.strict_work("maintenance", fallback) == (
         True,
-        "SQL maintenance response consumed",
+        expected,
     )
     assert calls == [timeout]
 
@@ -39,18 +42,31 @@ async def test_strict_maintenance_preserves_configured_timeout(monkeypatch, time
 @pytest.mark.parametrize("timeout", [17, 901])
 def test_maintenance_sets_odbc_timeout_before_cursor_creation(monkeypatch, timeout):
     import file_utils
+    from services.maintenance_dal import RELEASE_SESSION, SESSION_STATE
 
     calls = []
 
     class Cursor:
         __slots__ = ()
+        from services.maintenance_dal import FIELDS
 
-        def execute(self, statement):
+        description = tuple((field,) for field in FIELDS)
+
+        def execute(self, statement, request=None):
             calls.append(statement)
+
+        def fetchone(self):
+            return (0, "NoLock", "NoLock")
+
+        def fetchmany(self, size):
+            return [("post_import", 1, 1, 1, str(uuid4()), "complete", None, None)]
 
         def nextset(self):
             calls.append("response_consumed")
             return False
+
+        def close(self):
+            calls.append("cursor_closed")
 
     class Connection:
         timeout = 0
@@ -65,7 +81,15 @@ def test_maintenance_sets_odbc_timeout_before_cursor_creation(monkeypatch, timeo
 
     monkeypatch.setattr(file_utils, "get_conn_with_retries", lambda **kwargs: Connection())
     file_utils.run_post_import_stats_update("server", "database", "user", "password", timeout)
-    assert calls == ["EXEC [dbo].[usp_update_stats]", "response_consumed", "closed"]
+    assert calls == [
+        SESSION_STATE,
+        "EXEC dbo.usp_update_stats @RequestID=?",
+        "response_consumed",
+        RELEASE_SESSION,
+        "response_consumed",
+        "cursor_closed",
+        "closed",
+    ]
 
 
 @pytest.mark.asyncio

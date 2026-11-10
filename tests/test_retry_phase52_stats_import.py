@@ -164,13 +164,70 @@ async def test_required_post_sql_stages_rebuild_caches_and_run_maintenance(monke
 
 
 def test_post_stats_wrapper_does_not_forward_configured_credentials(monkeypatch):
+    from tests.test_maintenance_dal import receipt
+
     calls = []
     monkeypatch.setattr(
         recovery,
         "run_post_import_stats_update",
-        lambda *args: calls.append(args),
+        lambda *args: calls.append(args) or receipt(),
     )
 
     recovery._run_post_stats_without_argv_credentials()
 
     assert calls == [(recovery.SERVER, recovery.DATABASE, "", "")]
+
+
+@pytest.mark.parametrize("state", ["pending", "running", "failed", "unknown"])
+def test_post_stats_wrapper_rejects_outstanding_receipts(monkeypatch, state):
+    from tests.test_maintenance_dal import receipt
+
+    monkeypatch.setattr(recovery, "run_post_import_stats_update", lambda *args: receipt(state))
+    with pytest.raises(RuntimeError, match="Maintenance remains outstanding"):
+        recovery._run_post_stats_without_argv_credentials()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["complete", "pending", "running", "failed", "unknown"])
+async def test_actual_post_stats_adapter_controls_recovery_completion(
+    tmp_path, monkeypatch, capsys, state
+):
+    from tests.test_maintenance_dal import receipt
+
+    (tmp_path / COMPLETED_FILENAME).write_text("Governor ID,Name\n1,Example\n")
+    metadata = {
+        "completed_filename": COMPLETED_FILENAME,
+        "publication_state": "sql_owned",
+        "rank": 1184,
+        "seed": "B",
+    }
+
+    async def sql(**kwargs):
+        return True, "[SUCCESS] Counter reached 913.", None
+
+    async def cache():
+        pass
+
+    async def invoke(command, **kwargs):
+        # Match the generic worker's normal-return / exception contract.
+        try:
+            command()
+            return True, "completed"
+        except RuntimeError as error:
+            return False, str(error)
+
+    monkeypatch.setattr(recovery.stats_module, "READY_DIR", str(tmp_path))
+    monkeypatch.setattr(recovery.stats_module, "_load_import_metadata", lambda: metadata)
+    monkeypatch.setattr(
+        recovery.stats_module,
+        "_resolve_completed_filename",
+        lambda value: value["completed_filename"],
+    )
+    monkeypatch.setattr(recovery.stats_module, "run_sql_procedure", sql)
+    monkeypatch.setattr(recovery, "build_player_stats_cache", cache)
+    monkeypatch.setattr(recovery, "build_lastkvk_player_stats_cache", cache)
+    monkeypatch.setattr(recovery, "run_maintenance_with_isolation", invoke)
+    monkeypatch.setattr(recovery, "run_post_import_stats_update", lambda *args: receipt(state))
+    assert await recovery._run(_args()) == (0 if state == "complete" else 1)
+    output = capsys.readouterr()
+    assert ("PHASE52_STATS_IMPORT_RECOVERY_COMPLETE" in output.out) == (state == "complete")

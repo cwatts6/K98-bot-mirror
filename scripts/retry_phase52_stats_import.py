@@ -25,7 +25,13 @@ MAINT_WORKER_MODE = os.getenv("MAINT_WORKER_MODE", "thread").lower()
 
 def _run_post_stats_without_argv_credentials() -> None:
     """Run post-stats using the existing protected connection configuration."""
-    run_post_import_stats_update(SERVER, DATABASE, "", "")
+    from services.maintenance_service import result
+
+    complete, _ = result(run_post_import_stats_update(SERVER, DATABASE, "", ""))
+    if not complete:
+        # The generic callable worker considers every normal return successful.
+        # Keep the committed import distinct from outstanding maintenance.
+        raise RuntimeError("Maintenance remains outstanding; retain the committed SQL receipt.")
 
 
 def _build_parser() -> argparse.ArgumentParser:

@@ -181,15 +181,18 @@ async def strict_work(name, fallback):
         from file_utils import run_post_import_stats_update
         from processing_pipeline import POST_MAINT_TIMEOUT
 
-        await drain_thread(
+        receipt = await drain_thread(
             run_post_import_stats_update,
             SERVER,
             DATABASE,
             USERNAME,
             PASSWORD,
             timeout_seconds=POST_MAINT_TIMEOUT,
+            request_id=producer_operation(),
         )
-        return True, "SQL maintenance response consumed"
+        from services.maintenance_service import result
+
+        return result(receipt)
     result = fallback()
     return await result if inspect.isawaitable(result) else result
 
@@ -221,14 +224,9 @@ def result_evidence(dal, name, operation, result):
             True,
         )
     if name == "maintenance":
-        acknowledged = isinstance(result, tuple) and len(result) == 2 and result[0] is True
-        return (
-            dict(
-                outcome="statement_acknowledged" if acknowledged else "unconfirmed",
-                procedure="dbo.usp_update_stats",
-            ),
-            acknowledged,
-        )
+        from services.maintenance_service import evidence
+
+        return evidence(result)
     if name == "name_cache":
         from target_utils import get_name_cache_rows
 

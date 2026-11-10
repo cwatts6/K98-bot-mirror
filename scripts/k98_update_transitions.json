@@ -4215,6 +4215,71 @@
           "after_sha256": "98d68134dbe91a1ba4f73c864569a7d323e607270e36dbadf1b6c369f41e1cd9"
         }
       ]
+    },
+    {
+      "id": "p02_d3b_maintenance_ownership_v1",
+      "members": [
+        {
+          "path": "core/operation_evidence.py",
+          "before_sha256": "d95e7f6f9031777b73c69611105e483e02580a22aea1705d2d6fd9f0bc52fe5b",
+          "after_sha256": "d95e7f6f9031777b73c69611105e483e02580a22aea1705d2d6fd9f0bc52fe5b"
+        },
+        {
+          "path": "core/operation_timing.py",
+          "before_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52",
+          "after_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52"
+        },
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f",
+          "after_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91",
+          "after_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "637f9b16c49452b85bdfcc15683f4b98e6d0ad9db0607c932a246b890daf34af",
+          "after_sha256": "dc013fc8c2cf65143e7d4cd030e2e724a62316e00e447e4938ee44df39c7378d"
+        },
+        {
+          "path": "maintenance_worker.py",
+          "before_sha256": "5c8f66016f2ceb014e39d7b05ae118166634dbb9be3c2fe285101bf841c5c891",
+          "after_sha256": "c7166a5fc671f7807ce21f28adae08d76cca703b2678ef7fac55ea385e681733"
+        },
+        {
+          "path": "scripts/retry_phase52_stats_import.py",
+          "before_sha256": "e7b2930ef18c06aef6673693accc1be983c9dd07383bcab8c02190d4ace31490",
+          "after_sha256": "7653e377773604c925c8d207905b9ad16eb8aceb9d02914f5c7d4cef1f5318c5"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "e9c4c1ffbdc13e89db394310114da592581e5d32e6a44ff734b8d00b8734fb60",
+          "after_sha256": "e9c4c1ffbdc13e89db394310114da592581e5d32e6a44ff734b8d00b8734fb60"
+        },
+        {
+          "path": "services/maintenance_dal.py",
+          "before_sha256": null,
+          "after_sha256": "6fd333f436cb21dee32410f7eb364c24a5f5e9754958528004d29a6eb2a448e2"
+        },
+        {
+          "path": "services/maintenance_service.py",
+          "before_sha256": null,
+          "after_sha256": "6e3bde001b825b421581cda2faf01b57c7cffe2bc3be294ac472518c6fcab581"
+        },
+        {
+          "path": "services/processing_pipeline_receipt_dal.py",
+          "before_sha256": "b959afbdfe6219b00165e040b9209132e3481180d232450b55e8e80c1034758f",
+          "after_sha256": "b959afbdfe6219b00165e040b9209132e3481180d232450b55e8e80c1034758f"
+        },
+        {
+          "path": "services/processing_pipeline_receipts.py",
+          "before_sha256": "5d18b266516e76d1502b502b2aaed67ff0ff4ed52aac48d738f9d320942c6925",
+          "after_sha256": "d3d1acc9f50e1d0b3ab30036f40ed6f2d74542c6f8733c5f164fc07b98c60ec5"
+        }
+      ]
     }
   ]
 }
