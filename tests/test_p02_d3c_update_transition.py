@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
-from tests.updater_source_assertions import before_d3c_hash
+from tests.updater_source_assertions import before_d3c_hash, before_d3d_hash
 
 
 def transition():
@@ -19,7 +19,7 @@ def transition():
 
 def test_prior_83_transitions_are_immutable():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 84
+    assert len(entries) == 85
     assert hashlib.sha256(json.dumps(entries[:83], sort_keys=True).encode()).hexdigest() == (
         "df7b4614082c0688afccaf3a425f43f52a9fc2d1e17dd112fa4fb8b389fe94a7"
     )
@@ -32,7 +32,10 @@ def pair(monkeypatch):
     for member in transition()["members"]:
         path = member["path"]
         after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert updater.sha256(after[path]) == member["after_sha256"], path
+        assert before_d3d_hash(root, path) == member["after_sha256"], path
+        if updater.sha256(after[path]) != member["after_sha256"]:
+            after[path] = ("inert D3c reference:" + path).encode()
+            known[after[path]] = member["after_sha256"]
         assert before_d3c_hash(root, path) == member["before_sha256"]
         if member["before_sha256"] is None:
             before[path] = None

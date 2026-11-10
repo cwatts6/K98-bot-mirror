@@ -137,18 +137,18 @@ def test_busy_producer_defers_without_claiming(maintenance_database):
 def test_missing_child_refused_and_not_retried(maintenance_database):
     owner, connect = maintenance_database
     # The fixed dispatcher rejects an uninstalled child after persisting a claim.
-    owner.execute("EXEC dbo.usp_MaintenanceDue 'configuration'")
+    owner.execute("EXEC dbo.usp_MaintenanceDue 'player_report'")
     worker = connect()
     try:
         with pytest.raises(Exception, match="51963"):
-            drain(worker.execute("EXEC dbo.usp_RunMaintenance 'configuration'"))
+            drain(worker.execute("EXEC dbo.usp_RunMaintenance 'player_report'"))
     finally:
         worker.close()
-    assert state(owner, "configuration")[2] == "failed"
-    assert state(owner, "configuration")[4] == 51963
-    owner.execute("EXEC dbo.usp_MaintenanceDue 'configuration'")
-    drain(owner.execute("EXEC dbo.usp_RunMaintenance 'configuration'"))
-    assert state(owner, "configuration")[:3] == (2, 0, "failed")
+    assert state(owner, "player_report")[2] == "failed"
+    assert state(owner, "player_report")[4] == 51963
+    owner.execute("EXEC dbo.usp_MaintenanceDue 'player_report'")
+    drain(owner.execute("EXEC dbo.usp_RunMaintenance 'player_report'"))
+    assert state(owner, "player_report")[:3] == (2, 0, "failed")
 
 
 def test_transactional_worker_refused_before_dispatch(maintenance_database):
@@ -311,6 +311,7 @@ def test_default_odbc_pool_gets_no_owned_locks_on_return(
             "K98:post-import-stats:v1",
             "k98-legacy-output-snapshot",
             "K98:maintenance-schema:v1",
+            "K98:TargetPublication:DeltaPreprocessing",
         ):
             assert (
                 owner.execute(
