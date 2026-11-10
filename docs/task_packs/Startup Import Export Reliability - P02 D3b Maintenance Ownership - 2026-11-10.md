@@ -82,4 +82,38 @@ Initial immutable Changes reviews covered Bot `f333a225` (scan
 the concrete reliability corrections above; a security result is not D3b
 acceptance. The final correction requires its own exact-diff review and checks.
 
-Status: corrections and final validation in progress; no D3b acceptance claim yet.
+## Final qualification
+
+At Bot `4236bbfc`, the final unchanged-source full run passed: **13,134 passed,
+1,202 skipped, one existing Google Python-version warning, eight subtests passed**
+in 1,424.89 seconds. Production operational logs were unchanged. The earlier
+failed full run remains retained: it found a stale transition-count assertion
+and source-pin mismatches while corrections were being prepared. It is not an
+immutable-source acceptance result.
+
+Focused validation passed 48 Python cases and 105 updater cases. Eleven native
+maintenance cases passed, including success/failure with default ODBC pooling.
+Two SQL implicit-transaction regressions failed before the correction and pass
+afterward: both SQL entry points reject that mode before recording or reading
+maintenance state. The combined native selection passed 13 cases. A further
+native case exercised the production factory's fresh manual-mode connection.
+The DAL requires a fresh dedicated connection; its initial check protects
+pre-existing session locks, not arbitrary borrowed transactions.
+
+The final incremental Changes reviews completed with zero findings: Bot scan
+`3700a065-4e2d-40a2-9719-52a207371f3c` (all 12 changed paths) and SQL scan
+`cf8d43d4-579e-4353-a0d1-d015565fd6a0` (all eight changed paths). Measured usage:
+Bot 5,444,836 tokens (5,425,125 input, 5,355,136 cached, 19,711 output); SQL
+660,506 tokens (656,864 input, 605,440 cached, 3,642 output). These measured
+rollout scopes overlap earlier review accounting and must not be summed as
+independent task costs. Refreshed GitHub reviews reported no findings at the
+final runtime heads. Documentation-only closeout needs no repeated runtime scan.
+
+SQL review comments on seeding and owner execution were reconciled with the
+source-only contract. D4 must supply the exact installer, preserve outstanding
+work, and prove restricted-principal DMV access/signing and installed source
+compatibility. Database-owner impersonation failed native DMV qualification
+with SQL 15562; restoring it is not a safe permission fix.
+
+Status: D3b implementation and qualification complete for focused mirror merge.
+D3c–g, D4 and D5 remain open. No deployment or production acceptance is claimed.
