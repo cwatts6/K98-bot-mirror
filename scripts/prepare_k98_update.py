@@ -618,6 +618,7 @@ MGE_A1B_PATHS = frozenset(
 
 P02_D3B_MAINTENANCE_PATHS = frozenset(
     {
+        "scripts/retry_phase52_stats_import.py",
         "file_utils.py",
         "maintenance_worker.py",
         "services/processing_pipeline_receipts.py",

@@ -4250,6 +4250,11 @@
           "after_sha256": "c7166a5fc671f7807ce21f28adae08d76cca703b2678ef7fac55ea385e681733"
         },
         {
+          "path": "scripts/retry_phase52_stats_import.py",
+          "before_sha256": "e7b2930ef18c06aef6673693accc1be983c9dd07383bcab8c02190d4ace31490",
+          "after_sha256": "7653e377773604c925c8d207905b9ad16eb8aceb9d02914f5c7d4cef1f5318c5"
+        },
+        {
           "path": "services/legacy_export_snapshot_service.py",
           "before_sha256": "e9c4c1ffbdc13e89db394310114da592581e5d32e6a44ff734b8d00b8734fb60",
           "after_sha256": "e9c4c1ffbdc13e89db394310114da592581e5d32e6a44ff734b8d00b8734fb60"
@@ -4257,12 +4262,12 @@
         {
           "path": "services/maintenance_dal.py",
           "before_sha256": null,
-          "after_sha256": "b62e8fe3a803bb9ca07f0843e98912a02c14db6d729468d578001dd1c5e5017d"
+          "after_sha256": "6fd333f436cb21dee32410f7eb364c24a5f5e9754958528004d29a6eb2a448e2"
         },
         {
           "path": "services/maintenance_service.py",
           "before_sha256": null,
-          "after_sha256": "20356136f602fa9c45ad83f41af13b3eeed23d5e531df210bfcb5c7896648f9d"
+          "after_sha256": "6e3bde001b825b421581cda2faf01b57c7cffe2bc3be294ac472518c6fcab581"
         },
         {
           "path": "services/processing_pipeline_receipt_dal.py",

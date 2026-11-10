@@ -2,7 +2,10 @@
 
 
 def result(receipt):
+    from services.maintenance_dal import validate_receipts
+
     rows = receipt["maintenance"]
+    validate_receipts(rows)
     return all(row["State"] == "complete" for row in rows), receipt
 
 

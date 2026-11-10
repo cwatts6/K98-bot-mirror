@@ -62,7 +62,7 @@ def test_complete_package_and_dependencies_admitted(pair, crlf):
     changed = {
         m["path"] for m in transition()["members"] if m["before_sha256"] != m["after_sha256"]
     }
-    assert len(changed) == 5
+    assert len(changed) == 6
     assert set(after) == updater.P02_D3B_MAINTENANCE_PATHS
     read = lambda revision, path: (before if revision == "before" else after).get(path)
     updater.check_transition_inventory(changed, read, "before", "after")

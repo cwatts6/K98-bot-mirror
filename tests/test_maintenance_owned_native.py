@@ -265,3 +265,46 @@ def test_child_fault_keeps_first_failure_and_releases_only_on_close(maintenance_
     owner.execute("EXEC dbo.usp_MaintenanceDue 'post_import'")
     drain(owner.execute("EXEC dbo.usp_RunMaintenance 'post_import'"))
     assert state(owner)[2:] == ("failed", claim, 50002)
+
+
+@pytest.mark.parametrize("fail_child", [False, True])
+def test_default_odbc_pool_gets_no_owned_locks_on_return(
+    maintenance_database, snapshot_database, fail_child
+):
+    owner, _ = maintenance_database
+    if fail_child:
+        source = (
+            (SQL_ROOT / "dbo.usp_MaintenancePostImport.StoredProcedure.sql")
+            .read_text()
+            .split("GO\n", 1)[-1]
+        )
+        owner.execute(
+            source.replace("EXEC sys.sp_updatestats;", "THROW 50002,'Injected child failure',1;")
+        )
+    # A fresh interpreter uses pyodbc's production-default pooling. The test
+    # process stays alive after close so process exit cannot hide a pooled lock.
+    program = (
+        "import pyodbc,sys\nfrom services.maintenance_dal import run_maintenance\n"
+        f"def connect(): return pyodbc.connect({snapshot_database.connection_string!r},autocommit=True)\n"
+        "try:\n run_maintenance(connect)\nexcept Exception:\n pass\n"
+        "print('returned',flush=True)\nsys.stdin.readline()\n"
+    )
+    child = subprocess.Popen(
+        [sys.executable, "-c", program],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert child.stdout.readline().strip() == "returned"
+        for resource in ("K98:post-import-stats:v1", "k98-legacy-output-snapshot"):
+            assert (
+                owner.execute(
+                    "SELECT APPLOCK_TEST('public',?,'Exclusive','Session')", resource
+                ).fetchval()
+                == 1
+            )
+        assert state(owner)[2] == ("failed" if fail_child else "complete")
+    finally:
+        child.communicate("\n", timeout=5)

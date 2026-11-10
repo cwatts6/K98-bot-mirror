@@ -46,9 +46,12 @@ def connection(monkeypatch):
     class Cursor:
         description = tuple((field,) for field in dal.FIELDS)
 
-        def execute(self, statement, request):
-            events.append((statement, request))
+        def execute(self, statement, request=None):
+            events.append((statement, request) if request else statement)
             assert owner.timeout == 17
+
+        def fetchone(self):
+            return (0, "NoLock", "NoLock")
 
         def fetchmany(self, size):
             assert size == 7
@@ -82,7 +85,10 @@ def test_exact_receipt_consumed_before_cleanup(connection):
     result = dal.run_maintenance(lambda: c.owner, timeout_seconds=17, request_id=request)
     assert result == dict(c.result, request_id=request)
     assert c.events == [
+        dal.SESSION_STATE,
         ("EXEC dbo.usp_update_stats @RequestID=?", request),
+        "response_consumed",
+        dal.RELEASE_SESSION,
         "response_consumed",
         "cursor_closed",
         "closed",
@@ -117,9 +123,14 @@ def test_cleanup_failure_retains_connection_and_blocks_admission(connection, mon
 def test_late_sql_failure_survives_failed_cleanup(connection, monkeypatch):
     c = connection
     first = RuntimeError("late result failure")
+    raised = False
 
     def late():
-        raise first
+        nonlocal raised
+        if not raised:
+            raised = True
+            raise first
+        return False
 
     def close():
         raise OSError("cleanup failed")
@@ -130,6 +141,32 @@ def test_late_sql_failure_survives_failed_cleanup(connection, monkeypatch):
         dal.run_maintenance(lambda: c.owner, timeout_seconds=17)
     assert error.value is first
     assert "SQL close failed: OSError" in first.__notes__
+
+
+def test_foreign_session_owner_is_retained_without_releasing_it(connection, monkeypatch):
+    c = connection
+    monkeypatch.setattr(c.cursor, "fetchone", lambda: (0, "Exclusive", "NoLock"))
+    with pytest.raises(custody.SqlCleanupUnknown, match="pre-existing"):
+        dal.run_maintenance(lambda: c.owner, timeout_seconds=17)
+    assert c.events == [dal.SESSION_STATE]
+    assert custody.custody_snapshot()["admission"] == "closed"
+
+
+def test_unknown_session_release_never_returns_connection_to_pool(connection, monkeypatch):
+    c = connection
+    original = c.cursor.execute
+
+    def execute(statement, request=None):
+        if statement == dal.RELEASE_SESSION:
+            raise OSError("release acknowledgement lost")
+        return original(statement, request)
+
+    monkeypatch.setattr(c.cursor, "execute", execute)
+    with pytest.raises(OSError, match="acknowledgement lost"):
+        dal.run_maintenance(lambda: c.owner, timeout_seconds=17)
+    assert "cursor_closed" not in c.events
+    assert "closed" not in c.events
+    assert custody.custody_snapshot()["admission"] == "closed"
 
 
 @pytest.mark.parametrize("damage", ["missing", "duplicate", "invalid_state", "false_complete"])

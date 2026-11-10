@@ -51,4 +51,35 @@ selector, security-routing and updater predecessor checks. Separate Bot and SQL
 Changes reviews are required; Deep remains off. Local qualification artifacts
 must distinguish real children from inert fixture fault injection.
 
-Status: design/source implementation in progress; no D3b acceptance claim yet.
+## Coverage corrections before merge
+
+The first nine native cases passed, but the caller/connection review identified
+two related gaps. A fresh-process native test with the production-default ODBC
+pool reproduced retained SQL session locks after `close()` returned. The original
+fixture disabled pooling, so its passing close checks were insufficient. The DAL
+now verifies a clean initial session, explicitly acknowledges rollback/guard
+release on that still-owned session, and only then closes the handles. Unknown
+release retains the open connection/cursor and closes admission. Existing foreign
+session ownership is never released. New native cases keep the pooled worker
+process alive after both success and child failure and prove competing admission.
+The failed baseline remains in the local D3b qualification artifacts.
+
+The Phase52 recovery adapter discarded the new normal-return receipt, allowing
+its generic callable worker to label outstanding maintenance successful. It now
+raises a bounded outstanding-maintenance error while retaining the committed SQL
+receipt. Tests cover complete, pending, running, failed and unknown receipts and
+the final recovery-completion marker. No recovery operation was executed.
+
+The caller census also checked existing import-capture and legacy snapshot guard
+cleanup: these already verify explicit release and retain uncertainty. Broader
+manual/recovery disposition remains D4/P03; this slice does not assert that a
+pooled close proves physical release elsewhere. The D3b updater family includes
+the recovery adapter and retains all 82 predecessor definitions unchanged.
+
+Initial immutable Changes reviews covered Bot `f333a225` (scan
+`3b77917f-3726-41e4-8307-b55437fa3102`) and SQL `48dc44ad` (scan
+`d305e947-8e39-4f05-b290-16991aeaee71`) with zero security findings. Both retain
+the concrete reliability corrections above; a security result is not D3b
+acceptance. The final correction requires its own exact-diff review and checks.
+
+Status: corrections and final validation in progress; no D3b acceptance claim yet.

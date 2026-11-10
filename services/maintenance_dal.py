@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 from core.sql_connection_custody import (
+    SqlCleanupUnknown,
     preserve_failure,
     require_sql_admission,
     retain_connection,
@@ -22,6 +23,19 @@ FIELDS = (
     "FirstErrorNumber",
     "LastErrorNumber",
 )
+SESSION_STATE = (
+    "SELECT @@TRANCOUNT,"
+    "APPLOCK_MODE('public','K98:post-import-stats:v1','Session'),"
+    "APPLOCK_MODE('public','k98-legacy-output-snapshot','Session')"
+)
+RELEASE_SESSION = (
+    "SET NOCOUNT ON; IF @@TRANCOUNT>0 ROLLBACK; "
+    "IF APPLOCK_MODE('public','k98-legacy-output-snapshot','Session')='Exclusive' "
+    "EXEC sys.sp_releaseapplock @Resource='k98-legacy-output-snapshot',@LockOwner='Session'; "
+    "IF APPLOCK_MODE('public','K98:post-import-stats:v1','Session')='Exclusive' "
+    "EXEC sys.sp_releaseapplock @Resource='K98:post-import-stats:v1',@LockOwner='Session'; "
+    + SESSION_STATE
+)
 
 
 def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
@@ -36,12 +50,19 @@ def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
     cursor = None
     failure = None
     cleanup_error = None
+    owned_session = False
+    retain_open = False
     receipts = []
     try:
         require_sql_admission()
         connection.autocommit = True
         connection.timeout = timeout_seconds
         cursor = connection.cursor()
+        cursor.execute(SESSION_STATE)
+        if tuple(cursor.fetchone() or ()) != (0, "NoLock", "NoLock"):
+            retain_open = True
+            raise SqlCleanupUnknown("Maintenance connection has pre-existing SQL ownership.")
+        owned_session = True
         cursor.execute("EXEC dbo.usp_update_stats @RequestID=?", request)
         while True:
             if cursor.description:
@@ -64,18 +85,37 @@ def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
     except BaseException as error:
         failure = error
     finally:
+        if owned_session:
+            try:
+                # ODBC close may return the connection to a pool while session
+                # locks remain held. A command on this still-owned session must
+                # acknowledge quiescence before either handle can be returned.
+                cursor.execute(RELEASE_SESSION)
+                if tuple(cursor.fetchone() or ()) != (0, "NoLock", "NoLock"):
+                    raise SqlCleanupUnknown("Maintenance SQL release was not acknowledged.")
+                while cursor.nextset():
+                    pass
+            except BaseException as error:
+                failure = preserve_failure(failure, error, "session_release")
+                cleanup_error = error
+                retain_open = True
+        elif cursor is not None:
+            # An unacknowledged initial inspection does not authorize releasing
+            # a pre-existing session owner or putting it back in a reusable pool.
+            cleanup_error = failure
+            retain_open = True
         for phase, action in (
             ("cursor_close", cursor.close if cursor is not None else None),
             ("close", connection.close),
         ):
-            if action is None:
+            if action is None or retain_open:
                 continue
             try:
                 action()
             except BaseException as error:
                 failure = preserve_failure(failure, error, phase)
                 cleanup_error = cleanup_error or error
-        if cleanup_error is not None:
+        if cleanup_error is not None or retain_open:
             retain_connection(
                 SimpleNamespace(connection=connection, cursor=cursor),
                 effect="unknown",
