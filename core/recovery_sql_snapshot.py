@@ -6,6 +6,7 @@ retain their independent session guards, current-row locks and evidence CAS.
 """
 
 from contextlib import contextmanager
+import re
 
 from core.sql_connection_custody import require_sql_admission, retain_connection
 from core.sql_observation import ObservationBusy, lock_contention, observation
@@ -38,7 +39,8 @@ def require_recovery_snapshot_isolation(cursor):
 def recovery_snapshot(connect):
     """Own one dedicated read transaction through physical rollback and close.
 
-    No business commit, retry or application lock is performed here.
+    No business commit, retry or producer admission lock is performed here.
+    A shared transaction guard excludes optional schema maintenance only.
     A snapshot is a preview: it does not prove that a producer has physically ended.
     """
     require_sql_admission()
@@ -46,6 +48,7 @@ def recovery_snapshot(connect):
     cursor = None
     failure = None
     cleanup_failed = False
+    retain_open = False
     try:
         require_sql_admission()
         if connection.autocommit:
@@ -63,7 +66,14 @@ def recovery_snapshot(connect):
         connection.autocommit = False
         cursor = diagnostic_cursor(diagnostic_call("cursor", connection.cursor))
         with observation():
-            cursor.execute("SET LOCK_TIMEOUT 0; SET XACT_ABORT ON; SET NOCOUNT ON;")
+            cursor.execute(
+                "SET LOCK_TIMEOUT 0; SET XACT_ABORT ON; SET NOCOUNT ON; "
+                "DECLARE @r int; EXEC @r=sys.sp_getapplock "
+                "@Resource='K98:maintenance-schema:v1',@LockMode='Shared',"
+                "@LockOwner='Transaction',@LockTimeout=0; "
+                "IF @r=-1 THROW 51966,'Observation schema maintenance busy.',1; "
+                "ELSE IF @r<0 THROW 51967,'Observation schema guard not acquired.',1;"
+            )
             yield cursor
     except BaseException as error:
         failure = error
@@ -79,7 +89,7 @@ def recovery_snapshot(connect):
             ("cursor_close", cursor.close if cursor is not None else None),
             ("close", connection.close),
         ):
-            if action is None:
+            if action is None or retain_open:
                 continue
             try:
                 diagnostic_call(phase, action)
@@ -89,7 +99,10 @@ def recovery_snapshot(connect):
                     failure = error
                 else:
                     failure.add_note(f"Recovery observation {phase} failed: {type(error).__name__}")
-                if phase == "close":
+                if phase in {"rollback", "close"}:
+                    # A failed rollback may still own the shared transaction
+                    # guard. Never return it to a pool or change its isolation.
+                    retain_open = True
                     retain_connection(
                         connection,
                         effect="not_applicable",
@@ -101,7 +114,13 @@ def recovery_snapshot(connect):
             raise RecoveryObservationCleanupUnknown(
                 "Recovery observation cleanup was not acknowledged; retain its first failure."
             ) from failure
-        if lock_contention(failure) and not cleanup_failed:
+        args = getattr(failure, "args", ())
+        schema_busy = bool(
+            args
+            and args[0] == "42000"
+            and any(isinstance(v, str) and re.search(r"\(51966\)", v[:8192]) for v in args[1:5])
+        )
+        if (lock_contention(failure) or schema_busy) and not cleanup_failed:
             raise ObservationBusy(
                 "Recovery metadata is busy; retain the previous observation."
             ) from failure

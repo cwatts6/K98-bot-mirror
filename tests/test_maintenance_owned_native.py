@@ -63,7 +63,10 @@ def test_real_post_import_child_and_durable_receipt(maintenance_database):
     request = str(uuid4())
     receipt = run_maintenance(connect, request_id=request)
     assert receipt["request_id"] == request
-    assert receipt["maintenance"][0]["State"] == "complete"
+    assert (
+        next(row for row in receipt["maintenance"] if row["Kind"] == "post_import")["State"]
+        == "complete"
+    )
     assert state(owner)[:3] == (1, 1, "complete")
     # Exact acknowledgement loss readback never dispatches a second child.
     old_claim = state(owner)[3]
@@ -120,7 +123,10 @@ def test_busy_producer_defers_without_claiming(maintenance_database):
     )
     try:
         receipt = run_maintenance(connect)
-        assert receipt["maintenance"][0]["State"] == "pending"
+        assert (
+            next(row for row in receipt["maintenance"] if row["Kind"] == "post_import")["State"]
+            == "pending"
+        )
         assert state(owner)[3] is None
     finally:
         owner.execute(
@@ -131,18 +137,18 @@ def test_busy_producer_defers_without_claiming(maintenance_database):
 def test_missing_child_refused_and_not_retried(maintenance_database):
     owner, connect = maintenance_database
     # The fixed dispatcher rejects an uninstalled child after persisting a claim.
-    owner.execute("EXEC dbo.usp_MaintenanceDue 'import'")
+    owner.execute("EXEC dbo.usp_MaintenanceDue 'configuration'")
     worker = connect()
     try:
         with pytest.raises(Exception, match="51963"):
-            drain(worker.execute("EXEC dbo.usp_RunMaintenance 'import'"))
+            drain(worker.execute("EXEC dbo.usp_RunMaintenance 'configuration'"))
     finally:
         worker.close()
-    assert state(owner, "import")[2] == "failed"
-    assert state(owner, "import")[4] == 51963
-    owner.execute("EXEC dbo.usp_MaintenanceDue 'import'")
-    drain(owner.execute("EXEC dbo.usp_RunMaintenance 'import'"))
-    assert state(owner, "import")[:3] == (2, 0, "failed")
+    assert state(owner, "configuration")[2] == "failed"
+    assert state(owner, "configuration")[4] == 51963
+    owner.execute("EXEC dbo.usp_MaintenanceDue 'configuration'")
+    drain(owner.execute("EXEC dbo.usp_RunMaintenance 'configuration'"))
+    assert state(owner, "configuration")[:3] == (2, 0, "failed")
 
 
 def test_transactional_worker_refused_before_dispatch(maintenance_database):
@@ -209,7 +215,10 @@ def test_new_due_during_real_child_and_reverse_writer_arrival(maintenance_databa
         finally:
             owner.execute("UPDATE dbo.MaintenanceTestGate SET Released=1")
         response = future.result(10)
-    assert response["maintenance"][0]["State"] == "pending"
+    assert (
+        next(row for row in response["maintenance"] if row["Kind"] == "post_import")["State"]
+        == "pending"
+    )
     assert state(owner)[:3] == (2, 1, "pending")
     drain(owner.execute("EXEC dbo.usp_RunMaintenance 'post_import'"))
     assert state(owner)[:3] == (2, 2, "complete")
@@ -298,7 +307,11 @@ def test_default_odbc_pool_gets_no_owned_locks_on_return(
     )
     try:
         assert child.stdout.readline().strip() == "returned"
-        for resource in ("K98:post-import-stats:v1", "k98-legacy-output-snapshot"):
+        for resource in (
+            "K98:post-import-stats:v1",
+            "k98-legacy-output-snapshot",
+            "K98:maintenance-schema:v1",
+        ):
             assert (
                 owner.execute(
                     "SELECT APPLOCK_TEST('public',?,'Exclusive','Session')", resource
