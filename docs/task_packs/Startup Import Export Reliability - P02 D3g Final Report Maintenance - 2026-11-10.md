@@ -79,3 +79,12 @@ The 232448-byte cap is unchanged. This does not qualify the combined installed j
 Architecture, deferred-item and security-routing validators passed. SQL D3 custody,
 P0 receipt contracts and retained-business equivalence passed. Final security scans,
 stable full-suite result and PR review/merge receipts will be recorded at closure.
+
+## Review correction: backup relief eligibility
+
+Independent SQL review identified backup demand coupled to successful low-log
+statistics upkeep. Corrected claim eligibility to committed SummaryDueGeneration,
+independent of the unchanged <70 percent statistics gate and upkeep outcome.
+The physical guard/claim/ACK, optional queue-presence gate and no-replay rules remain.
+The initial full-suite run was stopped at roughly 20 percent before editing; its
+partial log is retained and is not acceptance evidence. A new stable run is required.

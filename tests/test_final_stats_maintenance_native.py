@@ -81,7 +81,7 @@ def test_actual_upkeep_and_request_ack_are_separate(database):
     owner, _ = database
     due(owner, 1, 1)
     upkeep(owner)
-    assert ledger(owner)[:3] == (1, 0, "pending")
+    assert ledger(owner)[:3] == (0, 0, "requested")
     assert tuple(
         owner.execute(
             "SELECT DashboardCompletedGeneration,SummaryCompletedGeneration,State FROM dbo.MaintenanceWork WHERE Kind='final_stats'"
@@ -164,7 +164,7 @@ def test_ack_is_exact_and_newer_due_remains_pending(database):
     assert ledger(owner)[:3] == (2, 1, "pending")
 
 
-def test_unfinished_upkeep_cannot_dispatch_backup(database):
+def test_uncommitted_summary_cannot_dispatch_backup(database):
     owner, _ = database
     owner.execute("UPDATE dbo.MaintenanceBackupWork SET DueGeneration=1,State='pending'")
     assert (
@@ -291,3 +291,50 @@ def test_report_schema_guard_and_maintenance_exclude_both_orders(database):
     finally:
         worker.execute(RELEASE_SESSION)
         worker.close()
+
+
+def test_high_log_defers_statistics_but_still_requests_backup(database, monkeypatch):
+    """Inject only the log observation; execute real dispatch/ownership SQL."""
+    import log_backup
+    from services.maintenance_dal import run_maintenance
+    from services.maintenance_service import result
+
+    owner, connect = database
+    source = Path(
+        "C:/K98-bot-SQL-Server/sql_schema/dbo.usp_RunMaintenance.StoredProcedure.sql"
+    ).read_text(encoding="utf-8-sig")
+    observation = "SELECT @log=used_log_space_in_percent FROM sys.dm_db_log_space_usage;"
+    assert source.count(observation) == 1
+    source = source[source.index("CREATE OR ALTER PROCEDURE") :].replace(
+        observation, "SET @log=75.0;"
+    )
+    owner.execute(source)
+    due(owner)
+    calls = []
+    monkeypatch.setattr(
+        log_backup, "trigger_log_backup_sync", lambda: calls.append(1) or {"outcome": "requested"}
+    )
+    receipt = run_maintenance(connect)
+    assert len(calls) == 1
+    assert (
+        next(row for row in receipt["maintenance"] if row["Kind"] == "final_stats")["State"]
+        == "pending"
+    )
+    assert receipt["backup_request"]["State"] == "requested"
+    assert not result(receipt)[0]
+
+
+def test_backup_eligibility_survives_failed_upkeep(database):
+    owner, _ = database
+    due(owner)
+    owner.execute(
+        "UPDATE dbo.MaintenanceWork SET State='failed',FirstErrorNumber=50048 WHERE Kind='final_stats'"
+    )
+    receipt = backup.run(owner.cursor(), lambda: {"outcome": "requested"})
+    assert receipt["State"] == "requested"
+    assert (
+        owner.execute(
+            "SELECT FirstErrorNumber FROM dbo.MaintenanceWork WHERE Kind='final_stats'"
+        ).fetchval()
+        == 50048
+    )
