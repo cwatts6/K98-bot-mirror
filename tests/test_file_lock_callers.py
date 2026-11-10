@@ -371,3 +371,48 @@ async def test_tracker_cancel_during_release_drains_and_preserves_first_error(
     if body_failure:
         assert caught.value is error
     assert_available(path)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cleanup_error", [OSError("release"), asyncio.CancelledError("release")])
+async def test_tracker_success_inside_except_does_not_suppress_release_error(
+    monkeypatch, tmp_path, cleanup_error
+):
+    from contextlib import contextmanager
+
+    from services import tracked_view_store
+
+    @contextmanager
+    def failing_release(*args, **kwargs):
+        yield
+        raise cleanup_error
+
+    monkeypatch.setattr(tracked_view_store, "tracker_lock", failing_release)
+    store = tracked_view_store.TrackedViewStore(tmp_path / "state", tmp_path / "lock")
+    ambient = ValueError("already handled")
+    try:
+        raise ambient
+    except ValueError:
+        with pytest.raises(type(cleanup_error)) as caught:
+            async with store.locked():
+                pass
+    assert caught.value is cleanup_error
+    assert not getattr(ambient, "__notes__", [])
+
+
+def test_guided_success_inside_except_does_not_suppress_cleanup_failure(monkeypatch, tmp_path):
+    import shutil
+
+    cache, target, output = cache_setup(monkeypatch, tmp_path)
+    error = OSError("staging cleanup")
+    monkeypatch.setattr(shutil, "rmtree", lambda *args: (_ for _ in ()).throw(error))
+    ambient = ValueError("already handled")
+    try:
+        raise ambient
+    except ValueError:
+        with pytest.raises(OSError) as caught:
+            cache.rebuild_validated_cache_only()
+    assert caught.value is error
+    assert json.loads(target.read_bytes()) == output
+    assert not getattr(ambient, "__notes__", [])
+    assert_available(cache._cache_lock_path())

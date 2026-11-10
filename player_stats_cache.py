@@ -1042,6 +1042,7 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
         candidate, backup = staging / "candidate.json", staging / "previous.json"
         published = False
         cleanup = True
+        original_error = None
 
         def read_bounded(path):
             with open(path, "rb") as source:
@@ -1070,8 +1071,9 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
             published = True
             if read_bounded(target) != raw:
                 raise CacheSnapshotValidationError("cache_readback_differs")
-        except Exception:
-            if published:
+        except BaseException as error:
+            original_error = error
+            if isinstance(error, Exception) and published:
                 try:
                     if previous is None:
                         os.replace(target, candidate)
@@ -1080,15 +1082,13 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
                 except Exception as restore_error:
                     # Keep the exact prior bytes if storage will not permit rollback.
                     cleanup = False
-                    raise CacheSnapshotValidationError(
+                    original_error = CacheSnapshotValidationError(
                         "cache_restore_failed_prior_bytes_retained"
-                    ) from restore_error
+                    )
+                    raise original_error from restore_error
             raise
         finally:
             if cleanup:
-                import sys
-
-                original_error = sys.exc_info()[1]
                 try:
                     shutil.rmtree(staging)
                 except Exception as cleanup_error:

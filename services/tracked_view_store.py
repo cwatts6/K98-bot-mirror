@@ -7,7 +7,6 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
-import sys
 from typing import Any, Literal
 
 from file_utils import acquire_lock, atomic_write_json
@@ -60,6 +59,7 @@ class TrackedViewStore:
     async def locked(self):
         lock = tracker_lock(self.lock_path, timeout=self.timeout, poll=self.poll)
         acquired = False
+        failure = (None, None, None)
 
         def enter():
             nonlocal acquired
@@ -69,9 +69,11 @@ class TrackedViewStore:
         try:
             await drain_thread(enter)
             yield
+        except BaseException as error:
+            failure = (type(error), error, error.__traceback__)
+            raise
         finally:
             if acquired:
-                failure = sys.exc_info()
                 try:
                     await drain_thread(lock.__exit__, *failure)
                 except BaseException as cleanup:
