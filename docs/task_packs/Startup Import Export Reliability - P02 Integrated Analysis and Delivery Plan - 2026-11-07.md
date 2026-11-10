@@ -1,4 +1,4 @@
-> **Current P02 checkpoint, 9 November 2026:** Phase 1 SQL/names/numeric/export and selected observer changes are deployed and verified; permanent release regressions are merged. [Approved remaining scope, handoff and lessons](Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md) govern D2-D5. The [D2 delivery review](Startup%20Import%20Export%20Reliability%20-%20P02%20D2%20Delivery%20Review%20-%202026-11-09.md) records implementation through D2l, 59 passing native fixture cases, and the final regression/review checkpoint. Continue remaining P02; production deployment stays separate. P03 settles actual retained-work blockers, with any essential P04 correction, before the first standard import/export test; do not wait merely for the end of P05 or require zero incidents. Earlier dated pending/deployment/approval text below is historical where superseded.
+> **Current P02 checkpoint, 10 November 2026:** D2a–l is reviewed and merged in private PR 738 (`cd04ed5e`), not deployed. D3 has completed initial scope and defect reproduction only; D3a implementation is next. The [D3 handover, scope and authorizations](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) governs the new chat: refresh caller/edge-case coverage, then begin D3a without repeated approval. All six D3 maintenance stages, D4 legacy/final combined updater compatibility, and D5 isolated qualification remain open. Deployment is held until the planned step after D5; D2’s combined updater jump is not yet admitted and must be resolved in D4. Phase 1 remains deployed; P03 actual blockers plus essential P04 corrections precede the first standard import/export, without waiting merely for P05 or requiring zero incidents. Older dated status/approval text below is historical where superseded.
 
 > **9 November 2026 qualification update:** Phase 1 coordinated SQL, shared latest names, exact numeric/export handling and selected recovery-observer concurrency passed independent full-size isolated verification. The current exports have 49,468 rows across 14 outputs; existing tied-rank and date-window differences are explicitly source-verified in the Phase 1 implementation record. Remaining D2-D4 work, whole-programme D5, release readiness and production/provider acceptance remain open.
 
@@ -35,10 +35,7 @@ and [tracing](Startup%20Import%20Export%20Reliability%20-%20Tracing%20-%202026-1
 remain authoritative programme records. Earlier status paragraphs in those records
 are history where superseded by this dated reconciliation.
 
-Analysis and plan preparation are authorized. Existing local P02.1/name/summary
-implementation approvals remain in force. This plan does not imply approval to
-implement the newly specified datatype, maintenance, remaining-observer or legacy
-changes, or to publish, deploy, recover production work or contact providers.
+Current authorization supersedes the original review-only hold: the operator approved the remaining P02 scope, completed D2 production promotion, and requested a new D3 chat to recheck relevant coverage and then begin D3a. Continue approved D3 implementation and isolated validation in focused slices without repeated approval. D3 production promotion is not blanket-authorized by the completed D2 action. Deployment remains held until after D5; production recovery and provider actions retain separate boundaries. See the current D3 handover for exact scope and agreements.
 
 ## Evidence actually available
 

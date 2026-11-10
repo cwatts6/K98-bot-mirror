@@ -1,3 +1,5 @@
+> **Historical 9 November handoff:** Superseded for current status, authorization and next-chat instructions by the [D3 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md). D2 private PR 738 is merged, not deployed. Begin D3a after the requested coverage/edge-case check; deployment remains held until after D5. Retain the older archive manifest and lessons below as historical evidence, not instructions to restart D2.
+
 # P02 Phase 1 delivered: remaining-work documentation handoff
 
 The operator approved the remaining P02 scope and requested this documentation

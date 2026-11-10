@@ -1,5 +1,7 @@
 # P02 D3: ownership and maintenance delivery review
 
+Current continuation instructions: [D3 handover and scope](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md). The operator explicitly requested a new chat to double-check coverage, edge cases and examples before beginning D3a. No D3 runtime change has been made at this handover; the new chat owns implementation after that check.
+
 ## Authorization and starting point
 
 The operator authorized completing and merging the D2 production PR, holding deployment until after D5, then starting D3. D2 private PR [738](https://github.com/cwatts6/k98-bot/pull/738) merged on 10 November 2026 at `cd04ed5e494adf5bf40f607798b38abb8df1b836`. Its exact reviewed head was `e02c2d37daffc46dcfb5a5b1521f809bfdab3efd`. All five CI checks passed, automated code review completed without findings, and Changes security review `783aa032-d4d3-4b19-898f-ca2bd037ebcf` completed with zero findings. Local tests: 12,951 passed, 1,184 skipped, one warning, eight subtests passed; both operational-log isolation checks passed. Linux CI: 12,772 passed, 1,363 skipped, 19 warnings, eight subtests passed. Windows updater and release-identity checks passed. The two-file test hygiene correction is merged in mirror PR 511.
