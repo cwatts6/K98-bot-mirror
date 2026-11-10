@@ -159,6 +159,15 @@ Changes review receipts for this follow-up are retained on its mirror PR and the
 combined production PR739. Earlier full-suite and security receipts above remain
 historical evidence for their recorded heads, not substitutes for this follow-up.
 
+The full cleanup regression exposed one historical D2j fixture still comparing
+current custody bytes directly with its original postimage, plus two older tests
+expecting connection close after failed rollback. The fixture now authenticates
+the current successor before exposing the unchanged historical hash; the two
+assertions require retained ownership and no pool-return attempt. Runtime and
+registry bytes are unchanged by this test correction. The preceding run retained
+13332 passes, 1262 skips, two stale assertions and 42 setup errors from that one
+fixture. Corrected focused results and the final full repeat are recorded on PR524.
+
 ## Remaining programme obligations
 
 D4 owns current installed/manual/legacy bindings (including UPDATE_ALL/Rally/TEST),

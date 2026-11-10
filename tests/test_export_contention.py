@@ -58,7 +58,17 @@ def test_retry_proof_requires_rollback_and_connection_release(failure):
             raise error
     assert error.transaction_released is (failure is None)
     connection.rollback.assert_called_once()
-    connection.close.assert_called_once()
+    if failure == "rollback":
+        from core import sql_connection_custody as custody
+
+        connection.close.assert_not_called()
+        held = next(iter(custody._holds.values())).retained_connection
+        assert held.connection.connection is connection  # Timed connection owner.
+        assert held.resource is connection.cursor.return_value
+        with pytest.raises(SqlCleanupUnknown):
+            custody.require_sql_admission()
+    else:
+        connection.close.assert_called_once()
     connection.commit.assert_not_called()
 
 

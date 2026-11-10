@@ -74,12 +74,18 @@ def test_observation_wait_requires_rollback_and_close(cleanup):
         with transaction(lambda: connection):
             raise error
     connection.rollback.assert_called_once()
-    connection.close.assert_called_once()
+    if cleanup == "rollback":
+        from core.sql_connection_custody import connection_retained
+
+        connection.close.assert_not_called()
+        assert connection_retained(connection)
+    else:
+        connection.close.assert_called_once()
     connection.commit.assert_not_called()
     assert "private query" not in str(caught.value)
     if cleanup:
         assert caught.value.__cause__ is error
-        assert custody_snapshot()["unconfirmed"] == (1 if cleanup == "close" else 0)
+        assert custody_snapshot()["unconfirmed"] == 1
 
 
 def test_write_timeout_and_unknown_commit_are_not_observer_waits():
