@@ -1,0 +1,130 @@
+"""Exact standalone recovery/pool observations and unchanged receipt dependencies."""
+
+from copy import deepcopy
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+
+from scripts import prepare_k98_update as updater
+from tests.updater_source_assertions import before_d2g_hash, before_d2h_hash
+
+
+def transition():
+    return next(
+        t
+        for t in updater.reviewed_transitions()
+        if t["id"] == "p02_d2g_recovery_pool_observation_v1"
+    )
+
+
+def test_prior_75_transitions_are_immutable():
+    entries = updater.reviewed_transitions()
+    assert len(entries) == 88
+    assert hashlib.sha256(json.dumps(entries[:75], sort_keys=True).encode()).hexdigest() == (
+        "c04e0177ab4beb5e34f7611f05b1a3cbcb559c5a381516c4b688246698af60d6"
+    )
+
+
+@pytest.fixture
+def pair(monkeypatch):
+    root = Path(__file__).resolve().parents[1]
+    before, after, known = {}, {}, {}
+    for member in transition()["members"]:
+        path = member["path"]
+        after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
+        assert before_d2h_hash(root, path) == member["after_sha256"], path
+        if updater.sha256(after[path]) != member["after_sha256"]:
+            after[path] = ("authenticated D2g postimage:" + path).encode()
+            known[after[path]] = member["after_sha256"]
+        assert before_d2g_hash(root, path) == member["before_sha256"]
+        if member["before_sha256"] == member["after_sha256"]:
+            before[path] = after[path]
+        else:
+            before[path] = ("inert D2g predecessor:" + path).encode()
+            known[before[path]] = member["before_sha256"]
+    original = updater.sha256
+    monkeypatch.setattr(updater, "sha256", lambda raw: known.get(raw, original(raw)))
+    return before, after
+
+
+def changed_paths(before, after):
+    return {path for path in after if before[path] != after[path]}
+
+
+@pytest.mark.parametrize("crlf", [False, True])
+def test_complete_package_and_dependencies_admitted(pair, crlf):
+    before, after = pair
+    if crlf:
+        before = {path: raw.replace(b"\n", b"\r\n") for path, raw in before.items()}
+        after = {path: raw.replace(b"\n", b"\r\n") for path, raw in after.items()}
+    changed = {
+        m["path"] for m in transition()["members"] if m["before_sha256"] != m["after_sha256"]
+    }
+    assert len(changed) == 2
+    assert set(after) == updater.P02_D2G_RECOVERY_POOL_OBSERVATION_PATHS
+    read = lambda revision, path: (before if revision == "before" else after).get(path)
+    updater.check_transition_inventory(changed, read, "before", "after")
+    updater.check_source_only(changed, read_blob=read, before="before", target="after")
+
+
+@pytest.mark.parametrize("path", sorted(updater.P02_D2G_RECOVERY_POOL_OBSERVATION_PATHS))
+@pytest.mark.parametrize("damage", ["predecessor", "postimage", "missing"])
+def test_changed_and_unchanged_members_are_authenticated(pair, path, damage):
+    before, after = pair
+    changed = changed_paths(before, after)
+    if damage == "predecessor":
+        before[path] = b"unreviewed predecessor"
+    elif damage == "postimage":
+        after[path] += b"# unreviewed postimage"
+    else:
+        del after[path]
+    read = lambda revision, name: (before if revision == "before" else after).get(name)
+    with pytest.raises(ValueError):
+        updater.check_transition_inventory(changed, read, "before", "after")
+
+
+def test_partial_inventory_and_old_reader_cannot_admit_package(pair, monkeypatch):
+    before, after = pair
+    changed = changed_paths(before, after)
+    read = lambda revision, path: (before if revision == "before" else after).get(path)
+    for path in changed:
+        # Both changed files are required; a partial family cannot authorize either.
+        with pytest.raises(ValueError):
+            updater.source_plan({}, "1" * 40, "2" * 40, list(changed - {path}), read)
+    old = [t for t in updater.reviewed_transitions() if t["id"] != transition()["id"]]
+    monkeypatch.setattr(updater, "reviewed_transitions", lambda: old)
+    with pytest.raises(ValueError):
+        updater.check_transition_inventory(changed, read, "before", "after")
+
+
+@pytest.mark.parametrize("damage", ["missing", "extra", "duplicate", "renamed"])
+def test_registry_cannot_widen_or_partially_describe_package(monkeypatch, damage):
+    item = deepcopy(transition())
+    if damage == "missing":
+        item["members"].pop()
+    elif damage == "extra":
+        item["members"].append(dict(item["members"][0], path="services/export_unreviewed.py"))
+    elif damage == "duplicate":
+        item["members"].append(dict(item["members"][0]))
+    else:
+        item["id"] = "p02_d2g_unreviewed"
+    raw = json.dumps(dict(version=1, transitions=[item])).encode()
+    monkeypatch.setattr(Path, "read_bytes", lambda self: raw)
+    with pytest.raises(ValueError):
+        updater.reviewed_transitions()
+
+
+@pytest.mark.parametrize("path", sorted(updater.P02_D2G_RECOVERY_POOL_OBSERVATION_PATHS))
+def test_historical_bridge_refuses_any_successor_drift(monkeypatch, path):
+    root = Path(__file__).resolve().parents[1]
+    before_d2g_hash(root, path)
+    original = Path.read_bytes
+    monkeypatch.setattr(
+        Path,
+        "read_bytes",
+        lambda p: original(p) + b"# unreviewed" if p == root / path else original(p),
+    )
+    with pytest.raises(AssertionError, match=path):
+        before_d2g_hash(root, path)
