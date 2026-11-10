@@ -1,4 +1,4 @@
-> **Current P02 checkpoint, 10 November 2026:** D2a–l is reviewed and merged in private PR 738 (`cd04ed5e`), not deployed. D3 has completed initial scope and defect reproduction only; D3a implementation is next. The [D3 handover, scope and authorizations](../task_packs/Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) governs the new chat: refresh caller/edge-case coverage, then begin D3a without repeated approval. All six D3 maintenance stages, D4 legacy/final combined updater compatibility, and D5 isolated qualification remain open. Deployment is held until the planned step after D5; D2’s combined updater jump is not yet admitted and must be resolved in D4. Phase 1 remains deployed; P03 actual blockers plus essential P04 corrections precede the first standard import/export, without waiting merely for P05 or requiring zero incidents. Older dated status/approval text below is historical where superseded.
+> **Current P02 checkpoint, 10 November 2026:** D3a-D3g source delivery is complete; Bot mirror PRs 513-519 and SQL PRs 142-147 are merged. The [D3 closeout and remaining-work handover](../task_packs/Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) carries the full coverage, review/test evidence and D4/D5 obligations. The operator authorized the combined private production PR and review cycle. D2 private PR 738 is merged; neither D2 nor D3 is deployed. D4 must resolve installed/manual/legacy compatibility and the refused combined updater jump; D5 must qualify final scale/cost. Deployment remains held until after D5. Phase 1 remains installed. P03 actual blockers plus essential P04 corrections precede the first normal import/export; zero incidents and waiting merely for P05 are not prerequisites. Older dated status below is historical where superseded.
 
 > **P02 connected-work reconciliation, 7 November 2026:** The [integrated delivery plan](../task_packs/Startup%20Import%20Export%20Reliability%20-%20P02%20Integrated%20Analysis%20and%20Delivery%20Plan%20-%202026-11-07.md) maps the brought-forward summary/numeric work, CFG-51421, lock-acknowledgement testing, release pins and other original P02 obligations. Existing unrelated/post-programme deferrals remain in force; no blanket optimisation batch or production action is authorized.
 
@@ -929,3 +929,12 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: low
 - Risk: low
 - Dependencies: P04 monitor/convergence test scope; P02.1 recorded the observed failure and separate passing native cases without silently claiming a green complete suite.
+
+### Deferred Optimisation
+- Area: tests/test_stats_report_continuation_sql.py::test_restricted_monitor_refreshes_changed_exception_chain_without_revision_churn
+- Type: consistency
+- Description: Opt-in native diagnostic test expects only exception_types/observed_utc to change, but the current fingerprint also changes; unrelated to D3 upkeep and retained as a known qualification exception.
+- Suggested Fix: Reconcile the assertion with the accepted fingerprint/incident-revision contract in a focused test-maintenance change; do not relax it merely to make D3 green.
+- Impact: low
+- Risk: low
+- Dependencies: Diagnostic fingerprint contract owner; actual D3 stage/ownership tests remain independently passing.

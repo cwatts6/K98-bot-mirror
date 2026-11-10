@@ -1,6 +1,6 @@
 # P02 remaining work: approved scope and delivery handover
 
-> **10 November continuation:** The [D3 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) is the current new-chat entry point. D2 private PR 738 is merged, all checks/reviews passed, and no D2 deployment occurred. Revalidate coverage then implement D3a under existing authorization; deployment waits until after D5. D4 must resolve combined updater compatibility. The original scope and lessons below remain active.
+> **10 November continuation:** The [D3 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) is the current entry point. D3a-D3g source delivery and individual mirror/SQL reviews are complete; the operator authorized the combined private production PR and review cycle. D2 private PR 738 is merged. Neither D2 nor D3 is deployed. D4 must resolve installed/manual/legacy and combined updater compatibility; D5 owns final integrated qualification. Deployment remains held until after D5. The original scope and lessons below remain active where not superseded.
 
 ## Current authorization and starting point
 
@@ -63,7 +63,7 @@ deployment, migration, rehearsal or recovery tooling to refresh evidence.
 
 The [D2 delivery review](Startup%20Import%20Export%20Reliability%20-%20P02%20D2%20Delivery%20Review%20-%202026-11-09.md)
 records all twelve D2a–l slices, the final caller/resource matrix and the original
-finding disposition. D2a–l implementation, combined checks, native qualification, review and production promotion are complete through private PR 738. All 59 combined native fixture cases passed; the final private validation and merge evidence are recorded in the D3 handover. D3 has initial scope/reproduction only; D3a implementation follows the requested fresh coverage check, then the remaining D3 maintenance boundaries, D4 and D5. D2 promotion authorization is consumed; no blanket D3 production promotion or retained-work recovery authorization is inferred. Deployment is held until after D5.
+finding disposition. D2a–l implementation, combined checks, native qualification, review and production promotion are complete through private PR 738. All 59 combined native fixture cases passed; the final private validation and merge evidence remain in the D2 delivery review and archived D3 original handover. D3a-D3g source delivery and all six maintenance boundaries are now implemented and individually merged. The later operator instruction expressly authorizes the combined D3 private PR and review/comment cycle. D4/D5 remain open; retained-work recovery is separately controlled and deployment is held until after D5.
 
 | Slice / findings | Required result | Verification before release |
 | --- | --- | --- |
