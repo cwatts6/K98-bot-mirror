@@ -8,7 +8,10 @@ import re
 
 import pytest
 
-from services.export_execution_dal import legacy_definition_hash, validate_legacy_permission_source
+from services.export_execution_dal import (
+    legacy_definition_hash,
+    validate_legacy_permission_source,
+)
 from services.export_runtime_composition import verify_legacy_installation_contract
 from services.export_sql_direct_permissions import FILE_VISIBILITY_MODULE_HASHES
 from tests.test_export_runtime_composition import legacy_permission_fixture
@@ -21,7 +24,10 @@ CALLER_FORMS = {
     "dbo.sp_RefreshInactiveGovernors",
 }
 TYPE_FORMS = CALLER_FORMS | {"dbo.sp_Create_Excel_For_Kvk_Indexes"}
-END_FORMS = {"dbo.fn_NormalizeGovernorNameKey", "dbo.usp_RecordKvkFinalReportCompletion"}
+END_FORMS = {
+    "dbo.fn_NormalizeGovernorNameKey",
+    "dbo.usp_RecordKvkFinalReportCompletion",
+}
 
 
 def source_definition(raw):
@@ -65,6 +71,22 @@ def historical_source_bytes(module, raw, outcome_source):
             == "57ee6b05d7902ccac98f36f9b0c98d0b10c775d11cdd7085080abca1f938448d"
         ), "D3 configuration predecessor drift"
         raw = raw.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    elif name == "dbo.sp_ExcelOutput_ByKVK":
+        normalized = raw.decode("utf-8-sig").replace("\r\n", "\n")
+        assert (
+            hashlib.sha256(normalized.encode()).hexdigest()
+            == "75237b6b2d9625bcff6205c370b2cfedef9ff6683c6fcb7775803c3da991d650"
+        ), "D3 KVK output source drift"
+        previous = json.loads(
+            (
+                Path(__file__).parent / "fixtures/sql/sp_ExcelOutput_ByKVK-before-d3f.json"
+            ).read_text()
+        )["source"]
+        assert (
+            hashlib.sha256(previous.encode()).hexdigest()
+            == "234dc4b2fb3956023a49bd7eaaa4ab03e3a5062e18661208268ff91b630b3016"
+        ), "D3 KVK output predecessor drift"
+        raw = previous.encode()
     elif name == "dbo.SP_Stats_for_Upload":
         normalized = raw.decode("utf-8-sig").replace("\r\n", "\n")
         assert hashlib.sha256(normalized.encode()).hexdigest() == (
@@ -179,7 +201,8 @@ def historical_source_bytes(module, raw, outcome_source):
                 text,
             )
         text = text.replace(
-            "        DECLARE @S11CompletionCounters TABLE (LastRunCounter int NOT NULL);\n", ""
+            "        DECLARE @S11CompletionCounters TABLE (LastRunCounter int NOT NULL);\n",
+            "",
         ).replace(
             "        OUTPUT inserted.LastRunCounter INTO @S11CompletionCounters (LastRunCounter)\n",
             "",
@@ -202,7 +225,10 @@ def historical_source_bytes(module, raw, outcome_source):
         text = text.replace(
             "    @RepublishReason [nvarchar](400) = NULL,\n    @ExportPreparationID uniqueidentifier = NULL",
             "    @RepublishReason [nvarchar](400) = NULL",
-        ).replace("IF @ExportPreparationID IS NULL AND @@TRANCOUNT <> 0", "IF @@TRANCOUNT <> 0")
+        ).replace(
+            "IF @ExportPreparationID IS NULL AND @@TRANCOUNT <> 0",
+            "IF @@TRANCOUNT <> 0",
+        )
         text = re.sub(
             r"(?ms)^    -- Only the typed configuration producer.*?(?=^    DECLARE @RequestedKVK int = @KVK;)",
             "",
@@ -310,7 +336,9 @@ def equivalent_tokens(name, text):
     return header_tokens, body_tokens
 
 
-def test_all_finite_forms_are_reconstructed_from_authoritative_source(permission_sources):
+def test_all_finite_forms_are_reconstructed_from_authoritative_source(
+    permission_sources,
+):
     manifest, outcome = permission_sources
     forms_bytes = (SQL_ROOT / manifest["compatibility_forms"]).read_bytes()
     assert hashlib.sha256(forms_bytes).hexdigest() == manifest["compatibility_forms_sha256"]
@@ -366,7 +394,10 @@ def test_amendment_reconstruction_rejects_changed_forward_image(permission_sourc
     raw = (SQL_ROOT / module["path"]).read_bytes()
     # Damage the added code itself, which inversion would otherwise remove.
     before, after = (
-        (b"EXEC dbo.usp_S11CompleteStatsReports", b"EXEC dbo.usp_S11ValidateStatsReportStage")
+        (
+            b"EXEC dbo.usp_S11CompleteStatsReports",
+            b"EXEC dbo.usp_S11ValidateStatsReportStage",
+        )
         if name == "dbo.UPDATE_ALL2"
         else (b"SELECT file_exists FROM", b"SELECT file_is_a_directory FROM")
     )
@@ -391,7 +422,8 @@ def test_amendment_reconstruction_rejects_resealed_outcome_manifest(permission_s
         (SQL_ROOT / module["path"])
         .read_bytes()
         .replace(
-            b"EXEC dbo.usp_S11CompleteStatsReports", b"EXEC dbo.usp_S11ValidateStatsReportStage"
+            b"EXEC dbo.usp_S11CompleteStatsReports",
+            b"EXEC dbo.usp_S11ValidateStatsReportStage",
         )
     )
     changed = deepcopy(outcome)
@@ -453,7 +485,12 @@ def test_compatible_form_does_not_accept_new_body_or_unlisted_format(monkeypatch
 
 @pytest.mark.parametrize(
     "field,value",
-    [("OwnerName", "other"), ("ExecuteAsPrincipal", -2), ("AnsiNulls", 0), ("QuotedIdentifier", 0)],
+    [
+        ("OwnerName", "other"),
+        ("ExecuteAsPrincipal", -2),
+        ("AnsiNulls", 0),
+        ("QuotedIdentifier", 0),
+    ],
 )
 def test_compatible_form_preserves_module_metadata_refusal(monkeypatch, field, value):
     from kvk.dal.new_source_import_dal import SourceConflict
@@ -496,7 +533,8 @@ def test_historical_conduct_layout_keeps_stats_candidate_projection_aligned():
     )
     assert re.search(r"INSERT INTO #StatsForUploadCandidate\s*\(", procedure)
     assert re.search(
-        r"INSERT INTO dbo.STATS_FOR_UPLOAD\s+SELECT \*\s+FROM #StatsForUploadCandidate", procedure
+        r"INSERT INTO dbo.STATS_FOR_UPLOAD\s+SELECT \*\s+FROM #StatsForUploadCandidate",
+        procedure,
     )
 
 
@@ -543,7 +581,13 @@ def test_shared_names_reference_rejects_modified_bundle(permission_sources, monk
 
 
 @pytest.mark.parametrize(
-    "name", ["dbo.UPDATE_ALL2", "dbo.SP_Stats_for_Upload", "dbo.CREATE_DELTA_TABLES"]
+    "name",
+    [
+        "dbo.UPDATE_ALL2",
+        "dbo.SP_Stats_for_Upload",
+        "dbo.CREATE_DELTA_TABLES",
+        "dbo.sp_ExcelOutput_ByKVK",
+    ],
 )
 def test_d3_historical_bridge_refuses_successor_drift(permission_sources, name):
     manifest, outcome = permission_sources

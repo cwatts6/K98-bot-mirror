@@ -27,9 +27,12 @@ def maintenance_database(snapshot_database):
 
     owner = connect()
     try:
-        owner.execute("DROP TABLE IF EXISTS dbo.MaintenanceWork")
+        owner.execute(
+            "DROP TABLE IF EXISTS dbo.MaintenanceWork; DROP TABLE IF EXISTS dbo.MaintenanceKvkWork"
+        )
         for name in (
             "dbo.MaintenanceWork.Table.sql",
+            "dbo.MaintenanceKvkWork.Table.sql",
             "dbo.usp_MaintenanceDue.StoredProcedure.sql",
             "dbo.usp_MaintenancePostImport.StoredProcedure.sql",
             "dbo.usp_RunMaintenance.StoredProcedure.sql",
@@ -75,7 +78,9 @@ def test_real_post_import_child_and_durable_receipt(maintenance_database):
     assert owner.execute("SELECT COUNT(*) FROM dbo.MaintenanceWork").fetchval() == 6
 
 
-def test_business_rollback_removes_due_and_nested_commit_does_not_publish(maintenance_database):
+def test_business_rollback_removes_due_and_nested_commit_does_not_publish(
+    maintenance_database,
+):
     owner, connect = maintenance_database
     reader = connect()
     try:
@@ -90,7 +95,9 @@ def test_business_rollback_removes_due_and_nested_commit_does_not_publish(mainte
         reader.close()
 
 
-def test_exact_live_claim_blocks_then_orphan_becomes_unknown_without_replay(maintenance_database):
+def test_exact_live_claim_blocks_then_orphan_becomes_unknown_without_replay(
+    maintenance_database,
+):
     owner, connect = maintenance_database
     owner.execute("EXEC dbo.usp_MaintenanceDue 'post_import'")
     owner.execute(
@@ -137,18 +144,18 @@ def test_busy_producer_defers_without_claiming(maintenance_database):
 def test_missing_child_refused_and_not_retried(maintenance_database):
     owner, connect = maintenance_database
     # The fixed dispatcher rejects an uninstalled child after persisting a claim.
-    owner.execute("EXEC dbo.usp_MaintenanceDue 'kvk_output'")
+    owner.execute("EXEC dbo.usp_MaintenanceDue 'final_stats'")
     worker = connect()
     try:
         with pytest.raises(Exception, match="51963"):
-            drain(worker.execute("EXEC dbo.usp_RunMaintenance 'kvk_output'"))
+            drain(worker.execute("EXEC dbo.usp_RunMaintenance 'final_stats'"))
     finally:
         worker.close()
-    assert state(owner, "kvk_output")[2] == "failed"
-    assert state(owner, "kvk_output")[4] == 51963
-    owner.execute("EXEC dbo.usp_MaintenanceDue 'kvk_output'")
-    drain(owner.execute("EXEC dbo.usp_RunMaintenance 'kvk_output'"))
-    assert state(owner, "kvk_output")[:3] == (2, 0, "failed")
+    assert state(owner, "final_stats")[2] == "failed"
+    assert state(owner, "final_stats")[4] == 51963
+    owner.execute("EXEC dbo.usp_MaintenanceDue 'final_stats'")
+    drain(owner.execute("EXEC dbo.usp_RunMaintenance 'final_stats'"))
+    assert state(owner, "final_stats")[:3] == (2, 0, "failed")
 
 
 def test_transactional_worker_refused_before_dispatch(maintenance_database):
@@ -257,7 +264,9 @@ def test_process_death_after_claim_keeps_unknown_outcome(maintenance_database, s
     assert state(owner)[3] == claim
 
 
-def test_child_fault_keeps_first_failure_and_releases_only_on_close(maintenance_database):
+def test_child_fault_keeps_first_failure_and_releases_only_on_close(
+    maintenance_database,
+):
     owner, connect = maintenance_database
     source = (
         (SQL_ROOT / "dbo.usp_MaintenancePostImport.StoredProcedure.sql")
