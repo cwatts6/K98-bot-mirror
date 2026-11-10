@@ -36,6 +36,8 @@ AUTHORITY_PATHS = (
     "services/failed_export_recovery_authority.py",
     "services/rollover_replacement_authority.py",
     "tests/test_authority_diagnostic_update_transition.py",
+    "tests/test_authority_observation_dispatch.py",
+    "tests/test_authority_observation_native.py",
     "tests/test_export_authority_boundaries.py",
     "tests/test_export_authority_diagnostics.py",
     "tests/test_export_authority_launcher.py",

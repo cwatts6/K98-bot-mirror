@@ -41,7 +41,7 @@ def test_complete_bundle_pins_current_source():
 
 def test_reviewed_history_and_mge_hashes_remain_exact():
     items = updater.reviewed_transitions()
-    assert len(items) == 80
+    assert len(items) == 81
     # All fifty historical entries are immutable; this is one fixed successor.
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     assert (
@@ -57,13 +57,13 @@ def test_reviewed_history_and_mge_hashes_remain_exact():
 @pytest.mark.parametrize("extra_byte", [False, True])
 def test_registry_byte_bound_is_enforced(monkeypatch, extra_byte):
     raw = Path(updater.__file__).with_name("k98_update_transitions.json").read_bytes()
-    raw += b" " * (224256 - len(raw) + int(extra_byte))
+    raw += b" " * (232448 - len(raw) + int(extra_byte))
     monkeypatch.setattr(Path, "read_bytes", lambda self: raw)
     if extra_byte:
         with pytest.raises(ValueError, match="registry exceeds bound"):
             updater.reviewed_transitions()
     else:
-        assert len(updater.reviewed_transitions()) == 80
+        assert len(updater.reviewed_transitions()) == 81
 
 
 def test_registry_entry_beyond_installed_bound_is_rejected(monkeypatch):

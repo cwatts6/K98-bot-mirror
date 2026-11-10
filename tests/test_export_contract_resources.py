@@ -57,7 +57,7 @@ def test_actual_contract_readers_from_isolated_zip(tmp_path, broken):
     with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED) as bundle:
         # Exercise actual imports in a fresh isolated interpreter, not a mocked
         # loader or a process that already imported the working-tree modules.
-        for package in ("services", "kvk"):
+        for package in ("services", "kvk", "core", "event_calendar"):
             for path in sorted((ROOT / package).rglob("*.py")):
                 bundle.writestr(path.relative_to(ROOT).as_posix(), path.read_bytes())
         for name in NAMES:

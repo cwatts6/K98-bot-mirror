@@ -6,6 +6,12 @@ The integrated plan, original action census and delivered Phase 1 evidence remai
 authoritative within their stated limits. Production deployment and retained-work
 recovery are separate. This review does not authorize another full-scale rehearsal.
 
+D2a–l implementation and local qualification are complete. The final mirror PR
+supplies the review/merge gate; no D2 production promotion or deployment occurred.
+The next implementation boundary is D3, followed by D4 and combined D5 business
+qualification. The evidence below distinguishes the broad regression checkpoint,
+its corrected test fixtures, and the passing native resource-boundary cases.
+
 ## Refreshed caller, resource and SQL matrix
 
 | Family | Owning paths and resource | Current disposition |
@@ -15,12 +21,12 @@ recovery are separate. This review does not authorize another full-scale rehears
 | Direct factories | `kvk/dal/kvk_all_import_dal.py`, `services/stats_import_outcome_service.py`; `weekly_activity_importer._cxn` | Producer wrapper retains its public call contract. Weekly activity's explicit override/import-time selection is distinct from execution-failure fallback; no credential-policy expansion. |
 | Profile result lifecycle | `stats/profile_cache_repository.read_profiles`; `dbo.v_PlayerProfile`, `dbo.v_PlayerScanMeta`, `dbo.v_PlayerKVK_Last3` | D2b requires explicit rollback/close acknowledgement and retains uncertain connection custody in the cache owner. Mapping and SQL definitions are unchanged; separate cursor/connection regressions and disposable-driver qualification cover this slice. Combined lifecycle qualification remains D2/D5. |
 | Qualified passive recovery | `core/recovery_sql_snapshot.py`; all-KVK, historical import, stats import outcome and stats-report continuation inspections | Retain the deployed three-second explicit snapshot contract and cleanup acknowledgement. No repeated completed rehearsal. |
-| Remaining recovery inspection | `services/unowned_sql_hold_dal.py`, `services/config_preparation_recovery_dal.py`, `services/export_coordination_dal.py` | Inspection currently shares account/resource/preparation/queue locks with mutation helpers. Separate only proven read-only entry points. Mutation snapshots retain locks and current-state revalidation. |
-| Capture/mutation custody | `services/import_capture_recovery_dal.py`, `kvk/dal/new_source_import_dal.py` | Global/session guards can protect physical capture and mutation. An observation label alone is insufficient to remove them. Review first-error/cleanup handling with each affected caller. |
-| Ordinary season reads | `kvk/dal/source_routing_dal.resolve_season_read`; KVK source selection/routing/configuration metadata | Replace exclusive read admission only after validating the complete consistent tuple and current SQL definitions. Immutable payload reads remain outside the metadata transaction. |
-| Authority dispatch | `scripts/run_export_authority.py:serve`, `services/authority_observation.py` | Synchronous observations occupy the authenticated accept loop. Proposed one worker plus one waiting request requires selector-by-selector proof, original peer/reply ownership and physical drain. Mutations stay serial. |
-| Holder evidence | `services/legacy_snapshot_admission.py`, `services/export_contention.py` | Current refusal carries requester facts, not a proven holder. Add only bounded refusal-triggered evidence with connection identity; permission denial/races remain explicitly unavailable. |
-| Player report budgets | `player_stats_cache._execute_sp_with_retries`, `services/player_report_continuation.py`; `dbo.SP_Stats_for_Upload` | Python's 300-second setting currently changes row-lock wait, not the dedicated 15-second query timeout; SQL children request 60-second locks. Resolve this policy within current limits before qualification. |
+| Recovery inspection | `services/unowned_sql_hold_dal.py`, `services/config_preparation_recovery_dal.py`, `services/export_coordination_dal.py`, `services/export_recovery_dal.py`, `kvk/dal/source_output_pool_dal.py` | D2d–g separate proved read-only snapshots from mutation locks. Complete tuples, original account/resource/preparation scope and fresh mutation checks are retained. |
+| Capture/mutation custody | `services/import_capture_recovery_dal.py`, `kvk/dal/new_source_import_dal.py`, `services/legacy_export_snapshot_dal.py`, `services/legacy_export_snapshot_service.py` | D2i/l retain global/session guards, first failure and uncertain cursor/connection ownership; commit uncertainty cannot replay. Borrowed no-op close is not physical release. |
+| Ordinary season reads | `kvk/dal/source_routing_dal.resolve_season_read`; KVK source selection/routing/configuration metadata | D2h uses one consistent owned snapshot for season routing, source and weight checks. Immutable payload reads stay outside the metadata transaction; mutation admission stays locked. |
+| Authority dispatch | `scripts/run_export_authority.py:serve`, `services/authority_observation.py` | D2j admits exact proved read-only selectors to one worker plus one waiter, retaining original peer/reply/handle custody and physical drain. Saturation is busy; mutations and configuration reconciliation remain serial. |
+| Holder evidence | `services/legacy_snapshot_admission.py`, `services/export_contention.py`, `services/sql_lock_holder_diagnostics.py` | D2k adds bounded refusal-triggered global-lock holder evidence, with birth/connection identity separate from the requester. Permission denial, races and truncated coordination names are explicitly unavailable. |
+| Player report budgets | `player_stats_cache._execute_sp_with_retries`, `services/player_report_continuation.py`; `dbo.SP_Stats_for_Upload` | D2l applies a real driver limit capped at 15s and the existing 1s row-lock policy. Native timeout evidence proves a 60s nested lock wait cannot evade the enclosing statement limit; separate cancellation evidence proves rollback without replay. Ordinary/guided connections close explicitly; no replay/fallback after commit or cleanup uncertainty. |
 | Shared file ownership | `file_utils.acquire_lock`; player cache/startup, Ark team/state, `services/tracked_view_store.py` | D3 must separate acquisition from body exceptions and release only the created generation in `finally`. Include foreign replacements and cancellation. |
 | Maintenance | Stats import, configuration, player report, KVK output, final reports, explicit post-import upkeep | D3 retains all six boundaries. Required shape/index/receipt work stays atomic; eligible optional upkeep requires durable separate ownership and restart semantics. |
 | Legacy/manual SQL | `UPDATE_ALL`, Rally and TEST entry points | D4 requires read-only installed-binding/use inventory. Used paths require input custody and propagated child errors; retirement needs explicit approval. Never execute business procedures merely to discover use. |
@@ -36,10 +42,10 @@ text matches alone are not the full resource census.
 
 | Findings | Delivery boundary and remaining evidence |
 | --- | --- |
-| F01/F26 | D2a connection selection and failure propagation; remaining operation budgets, lifecycle and native timeout/cancellation qualification stay open. |
-| F03/F09 | D2 passive reader census, original global/account/resource guards, CFG-51421 actual-holder evidence and uncertain lock acknowledgement. Test both arrival orders and foreign owners. |
-| F12 | D2 bounded authenticated observation admission, busy replies, lost replies, reconnect and shutdown/drain. No arbitrary selector concurrency. |
-| F14 | D2 consistent season-read metadata, sealed relationships, stale/partial tuples and snapshot refusal. |
+| F01/F26 | D2a–c/i/l deliver stable selection, failure propagation, explicit operation budgets and affected resource custody, including real driver timeout/cancellation. Business workload performance remains D5. |
+| F03/F09 | D2d–i/k/l deliver scoped passive readers, retained global/account/resource guards, CFG-51421 observed holder identity and uncertain acknowledgement custody. Both arrival orders and foreign owners are qualified in disposable fixtures; retained incidents remain P03. |
+| F12 | D2j delivers bounded authenticated observation admission, busy replies, lost replies/reconnect and shutdown/drain. No arbitrary selector concurrency or new provider capacity. |
+| F14 | D2h delivers consistent season metadata, sealed relationships, stale/partial tuple refusal and explicit snapshot prerequisites. |
 | F16/F18/F21/F22 | D3 all six maintenance stages, real child procedures, durable due/outcome state, failure after business commit and restart. Raw-history/index-REBUILD SQL 3961 remains a required boundary. |
 | F20 | D3 shared lock ownership across ordinary, guided, startup, Ark and tracked-view callers. Body FileExistsError is a body failure, not acquisition contention. |
 | F31 | D4 legacy/manual input custody, parent rollback, direct invocation and child-error propagation; release/source/SQL compatibility. |
@@ -891,3 +897,134 @@ preserves all 79 predecessors (canonical digest
 `dbde06387dd0a3e437dd778bdbf168f5a04546b6188c0e2216276279758c29ef`), and bounds
 the registry to 80 entries/224256 bytes. Full-suite and final caller/resource
 census remain at the combined D2 checkpoint; no production action occurred.
+
+## D2l operation budgets and final lifecycle census — scoped before coding
+
+Name the existing login/default/metadata/coordination/snapshot budgets without
+raising them. Player reports must set the actual driver statement limit before
+cursor creation, bounded by the existing 15-second default and any smaller valid
+request. Replace the misleading 300-second row-lock assignment with the existing
+one-second metadata row-lock policy. SQL's import/publication application-lock
+children still request 60 seconds internally, but the enclosing ODBC statement
+deadline cancels earlier. This is a caller-budget correction, not a SQL schema
+or procedure contract change; existing explicit import/report-continuation and
+maintenance overrides remain distinct. Native fixture SQL will prove the nested
+lock wait cannot evade the enclosing statement limit.
+
+The final affected-caller census found player report cursors can escape on error,
+legacy connection context exit does not physically close, and writer guard/close
+failures can lose first-error or handle custody. Correct these directly related
+boundaries while preserving acknowledged business commits and durable receipts.
+No retry after commit attempt/acknowledgement or unconfirmed cleanup; cancellation
+retains ownership until driver work and cleanup finish. Test ordinary, guided and
+startup callers, lost commit reply, rollback/close failure, session grant/release
+acknowledgement and no implicit commit on context exit. Shared file locking and
+maintenance restructuring remain D3. Changes review required, Deep off.
+
+D2k's initial mirror review identified two cleanup details before merge:
+process interrupts must propagate after cleanup, and simultaneous cleanup failures
+must retain one cursor/connection owner. Both are corrected and tested. The final
+complete range through `2aa9230d053578072b291c45d9e6fc20a69a4514` passed Changes
+scan `c22ff387-9c1b-484a-9447-4a3037a473a7` without findings, 63 correction/release
+checks and all four native cases. Its exact-head mirror review then completed
+without findings; PR 509 merged at `43a0e793ff1e1bcdade77fdb6d222d7345585eda`.
+
+D2l's native tests prove the requested 300-second player setting remains capped
+by the actual 15-second statement budget even when an inner application lock asks
+for 60 seconds. Cancellation returns HY008, does not replay, rolls back the
+fixture insert and physically closes its connection. A lost writer guard-grant
+reply is cleaned up on the original session, and an independent fixture session
+can subsequently acquire that guard. The original refusal/error remains the
+cause; unknown release/cursor/connection cleanup retains custody and closes
+admission. This does not certify that the real business report completes within
+15 seconds; changing that budget still requires measured qualification.
+
+Initial caller regressions passed 149; new lifecycle/policy/native checks passed 31;
+the final release/focused package passed 111. Exact-path type comparison reproduces
+18 errors and two warnings with identical messages; both new modules have none.
+Architecture, deferred, routing, selection, lint, imports and command registration
+passed. Final Changes scan `c8861513-ee84-43ed-91a7-ec62ec58cc4f` completed with
+zero findings, snapshot
+`989f66e67534d072be5d2837c081ae3a0b1340c5adcd8110ac29ea83dfb15d77`.
+
+Combined-suite follow-up corrected older fixture assumptions about cleanup
+exception custody, sealed-bundle dependencies and acknowledged guard release.
+The mirror filter now explicitly includes the two inert D2j authority test files;
+broad credential exclusions are unchanged. These four affected test files pass
+136 checks, with two platform/tooling skips and eight subtests. Historical source
+comparison now authenticates D2 successors before comparing the original P0a
+image. The process-identity dependency test rejects unreviewed content through
+its exact reviewed family, matching the existing constants dependency test.
+Those two release files pass all 170 checks. No runtime or registry source changed
+for these regression corrections.
+
+Final Changes scan `62a41a80-61f2-4101-9186-455b46ae5232` includes the publication
+filter correction and completed without findings, snapshot
+`8e42b394d24e7f8f207b25df7fbf8460d9126b137dcf31b8f2aae4f081701173`.
+Its measured usage is 969925 tokens including 958848 cached-input tokens.
+The later edits to `tests/test_p0a_release.py` and
+`tests/test_prepare_k98_update.py` only correct historical fixture expectations;
+they preserve exact successor authentication and negative rejection checks.
+Additional security scanning is skipped for those two test-only corrections
+and delivery-document updates: runtime, permissions, configuration, release
+admission and publication filter bytes remain unchanged from the final scan.
+
+The complete combined pytest checkpoint finished with 12942 passed, 1185 skipped,
+one dependency warning and eight subtests passed in 1284.65 seconds. Its eight
+failures were exactly the six test-file corrections described above; there were
+no additional failures. A single final run of all six corrected files passed
+306 tests, with two platform/tooling skips and eight subtests passed. The broad
+run and final correction run both verified unchanged production operational logs.
+The original failed result remains retained. A second whole-suite run is not
+required for these fixture corrections: all affected files were rerun together,
+and the runtime/package bytes retain the completed full and native coverage.
+
+The `p02_d2l_operation_policy_v1` package has 15 members/nine changed sources,
+including two new modules. All 80 prior entries retain their original definitions,
+canonical digest `e553ee1fbc4cd7480574bdc6890c4e1d17e565de71a09b0c3d3e39a38f83e00e`.
+The registry is bounded to 81 entries/232448 bytes. Every historical bridge checks
+the exact successor before using an inert earlier image in a test.
+
+## Final D2 caller and resource census
+
+The refreshed tracked-source AST inventory explicitly includes `_conn`,
+`_conn_trusted`, `_conn_import`, `get_conn_with_retries`, `producer_connection`
+and `producer_connection_factory`: 77 call sites in 49 non-test/non-script files.
+It also finds 35 direct `recovery_snapshot` calls in 11 owning modules and the two
+ordinary/guided `player_connection` callers. These are call-site counts, not
+claims that all paths execute under an admitted producer. The expanded six-name
+inventory is not directly comparable with the earlier three-entry-point count.
+
+| Resource boundary | Final owner and disposition |
+| --- | --- |
+| Factory selection and retries | D2a selects the callable before attempts; profile/pre-KVK adapter import/execution fallback is removed. Explicit operational routes and weekly-activity explicit/import-time factory selection retain their separate contracts. |
+| Profile read / factory setup | D2b/c own rollback/physical close and retain uncertainty. Real-driver qualification covers both; no implicit context commit is treated as cleanup. |
+| Previously qualified recovery | All-KVK capture, historical import, stats import outcome and stats-report continuation `inspect` methods retain their existing owned snapshot contract. |
+| Unowned/configuration recovery | Unowned `pending/snapshot/action`; configuration `identity/pending_recovery/target_data/snapshot` are passive. Confirmation/adoption/closure retain current locks and CAS. Configuration authority inspection is deliberately not a parallel selector because it can reconcile. |
+| Queue/recovery/pool metadata | Queue `pending_intents/accounts/pending_source_jobs/operator_snapshot/repair_receipt/check_intent_weights`, five export-recovery readers, and 11 standalone pool readers use complete owned snapshots. Pool methods with an existing mutation cursor preserve that transaction's ownership. |
+| Season/weights | Season source `read`, routing `resolve_season_read` and queue weight validation retain coherent committed tuples. Stale identity/configuration/receipt checks still refuse mutation. |
+| Capture and writers | Source transactions and capture sessions preserve first cause and unknown commit; lost grant/release and close uncertainty retains custody. Live writer sessions now verify actual guard release and cannot withdraw while cleanup is unconfirmed. |
+| Authority transport | Exact read-only selectors only; one active/one waiting observation. Original handles/replies, authentication, process incarnation, namespace ownership, cancellation and drain remain owned. No queued mutation or provider replay. |
+| Player report/cache | Ordinary build, guided report and startup worker use the bounded report statement and explicit connection cleanup. Old-cache fallback is forbidden after uncertain commit or cleanup; acknowledged rollback remains distinct from business completion. |
+| Operation overrides | Login 5s/default statement 15s/metadata row lock 1s/coordination horizon 15s/global admission 0/snapshot statement 3s and row wait 0 are retained. Existing stats-import/report-continuation 595s and explicit maintenance budgets are separate; D3 owns their stage restructuring. |
+
+The combined final native run passed 59 cases across profile/setup custody,
+unowned/configuration/queue/pool/season observations, transaction lifecycle,
+holder attribution, player deadline/cancellation and Windows pipe dispatch.
+Resource preflight recorded 9.69 GiB free RAM, ample disk, zero version store and
+27.7% tempdb log use. Every SQL fixture creates and normally drops its own unique
+local database; pipe fixtures use unique names and inert requests. No retained
+21-input rehearsal, real business import/report/provider operation, production
+database, service or deployment was used. Real business cost and production
+qualification remain D5 and the later approved promotion gate.
+
+### Separate standalone-importer custody debt
+
+### Deferred Optimisation
+- Area: `prekvk_importer.import_prekvk_bytes`, `weekly_activity_importer` SQL import context
+- Type: cleanup
+- Description: The final shared-factory census confirms these standalone upload paths still use pyodbc connection context exit without explicit physical close, and pre-KVK does not separately close its cursor. They do not run through the D2 scan-data writer/authority resource owner. D2a corrected factory selection, not these importers' transaction/outcome contracts.
+- Suggested Fix: Deliver a separate bounded importer lifecycle patch with explicit cursor/connection cleanup, preserved acknowledged commits and unknown outcomes, and duplicate/history/result-contract regressions. Reuse the established custody outcome pattern after checking each importer caller; do not make all shared factories implicitly own caller transactions.
+- Impact: medium
+- Risk: medium
+- Dependencies: Existing pre-KVK/weekly upload outcome and history tests, authoritative SQL definitions, and focused native physical-close evidence. This is separate cleanup debt, not a retained P02 incident or evidence of production failure.

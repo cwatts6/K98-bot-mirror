@@ -184,10 +184,10 @@ class PlayerReportContinuation:
 
     @staticmethod
     def _run():
-        from file_utils import get_conn_with_retries
         from player_stats_cache import _execute_sp_with_retries
+        from services.player_report_sql import player_connection
 
-        with get_conn_with_retries(meta={"operation": "guided_player_report"}) as connection:
+        with player_connection(operation="guided_player_report") as connection:
             _execute_sp_with_retries(connection, retries=1)
 
     @staticmethod

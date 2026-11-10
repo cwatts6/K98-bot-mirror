@@ -60,8 +60,13 @@ deployment, migration, rehearsal or recovery tooling to refresh evidence.
 ## Remaining P02 delivery slices
 
 The [D2 delivery review](Startup%20Import%20Export%20Reliability%20-%20P02%20D2%20Delivery%20Review%20-%202026-11-09.md)
-records the refreshed caller/resource matrix, original finding disposition and
-first connection-selection slice. It does not close the remaining qualification.
+records all twelve D2a–l slices, the final caller/resource matrix and the original
+finding disposition. D2a–l implementation, combined regression/correction checks,
+native qualification and Changes review are complete. The final D2l mirror PR
+supplies the review/merge gate. All 59 combined native fixture cases passed;
+the full regression checkpoint and eight corrected fixture failures are recorded
+in the delivery review. Next is D3, then D4 and D5. This does not authorize
+production promotion or retained-work recovery.
 
 | Slice / findings | Required result | Verification before release |
 | --- | --- | --- |
@@ -70,9 +75,10 @@ first connection-selection slice. It does not close the remaining qualification.
 | D4: legacy/manual paths and final release compatibility; F31 | Reconcile installed bindings and manual use of UPDATE_ALL/Rally/TEST. Qualify used paths or seek explicit retirement approval. Preserve input custody, error propagation and post-commit archive semantics. Keep exact source/SQL/startup contracts aligned. | No business execution merely to discover use. Test rollback preserves input and child errors propagate. Verify current updater/source pins and actual changed-path custody before any later deployment. |
 | D5: combined isolated qualification | Qualify the final remaining P02 package together against the delivered Phase 1 baseline. | Correctness, real concurrency, failures, cancellation, restart, cleanup and resource cost. Reuse valid baseline evidence; repeat affected checks for a reason, not merely to increase test counts. |
 
-Existing D2 design proposes one bounded observation worker and at most one waiting
-observation, while mutations remain serial. Revalidate the need and whole lifecycle
-before implementation; this is not permission to parallelize arbitrary selectors.
+D2j delivers one bounded observation worker and at most one waiting observation,
+while mutations remain serial. Only the exact proved read-only selectors use that
+worker. Configuration reconciliation retains serial dispatch. Lifecycle evidence
+includes authentication, saturation, lost replies, cancellation and physical drain.
 Check every selector for reconcile/seal/provider side effects. Do not add a general
 scheduler, outbox, SQL notification system or broad diagnostics without demonstrated need.
 

@@ -39,7 +39,7 @@ _WARNED_LEGACY_DB_ENVS = False
 # NEW: cross-process lock timeout for cache writer (seconds)
 _CACHE_LOCK_TIMEOUT = float(os.getenv("PLAYER_STATS_CACHE_LOCK_TIMEOUT", "5.0"))
 
-# NEW: Stored procedure execution timeout (seconds)
+# Requested statement limit (seconds), capped by the existing 15-second policy.
 _SP_EXECUTION_TIMEOUT = int(os.getenv("PLAYER_STATS_SP_TIMEOUT", "300"))
 
 # NEW: Enable/disable stored procedure execution before cache build
@@ -447,123 +447,90 @@ def _execute_sp_with_retries(
     base_backoff: float = 2.0,
     max_backoff: float = 10.0,
 ) -> None:
-    """
-    Execute SP_Stats_for_Upload with retry logic and explicit transaction management.
+    """Bound each report statement; retry only an acknowledged pre-commit rollback."""
+    from core.sql_connection_custody import SqlCleanupUnknown, custody_snapshot, retain_connection
+    from core.sql_operation_policy import METADATA_LOCK_MILLISECONDS
+    from kvk.dal.new_source_import_dal import UncertainCommit
+    from services.legacy_export_snapshot_service import (
+        begin_writer_transaction,
+        record_writer_stage,
+        verify_producer_cursor,
+    )
+    from services.player_report_sql import player_report_cursor
 
-    Args:
-        cn: Active database connection
-        retries: Number of retry attempts
-        base_backoff: Base delay in seconds for exponential backoff
-        max_backoff: Maximum delay in seconds
-    """
-    last_exc: Exception | None = None
-
+    if cn.autocommit is not False:
+        raise ValueError("Player report requires an owned manual-commit connection.")
+    if type(retries) is not int or not 1 <= retries <= 3:
+        raise ValueError("Player report uses at most three existing attempts.")
     if current_owner() is not None:
-        retries = 1  # A lost commit acknowledgment requires reconciliation.
-
+        retries = 1
     for attempt in range(1, retries + 1):
+        commit_attempted = False
         try:
-            logger.info(
-                "[CACHE] Executing SP_Stats_for_Upload (attempt %d/%d) with timeout=%ds...",
-                attempt,
-                retries,
-                _SP_EXECUTION_TIMEOUT,
-            )
-
-            sp_start = time.perf_counter()
-            cur = cn.cursor()
-            from services.legacy_export_snapshot_service import (
-                begin_writer_transaction,
-                record_writer_stage,
-                verify_producer_cursor,
-            )
-
-            verify_producer_cursor(cur, before_side_effects=True)
-            begin_writer_transaction(cur)
-
-            # Set query timeout
-            cur.execute(f"SET LOCK_TIMEOUT {_SP_EXECUTION_TIMEOUT * 1000};")  # milliseconds
-
-            # Execute stored procedure
-            record_writer_stage("producer_entered")
-            cur.execute(_SQL_EXEC_SP)
-            while cur.nextset():
-                pass
-            record_writer_stage("producer_returned")
-
-            if current_owner() is not None:
-                record_writer_completion(
-                    cursor=cur, procedure="dbo.SP_Stats_for_Upload", atomic_checkpoint=1
+            with player_report_cursor(cn, requested=_SP_EXECUTION_TIMEOUT) as (cur, seconds):
+                logger.info(
+                    "[CACHE] Executing SP_Stats_for_Upload attempt=%d/%d statement_timeout_s=%d row_lock_timeout_ms=%d",
+                    attempt,
+                    retries,
+                    seconds,
+                    METADATA_LOCK_MILLISECONDS,
                 )
-
-            # Explicitly commit the transaction
-            record_writer_stage("commit_requested")
-            cn.commit()
-            record_writer_stage("commit_confirmed")
-            if current_owner() is None:
-                record_writer_completion(procedure="dbo.SP_Stats_for_Upload")
-
-            sp_duration = time.perf_counter() - sp_start
-            logger.info(
-                "[CACHE] ✅ SP_Stats_for_Upload completed successfully in %.2fs",
-                sp_duration,
-            )
-
-            # Close cursor
-            cur.close()
-
+                sp_start = time.perf_counter()
+                try:
+                    verify_producer_cursor(cur, before_side_effects=True)
+                    begin_writer_transaction(cur)
+                    cur.execute(f"SET LOCK_TIMEOUT {METADATA_LOCK_MILLISECONDS};")
+                    record_writer_stage("producer_entered")
+                    cur.execute(_SQL_EXEC_SP)
+                    while cur.nextset():
+                        pass
+                    record_writer_stage("producer_returned")
+                    if current_owner() is not None:
+                        record_writer_completion(
+                            cursor=cur, procedure="dbo.SP_Stats_for_Upload", atomic_checkpoint=1
+                        )
+                    record_writer_stage("commit_requested")
+                    commit_attempted = True
+                    cn.commit()
+                    record_writer_stage("commit_confirmed")
+                    if current_owner() is None:
+                        record_writer_completion(procedure="dbo.SP_Stats_for_Upload")
+                except BaseException as original:
+                    if commit_attempted:
+                        raise UncertainCommit(
+                            "Read the retained player-report receipt before retrying."
+                        ) from original
+                    try:
+                        cn.rollback()
+                    except BaseException as cleanup:
+                        original.add_note("Player rollback failed: " + type(cleanup).__name__)
+                        retain_connection(
+                            cn, effect="unknown", first_failure=original, cleanup_error=cleanup
+                        )
+                        raise SqlCleanupUnknown(
+                            "Player report rollback was not acknowledged."
+                        ) from original
+                    raise
+                logger.info(
+                    "[CACHE] SP_Stats_for_Upload completed in %.2fs", time.perf_counter() - sp_start
+                )
             return
-
-        except pyodbc.Error as e:
-            last_exc = e
-            sqlstate = getattr(e, "args", [None])[0] if e.args else None
-
+        except Exception as error:
             logger.warning(
-                "[CACHE] SP_Stats_for_Upload failed (attempt %d/%d): SQLSTATE=%s, error_type=%s",
+                "[CACHE] Player report attempt=%d failed error_type=%s",
                 attempt,
-                retries,
-                sqlstate,
-                type(e).__name__,
+                type(error).__name__,
             )
-
-            # Rollback on error
-            try:
-                cn.rollback()
-            except Exception as rollback_err:
-                logger.warning("[CACHE] Rollback failed: %s", rollback_err)
-
-            if attempt >= retries:
-                break
-
-            # Exponential backoff with jitter
+            if (
+                attempt >= retries
+                or commit_attempted
+                or isinstance(error, (UncertainCommit, SqlCleanupUnknown))
+                or (isinstance(error, pyodbc.Error) and error.args and error.args[0] == "HY008")
+                or custody_snapshot()["unconfirmed"]
+            ):
+                raise
             cap = min(max_backoff, base_backoff * (2 ** (attempt - 1)))
-            delay = random.uniform(cap * 0.5, cap)
-            logger.info("[CACHE] Retrying SP execution in %.2fs...", delay)
-            time.sleep(delay)
-
-        except Exception as e:
-            last_exc = e
-            logger.error(
-                "[CACHE] Unexpected error executing SP_Stats_for_Upload (error_type=%s)",
-                type(e).__name__,
-            )
-
-            try:
-                cn.rollback()
-            except Exception:
-                pass
-
-            if attempt >= retries:
-                break
-
-            cap = min(max_backoff, base_backoff * (2 ** (attempt - 1)))
-            delay = random.uniform(cap * 0.5, cap)
-            time.sleep(delay)
-
-    # If we get here, all retries failed
-    assert last_exc is not None
-    logger.error("[CACHE] ❌ SP_Stats_for_Upload failed after %d attempts", retries)
-    raise last_exc
+            time.sleep(random.uniform(cap * 0.5, cap))
 
 
 # =========================
@@ -794,7 +761,7 @@ def _build_cache_sync(*, refresh: bool | None = None) -> dict[str, Any]:
     Refreshes STATS_FOR_UPLOAD when enabled, then validates the complete SQL
     snapshot before allowing it to replace the JSON cache.
     """
-    from file_utils import get_conn_with_retries
+    from services.player_report_sql import player_connection
 
     _warn_legacy_db_envs_once()
 
@@ -807,7 +774,7 @@ def _build_cache_sync(*, refresh: bool | None = None) -> dict[str, Any]:
     source_refreshes: set[str] = set()
 
     # Standardized DB_* env vars are honored inside get_conn_with_retries()
-    with get_conn_with_retries(meta={"operation": "player_stats_cache"}) as cn:
+    with player_connection(operation="player_stats_cache") as cn:
         if _REFRESH_BEFORE_BUILD if refresh is None else refresh:
             sp_attempted = True
             try:
@@ -815,6 +782,12 @@ def _build_cache_sync(*, refresh: bool | None = None) -> dict[str, Any]:
                 refresh_status = "refreshed"
                 refresh_succeeded = True
             except Exception as e:
+                from core.sql_connection_custody import SqlCleanupUnknown, require_sql_admission
+                from kvk.dal.new_source_import_dal import UncertainCommit
+
+                if isinstance(e, (SqlCleanupUnknown, UncertainCommit)):
+                    raise
+                require_sql_admission()
                 refresh_status = "last_known_good"
                 refresh_succeeded = False
                 refresh_error_code = _safe_error_code(e)

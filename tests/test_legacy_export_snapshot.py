@@ -477,6 +477,7 @@ def test_evidence_session_checks_same_connection_before_producer_and_preserves_t
     dal.authorize = Mock()
     cursor = Mock()
     connection = Mock(autocommit=True)
+    cursor.fetchone.return_value = ("NoLock",)
     connection.cursor.return_value = cursor
     collected = Mock(return_value=observed)
     monkeypatch.setattr(evidence, "legacy_installation_snapshot", collected)

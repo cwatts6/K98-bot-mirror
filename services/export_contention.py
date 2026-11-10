@@ -8,6 +8,7 @@ import logging
 import re
 import time
 
+from core.sql_operation_policy import COORDINATION_HORIZON_SECONDS, METADATA_LOCK_MILLISECONDS
 from kvk.dal.new_source_import_dal import transaction as source_transaction
 
 logger = logging.getLogger(__name__)
@@ -16,11 +17,11 @@ _deadline = ContextVar("export_coordination_deadline", default=None)
 admission_diagnostics_enabled = ContextVar("export_admission_diagnostics", default=True)
 # Match the existing dedicated SQL connection's 1000ms lock budget. This is
 # shared across retries, not another 1000ms allowance for every lock/attempt.
-LOCK_BUDGET_SECONDS = 1.0
+LOCK_BUDGET_SECONDS = METADATA_LOCK_MILLISECONDS / 1000
 MAX_ATTEMPTS = 8
 # Connection establishment has its own driver timeout. It must not consume the
 # entire short-lock retry allowance, but credit is capped by this total horizon.
-MAX_ELAPSED_SECONDS = 15.0
+MAX_ELAPSED_SECONDS = COORDINATION_HORIZON_SECONDS
 
 
 class CoordinationLockRefused(RuntimeError):

@@ -977,8 +977,10 @@ class LegacyExportRuntime:
     def begin_writer(self, kind):
         from uuid import uuid4
 
+        from core.sql_connection_custody import require_sql_admission, retain_connection
         from services.producer_recovery_intent import current_intent
 
+        require_sql_admission()
         configuration = json.loads(self.configuration)
         scope = configuration[kind]
         producer = current_intent()
@@ -1037,7 +1039,17 @@ class LegacyExportRuntime:
         except BaseException as original:
             try:
                 if connection is not None:
-                    connection.close()
+                    try:
+                        connection.close()
+                    except BaseException as cleanup:
+                        retain_connection(
+                            connection,
+                            effect="not_started",
+                            first_failure=original,
+                            cleanup_error=cleanup,
+                        )
+                        raise
+                require_sql_admission()
                 # The guard has not yielded and no owner/body has been exposed.
                 # After its connection closes, exact CAS can close this live
                 # unstarted attempt. Unknown cleanup leaves ownership retained.
@@ -1066,21 +1078,42 @@ class LegacyExportRuntime:
         return self.dal.authorize(owner.claim)
 
     def _close_writer(self, owner):
+        from core.sql_connection_custody import preserve_failure, retain_connection
+
         self._require_writer(owner)
         owner.closed = True
+        failure = None
         try:
             owner.session_guard.__exit__(None, None, None)
+        except BaseException as error:
+            failure = error
         finally:
-            owner.connection.close()
+            try:
+                owner.connection.close()
+            except BaseException as error:
+                failure = preserve_failure(failure, error, "writer_connection_close")
+        if failure is not None:
+            retain_connection(owner, effect="unknown", first_failure=failure, cleanup_error=failure)
+            raise failure
 
     def uncertain_writer(self, owner):
+        from core.sql_connection_custody import preserve_failure
+
         self._require_writer(owner)
         if owner.closed:
             return
+        failure = None
         try:
             self.dal.uncertain(owner.claim)
+        except BaseException as error:
+            failure = error
         finally:
-            self._close_writer(owner)
+            try:
+                self._close_writer(owner)
+            except BaseException as error:
+                failure = preserve_failure(failure, error, "uncertain_writer_close")
+        if failure is not None:
+            raise failure
 
     def refused_writer(self, owner):
         """Release only this live, explicitly unstarted writer after lock refusal.
