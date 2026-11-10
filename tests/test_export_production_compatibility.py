@@ -48,6 +48,38 @@ def historical_source_bytes(module, raw, outcome_source):
     name = module["name"]
     # Authenticate D3 successors before reconstructing immutable historical
     # permission evidence. This test-only bridge supplies no installed authority.
+    if name == "dbo.usp_S11CompleteStatsReportsCore":
+        assert (
+            hashlib.sha256(raw.decode("utf-8-sig").replace("\r\n", "\n").encode()).hexdigest()
+            == "d5c83d1918b50248cc24f97387431f3b6627f91296553daf822537441a4b062b"
+        ), "D3g report source drift"
+        previous = json.loads(
+            (
+                Path(__file__).parent
+                / "fixtures/sql/usp_S11CompleteStatsReportsCore-before-d3g.json"
+            ).read_text(encoding="utf-8")
+        )["source"]
+        assert (
+            hashlib.sha256(previous.encode()).hexdigest()
+            == "2a3c6183644f447d4d48c3b6e91992455ec1b431094b8db4aebbcdadff54372f"
+        ), "D3g report predecessor drift"
+        raw = previous.encode()
+    elif name == "dbo.usp_S11ValidateStatsReportStage":
+        assert (
+            hashlib.sha256(raw.decode("utf-8-sig").replace("\r\n", "\n").encode()).hexdigest()
+            == "e52d670e90be9502fa5eb08eb5a795eb5cdc243cfbb0e6374402b8f532044e9d"
+        ), "D3g report source drift"
+        previous = json.loads(
+            (
+                Path(__file__).parent
+                / "fixtures/sql/usp_S11ValidateStatsReportStage-before-d3g.json"
+            ).read_text(encoding="utf-8")
+        )["source"]
+        assert (
+            hashlib.sha256(previous.encode()).hexdigest()
+            == "580d20908b22f520862cdc1f3242b2a5e9349dc346b12fb18db4d5dc58f9dd67"
+        ), "D3g report predecessor drift"
+        raw = previous.encode()
     if name == "dbo.UPDATE_ALL2":
         validate_legacy_permission_source(outcome_source)
         normalized = raw.decode("utf-8-sig").replace("\r\n", "\n")

@@ -6,7 +6,18 @@ def result(receipt):
 
     rows = receipt["maintenance"]
     validate_receipts(rows)
-    return all(row["State"] == "complete" for row in rows), receipt
+    return _complete(receipt), receipt
+
+
+def _complete(receipt):
+    from services.maintenance_backup_dal import requested
+
+    rows = receipt["maintenance"]
+    complete = all(row["State"] == "complete" for row in rows)
+    if any(row["Kind"] == "final_stats" and row["DueGeneration"] > 0 for row in rows):
+        backup = receipt.get("backup_request")
+        complete = complete and backup is not None and requested(backup)
+    return complete
 
 
 def evidence(value):
@@ -21,5 +32,5 @@ def evidence(value):
     from services.maintenance_dal import validate_receipts
 
     validate_receipts(receipt["maintenance"])
-    complete = all(row["State"] == "complete" for row in receipt["maintenance"])
+    complete = _complete(receipt)
     return dict(receipt, outcome="complete" if complete else "maintenance_outstanding"), complete

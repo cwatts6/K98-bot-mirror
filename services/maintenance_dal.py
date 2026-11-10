@@ -62,6 +62,7 @@ def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
     owned_session = False
     retain_open = False
     receipts = []
+    backup = None
     try:
         require_sql_admission()
         connection.autocommit = True
@@ -91,6 +92,10 @@ def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
             if not cursor.nextset():
                 break
         validate_receipts(receipts)
+        if any(row["Kind"] == "final_stats" and row["DueGeneration"] > 0 for row in receipts):
+            from services.maintenance_backup_dal import run
+
+            backup = run(cursor)
     except BaseException as error:
         failure = error
     finally:
@@ -140,7 +145,10 @@ def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
             )
     if failure is not None:
         raise failure
-    return {"request_id": request, "maintenance": receipts}
+    result = {"request_id": request, "maintenance": receipts}
+    if backup is not None:
+        result["backup_request"] = backup
+    return result
 
 
 def validate_receipts(receipts):

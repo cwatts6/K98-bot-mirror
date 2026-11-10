@@ -32,6 +32,8 @@ def reports(recovery):
     names = {
         "dbo." + name: "dbo.Report_" + namespace + "_" + name
         for name in (
+            "MaintenanceWork",
+            "usp_MaintenanceDue",
             "StatsImportReportContinuation",
             "ProcConfig",
             "KingdomScanData4",
@@ -117,7 +119,14 @@ def reports(recovery):
             (SELECT KVKVersion,ConfigKey,ConfigValue,LastUpdated FROM dbo.ProcConfig ORDER BY KVKVersion,ConfigKey FOR JSON PATH,INCLUDE_NULL_VALUES),
             10,10,GETDATE() FROM dbo.StatsImportExecution;
     """))
-    procedures = []
+    maintenance = (schema / "dbo.MaintenanceWork.Table.sql").read_text(encoding="utf-8-sig")
+    maintenance = re.sub(
+        r"CONSTRAINT (\w+)", lambda m: "CONSTRAINT " + m[1] + "_" + namespace, maintenance
+    )
+    r.owner.execute(rewrite(maintenance))
+    demand = (schema / "dbo.usp_MaintenanceDue.StoredProcedure.sql").read_text(encoding="utf-8-sig")
+    r.owner.execute(rewrite(demand[demand.index("CREATE OR ALTER PROCEDURE") :]))
+    procedures = [names["dbo.usp_MaintenanceDue"]]
     try:
         # Syntax/binding compilation of the unchanged business procedure. It is
         # never executed in master and references no real production database.
@@ -156,6 +165,10 @@ def reports(recovery):
             + "\n"
             + raw[end:]
         )
+        # Display-name staging belongs to the simulated report calculations.
+        start = body.index("        -- One display-name list")
+        end = body.index("        SET @StartTime=", start)
+        body = body[:start] + body[end:]
         # Diagnostic DMV/DBCC reads are compiled above with the real procedure;
         # the transaction fault fixture must not checkpoint its host database.
         start = body.index("        -- *** NEW: Check log space at Phase B start ***")
@@ -220,6 +233,12 @@ def test_partial_repair_retries_only_uncommitted_stage(reports, failed_stage):
         r.dal.run(r.source, first["token"], action_id)
     after = r.dal.inspect(r.source)
     assert after["receipt"]["CompletedStage"] == failed_stage - 1
+    demand = r.owner.execute(
+        r.rewrite(
+            "SELECT DashboardDueGeneration,SummaryDueGeneration FROM dbo.MaintenanceWork WHERE Kind='final_stats'"
+        )
+    ).fetchone()
+    assert tuple(demand) == (int(failed_stage > 1), 0)
     assert after["receipt"]["RecoveryState"] == "failed"
     # Same failed action must not retry without another explicit confirmation.
     with pytest.raises(SourceConflict, match="attempt ended"):
@@ -228,6 +247,13 @@ def test_partial_repair_retries_only_uncommitted_stage(reports, failed_stage):
     action_id = str(uuid4())
     r.dal.run(r.source, after["token"], action_id)
     assert r.dal.inspect(r.source)["complete"]
+    assert tuple(
+        r.owner.execute(
+            r.rewrite(
+                "SELECT DashboardDueGeneration,SummaryDueGeneration FROM dbo.MaintenanceWork WHERE Kind='final_stats'"
+            )
+        ).fetchone()
+    ) == (1, 2)
     assert [
         row[0]
         for row in r.owner.execute(r.rewrite("SELECT Stage FROM dbo.StageProbe ORDER BY Stage"))
@@ -435,8 +461,10 @@ def restricted_reports(reports):
         "Update_ALL_Complete",
         "StageProbe",
         "StageFailure",
+        "MaintenanceWork",
     )
     procedures = (
+        "usp_MaintenanceDue",
         "usp_S11ValidateStatsReportStage",
         "usp_S11CompleteStatsReportsCore",
         "ARCHIVE_IMPORT_STAGING_FILE",

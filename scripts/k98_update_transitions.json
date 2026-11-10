@@ -4410,6 +4410,71 @@
           "after_sha256": "d3d1acc9f50e1d0b3ab30036f40ed6f2d74542c6f8733c5f164fc07b98c60ec5"
         }
       ]
+    },
+    {
+      "id": "p02_d3g_final_report_maintenance_v1",
+      "members": [
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f",
+          "after_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f"
+        },
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "572eb6c563823238da39cb15c8336da8a507f4fe629e044ca3aa0d73e33b7ee7",
+          "after_sha256": "572eb6c563823238da39cb15c8336da8a507f4fe629e044ca3aa0d73e33b7ee7"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91",
+          "after_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "dc013fc8c2cf65143e7d4cd030e2e724a62316e00e447e4938ee44df39c7378d",
+          "after_sha256": "dc013fc8c2cf65143e7d4cd030e2e724a62316e00e447e4938ee44df39c7378d"
+        },
+        {
+          "path": "log_backup.py",
+          "before_sha256": "512126a3cdc5cd8eb027b857447fa9cb0e0882db11a35708700846d970fb4ffc",
+          "after_sha256": "bd6a99fbd5eab29ac31528fe2e137b0e1dc1d411ff336b19ec380efeb04dac50"
+        },
+        {
+          "path": "log_health.py",
+          "before_sha256": "75787c1e6f7b5a434313ae7d3f90085f04c5b66eb23c2f2a29fdb061036946c4",
+          "after_sha256": "ace496d7ab1fea6199cf77923377dba224d657f78f37c4e8eefe6f102d3d77f1"
+        },
+        {
+          "path": "maintenance_worker.py",
+          "before_sha256": "c7166a5fc671f7807ce21f28adae08d76cca703b2678ef7fac55ea385e681733",
+          "after_sha256": "c7166a5fc671f7807ce21f28adae08d76cca703b2678ef7fac55ea385e681733"
+        },
+        {
+          "path": "services/maintenance_backup_dal.py",
+          "before_sha256": null,
+          "after_sha256": "bafbd778950cd7ec6f5e4c66bbbf04456a6b73d03d0486d1edb0719e5f571e01"
+        },
+        {
+          "path": "services/maintenance_dal.py",
+          "before_sha256": "94dd87504cdfda32f1f283a24f03d5ac329c6df3ca7a9847703df8c9b5658a82",
+          "after_sha256": "360a9f437354bbf408b2e2eb109056aad2319631e8e2fef63cdef70024a03bff"
+        },
+        {
+          "path": "services/maintenance_service.py",
+          "before_sha256": "6e3bde001b825b421581cda2faf01b57c7cffe2bc3be294ac472518c6fcab581",
+          "after_sha256": "fd8905691eac33bf9e7bda844fc3e37a30056bff46f6cf330d795e2b69ad9cf6"
+        },
+        {
+          "path": "services/processing_pipeline_receipts.py",
+          "before_sha256": "d3d1acc9f50e1d0b3ab30036f40ed6f2d74542c6f8733c5f164fc07b98c60ec5",
+          "after_sha256": "d3d1acc9f50e1d0b3ab30036f40ed6f2d74542c6f8733c5f164fc07b98c60ec5"
+        },
+        {
+          "path": "update_all2_log_manager.py",
+          "before_sha256": "8f2cfe29b4d05313818b7d2d4b2892b57589cf72a231931df23507359ea44d91",
+          "after_sha256": "2fb21b7af74ee31b3beb74c87e9ab7a637463c2fac0674a6d031c18ba0af1228"
+        }
+      ]
     }
   ]
 }

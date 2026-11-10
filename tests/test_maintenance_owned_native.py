@@ -147,12 +147,12 @@ def test_missing_child_refused_and_not_retried(maintenance_database):
     owner.execute("EXEC dbo.usp_MaintenanceDue 'final_stats'")
     worker = connect()
     try:
-        with pytest.raises(Exception, match="51963"):
+        with pytest.raises(Exception, match="2812"):
             drain(worker.execute("EXEC dbo.usp_RunMaintenance 'final_stats'"))
     finally:
         worker.close()
     assert state(owner, "final_stats")[2] == "failed"
-    assert state(owner, "final_stats")[4] == 51963
+    assert state(owner, "final_stats")[4] == 2812
     owner.execute("EXEC dbo.usp_MaintenanceDue 'final_stats'")
     drain(owner.execute("EXEC dbo.usp_RunMaintenance 'final_stats'"))
     assert state(owner, "final_stats")[:3] == (2, 0, "failed")

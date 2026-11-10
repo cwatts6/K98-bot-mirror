@@ -1,8 +1,7 @@
 """
 Update ALL2 Log Management Module
 ==================================
-Thin wrapper that integrates existing log_health and log_backup modules
-to provide intelligent log backup coordination for UPDATE_ALL2 stored procedure.
+Consume UPDATE_ALL2 business receipts without making success depend on optional upkeep.
 
 This module leverages:
 - log_health.preflight_from_env_sync() for headroom checks
@@ -332,121 +331,18 @@ def mark_trigger_processed(
 
 
 def process_log_backup_triggers(cursor, max_triggers: int = 5) -> dict[str, Any]:
+    """Legacy queue rows require reconciliation, never age-based replay.
+
+    New final-report demand is handled by the owned maintenance DAL. Historical
+    unprocessed rows have no attempt custody and cannot safely be adopted here.
     """
-    Process any pending log backup triggers from the queue.
-    Uses existing log_backup.trigger_log_backup_sync() for actual backup triggering.
-
-    Args:
-        cursor: Active database cursor
-        max_triggers: Maximum number of triggers to process in one call
-
-    Returns:
-        Dictionary with processing results
-    """
-    results = {"triggers_found": 0, "triggers_processed": 0, "backups_triggered": 0, "errors": []}
-
-    pending = check_pending_log_backup_triggers(cursor, max_age_minutes=10)
-    results["triggers_found"] = len(pending)
-
-    if not pending:
-        logger.debug("No pending log backup triggers found")
-        return results
-
-    logger.info("Found %d pending log backup trigger(s)", len(pending))
-
-    for trigger in pending[:max_triggers]:
-        trigger_id = trigger["id"]
-        procedure_name = trigger["procedure_name"]
-        reason = trigger["reason"]
-
-        logger.info(
-            "Processing trigger ID %d from %s (reason: %s, age: %ds)",
-            trigger_id,
-            procedure_name,
-            reason,
-            trigger["age_seconds"],
-        )
-
-        # Get log usage before backup
-        _log_before = get_log_space_usage(cursor)
-
-        # Trigger log backup using existing module
-        backup_success = False
-        backup_msg = "not_attempted"
-
-        if trigger_log_backup_sync:
-            try:
-                result = trigger_log_backup_sync()
-                backup_success = result.get("ok", False)
-                backup_msg = f"method={result.get('used_method', 'unknown')}, ok={backup_success}"
-
-                if backup_success:
-                    results["backups_triggered"] += 1
-                    logger.info("Log backup triggered successfully for trigger ID %d", trigger_id)
-                    _safe_emit_telemetry(
-                        {
-                            "event": "log_backup_triggered",
-                            "trigger_id": trigger_id,
-                            "method": result.get("used_method"),
-                            "status": "success",
-                        }
-                    )
-                else:
-                    error_detail = result.get("error", "unknown")
-                    backup_msg += f", error={error_detail}"
-                    logger.warning(
-                        "Log backup trigger failed for ID %d: %s", trigger_id, error_detail
-                    )
-                    results["errors"].append(f"Trigger {trigger_id}: {error_detail}")
-                    _safe_emit_telemetry(
-                        {
-                            "event": "log_backup_triggered",
-                            "trigger_id": trigger_id,
-                            "status": "failed",
-                            "error": error_detail,
-                        }
-                    )
-            except Exception as e:
-                backup_msg = f"exception:{type(e).__name__}:{str(e)[:100]}"
-                logger.exception("Exception triggering log backup for trigger ID %d", trigger_id)
-                results["errors"].append(f"Trigger {trigger_id}: {e!s}")
-                _safe_emit_telemetry(
-                    {
-                        "event": "log_backup_triggered",
-                        "trigger_id": trigger_id,
-                        "status": "exception",
-                        "error_type": type(e).__name__,
-                        "error": str(e)[:200],
-                    }
-                )
-        else:
-            backup_msg = "trigger_log_backup_sync_unavailable"
-            logger.warning(
-                "trigger_log_backup_sync not available, cannot process trigger %d", trigger_id
-            )
-            _safe_emit_telemetry(
-                {"event": "log_backup_triggered", "trigger_id": trigger_id, "status": "unavailable"}
-            )
-
-        # Wait briefly for backup to start
-        if backup_success:
-            time.sleep(2)
-
-        log_after = get_log_space_usage(cursor)
-
-        # Mark as processed
-        if mark_trigger_processed(
-            cursor,
-            trigger_id,
-            processed_by="Python Bot (update_all2_log_manager)",
-            log_used_pct_after=log_after,
-            backup_result=backup_msg[:4000],
-        ):
-            results["triggers_processed"] += 1
-
-    _safe_emit_telemetry({"event": "process_log_backup_triggers_complete", **results})
-
-    return results
+    return {
+        "triggers_found": 0,
+        "triggers_processed": 0,
+        "backups_triggered": 0,
+        "errors": ["legacy_queue_requires_reconciliation"],
+        "outcome": "held",
+    }
 
 
 def execute_update_all2_with_log_management(
@@ -464,9 +360,8 @@ def execute_update_all2_with_log_management(
 
     This function:
     1. Executes UPDATE_ALL2 stored procedure
-    2. Monitors for log backup triggers in LogBackupTriggerQueue
-    3. Processes pending triggers and initiates backups
-    4. Waits for backup to reduce log pressure
+    2. Consumes the exact final business success receipt
+    3. Leaves optional maintenance and backup requests to their durable owner
 
     Note: Preflight checks are handled separately by processing_pipeline.py
 
@@ -475,8 +370,8 @@ def execute_update_all2_with_log_management(
         param1: KINGDOM_RANK parameter (optional)
         param2: KINGDOM_SEED parameter (optional)
         completed_filename: Exact canonical immutable Ready basename (required)
-        post_trigger_wait: Initial wait after triggering backup (seconds)
-        max_post_trigger_wait: Maximum total wait for log backup (seconds)
+        post_trigger_wait: Compatibility argument; optional waits are no longer on this path
+        max_post_trigger_wait: Compatibility argument; optional waits are no longer on this path
 
     Returns:
         Dictionary containing:
@@ -621,44 +516,15 @@ def execute_update_all2_with_log_management(
                 len(result["phase_results"]),
             )
 
-        # Capture log usage after
-        result["log_after"] = get_log_space_usage(cursor)
-        if result["log_after"] is not None:
-            logger.info("Log usage after UPDATE_ALL2: %.2f%%", result["log_after"])
-
-        # Process any pending log backup triggers
-        logger.info("Checking for pending log backup triggers...")
-        trigger_results = process_log_backup_triggers(cursor, max_triggers=5)
+        # Business success is fixed by the consumed final SQL receipt. Optional
+        # checkpoint/statistics/backup work is independently owned and durable.
+        result["log_after"] = result["sp_result"]["log_used_pct_after"]
+        trigger_results = {
+            "backups_triggered": 0,
+            "triggers_processed": 0,
+            "outcome": "maintenance_deferred",
+        }
         result["trigger_results"] = trigger_results
-
-        if trigger_results["backups_triggered"] > 0:
-            logger.info(
-                "Log backup(s) triggered (%d), waiting %.1fs for backup to start...",
-                trigger_results["backups_triggered"],
-                post_trigger_wait,
-            )
-            time.sleep(post_trigger_wait)
-
-            # Optional: Wait for log usage to drop
-            wait_start = time.time()
-            while time.time() - wait_start < max_post_trigger_wait:
-                current_usage = get_log_space_usage(cursor)
-                if current_usage is None:
-                    break
-
-                if result["log_after"] and current_usage < result["log_after"] - 5.0:
-                    logger.info(
-                        "Log usage reduced from %.2f%% to %.2f%% (waited %.1fs)",
-                        result["log_after"],
-                        current_usage,
-                        time.time() - wait_start,
-                    )
-                    result["log_after"] = current_usage
-                    break
-
-                time.sleep(5)
-            else:
-                logger.info("Max wait time reached, continuing...")
 
         result["success"] = True
         elapsed = time.time() - start_time
