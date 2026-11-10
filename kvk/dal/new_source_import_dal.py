@@ -163,6 +163,7 @@ def transaction(connect):
                 first_failure=failure,
                 cleanup_error=cleanup,
             )
+            retain_connection_resource(connection, cursor)
     if failure is not None:
         if commit_attempted and not committed:
             raise UncertainCommit("Read the durable operation before retrying.") from failure
