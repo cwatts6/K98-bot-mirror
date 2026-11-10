@@ -616,6 +616,20 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P02_D3E_PLAYER_REPORT_MAINTENANCE_PATHS = frozenset(
+    [
+        "core/owned_work.py",
+        "core/recovery_sql_snapshot.py",
+        "core/sql_connection_custody.py",
+        "file_utils.py",
+        "maintenance_worker.py",
+        "services/maintenance_dal.py",
+        "services/maintenance_service.py",
+        "services/processing_pipeline_receipts.py",
+    ]
+)
+
+
 P02_D3D_CONFIGURATION_MAINTENANCE_PATHS = frozenset(
     [
         "core/owned_work.py",
@@ -1171,7 +1185,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 85:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 86:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -1284,6 +1298,10 @@ def reviewed_transitions():
             )
             fixed_p02_d3a = (
                 item["id"] == "p02_d3a_file_ownership_v1" and path in P02_D3A_FILE_OWNERSHIP_PATHS
+            )
+            fixed_p02_d3e = (
+                item["id"] == "p02_d3e_player_report_maintenance_v1"
+                and path in P02_D3E_PLAYER_REPORT_MAINTENANCE_PATHS
             )
             fixed_p02_d3d = (
                 item["id"] == "p02_d3d_configuration_maintenance_v1"
@@ -1470,6 +1488,7 @@ def reviewed_transitions():
                     or fixed_p021
                     or fixed_p02_phase1
                     or fixed_p02_d3a
+                    or fixed_p02_d3e
                     or fixed_p02_d3d
                     or fixed_p02_d3c
                     or fixed_p02_d3b
@@ -1668,6 +1687,13 @@ def reviewed_transitions():
         ):
             raise ValueError(
                 "Complete fixed P02 D3d configuration maintenance transition required."
+            )
+        if (
+            item["id"] == "p02_d3e_player_report_maintenance_v1"
+            and paths != P02_D3E_PLAYER_REPORT_MAINTENANCE_PATHS
+        ):
+            raise ValueError(
+                "Complete fixed P02 D3e player report maintenance transition required."
             )
         if item["id"] == "p02_d3b_maintenance_ownership_v1" and paths != P02_D3B_MAINTENANCE_PATHS:
             raise ValueError("Complete fixed P02 D3b maintenance transition required.")

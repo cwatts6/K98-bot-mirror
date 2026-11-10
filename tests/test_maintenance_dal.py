@@ -51,7 +51,7 @@ def connection(monkeypatch):
             assert owner.timeout == 17
 
         def fetchone(self):
-            return (0, "NoLock", "NoLock", "NoLock", "NoLock")
+            return (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock")
 
         def fetchmany(self, size):
             assert size == 7
@@ -146,7 +146,7 @@ def test_late_sql_failure_survives_failed_cleanup(connection, monkeypatch):
 def test_foreign_session_owner_is_retained_without_releasing_it(connection, monkeypatch):
     c = connection
     monkeypatch.setattr(
-        c.cursor, "fetchone", lambda: (0, "Exclusive", "NoLock", "NoLock", "NoLock")
+        c.cursor, "fetchone", lambda: (0, "Exclusive", "NoLock", "NoLock", "NoLock", "NoLock")
     )
     with pytest.raises(custody.SqlCleanupUnknown, match="pre-existing"):
         dal.run_maintenance(lambda: c.owner, timeout_seconds=17)
