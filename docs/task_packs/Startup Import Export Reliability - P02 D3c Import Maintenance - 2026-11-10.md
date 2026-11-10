@@ -1,4 +1,4 @@
-D3c scoped before implementation:
+# P02 D3c: import maintenance and managed reader exclusion
 - Extract only KS5 sampled stats and conditional KS4 index/stats upkeep from UPDATE_ALL2. Preserve required Refresh_PlayerScanMeta, typed/history data, file/digest/scan allocation, receipts and archive, byte-for-byte outside the two upkeep blocks and transactional due statement.
 - Keep six fixed maintenance kinds. Add import-specific KS4 due/completed generations, coalesced with import generations; only a promotion requests KS4 upkeep. A captured generation cannot acknowledge a later request. No per-import queue.
 - Add fixed import child with existing four-index whitelist and unchanged <10/<30 thresholds, SAMPLE20/SAMPLE25; no added nightly rebuild or widened MAXDOP policy.
@@ -17,4 +17,27 @@ Qualification checkpoint (10 November 2026):
 - Native fixture preparation exposed insufficient log headroom when reusing a small disposable database. Tests now create a separately owned database per import case, retain the unchanged <70% gate, and close setup failures safely. The exact leaked failed fixture was removed only after checking it had no connected sessions; no forced disconnection or retained database mutation occurred. This is fixture qualification, not a production-scale cost result.
 - Historical source checks authenticate the exact D3 candidates before testing immutable pre-D3 contracts. Runtime installed-source admission remains unchanged and intentionally refuses this coordinated release until D4. No production SQL, provider, restart, deployment or retained recovery occurred.
 
-Status: implementation and targeted qualification complete; final review/gates in progress. D3d-g and D4/D5 remain open. Unmanaged raw-history SNAPSHOT readers are not qualified by the managed helper tests; D4 must reconcile manual and legacy consumers before installation. D5 must measure the deferred maintenance cost against existing budgets.
+Status: implementation, targeted qualification and review complete. D3d-g and D4/D5 remain open. Unmanaged raw-history SNAPSHOT readers are not qualified by the managed helper tests; D4 must reconcile manual and legacy consumers before installation. D5 must measure the deferred maintenance cost against existing budgets.
+
+Final review and qualification:
+
+The broad regression selection passed 2,064 cases, with 28 opt-in/platform skips,
+12,285 deselected and one existing Google Python-version warning (370.78 seconds).
+The final default-pooling check passed both success/failure cases with all three
+session guards available before child process exit. Architecture, deferred,
+selector, security-routing, pre-commit and both SQL CI runs passed. Repeating the
+full repository suite for this bounded slice was not required after the D3b full
+pass and the affected caller/native/updater selection; D5 combined qualification
+remains mandatory.
+
+Bot Changes scan 436d1ab6-d2ad-44db-a541-9f116cfb21d7 covered all 44 changed paths;
+SQL Changes scan 97a2fbe6-c6e9-4345-89d1-1dcc9959f658 covered all 16. Both completed
+with zero findings, and GitHub code reviews at f2fa758e and 4b6961b reported no
+findings or open threads. Each scan reports the same overlapping rollout usage:
+1,913,398 tokens (1,908,933 input, 1,890,816 cached input, 4,465 output); do not add
+these as independent costs. The immutable SQL encoding baseline intentionally
+retains historical whitespace; new executable SQL passes whitespace checks.
+
+SQL PR 143 merged at faddbd12. Bot mirror PR 515 is ready for the authorized merge.
+D3c qualifies managed reader exclusion and source separation, not installed/manual
+compatibility or production-scale cost. D3d-g, D4 and D5 remain open.
