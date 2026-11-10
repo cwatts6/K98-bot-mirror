@@ -101,6 +101,18 @@ Its measured window was 2,690,463 total tokens (2,681,144 input, 2,630,400 cache
 billing claim. The final closeout/archive follow-up is Markdown only, with a
 documented security skip and exact runtime/test equivalence retained.
 
+The private production PR is [739](https://github.com/cwatts6/k98-bot/pull/739).
+Its first candidate passed all six CI checks, including 13,141 Linux tests;
+the code review was clear. The separate Copilot review raised three comments.
+The password-placeholder claim was disproved against the exact source f-string
+without reading credentials or attempting a connection. Mirror
+[PR522](https://github.com/cwatts6/K98-bot-mirror/pull/522) corrects the two valid
+text issues: the D3g archive heading's encoding and its final-report refusal label.
+All 56 D3g transition tests pass; AST comparison proves only the diagnostic literal
+changes. No predicate, exception type, registry, hash or admission policy changes.
+This follow-up has a precise security skip for diagnostic text and documentation;
+the private PR retains the final-head CI and comment-cycle receipts.
+
 The updater has 87 fixed entries; prior 86 digest is
 `49752cc86f05563aeb7b04111c050e2730548e0a32654e757b5b24e7d7991d90`.
 D3g has twelve members, six changed. The 232448-byte registry cap is unchanged.
