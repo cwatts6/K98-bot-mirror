@@ -10,6 +10,21 @@ try:
 except ImportError:
     pyodbc = None
 
+# Execute this fixed metadata query in msdb even when the equivalent pre-admission
+# caller supplied a cursor whose current database is master. OBJECT_ID alone
+# cannot distinguish a missing wrapper from metadata hidden from this principal.
+# Database VIEW DEFINITION is insufficient: an object-level DENY can hide the
+# wrapper while that database permission still reports 1. Only the existing dbo
+# context can prove absence here; never grant broader rights to satisfy this check.
+BACKUP_ROUTE_METADATA = """SET NOCOUNT ON;
+SELECT OBJECT_ID(N'dbo.usp_start_rok_tracker_log_backup',N'P') AS wrapper_id,
+       CASE WHEN DATABASE_PRINCIPAL_ID()=1 THEN 1 ELSE 0 END AS can_prove_absence,
+       HAS_PERMS_BY_NAME(N'dbo.usp_start_rok_tracker_log_backup',N'OBJECT',N'EXECUTE') AS can_execute_wrapper;
+"""
+BACKUP_ROUTE_QUERY = (
+    "EXEC msdb.sys.sp_executesql N'" + BACKUP_ROUTE_METADATA.replace("'", "''") + "';"
+)
+
 
 def trigger_log_backup_sync(job_name: str = "ROK_TRACKER - LOG Backup") -> dict:
     """Request the existing job once. Acknowledgement is not backup completion.
@@ -76,13 +91,18 @@ def request_once(cursor, *, job_name="ROK_TRACKER - LOG Backup", job_id=None):
     result = {"ok": False, "outcome": "not_attempted", "backup_completed": None}
     attempted = False
     try:
-        cursor.execute("SELECT OBJECT_ID(N'msdb.dbo.usp_start_rok_tracker_log_backup',N'P')")
-        row = cursor.fetchone()
-        if row is None:
+        cursor.execute(BACKUP_ROUTE_QUERY)
+        rows = cursor.fetchmany(2)
+        if len(rows) != 1 or len(rows[0]) != 3:
             raise RuntimeError("Backup route inspection was not acknowledged.")
-        wrapper = row[0] is not None
-        while cursor.nextset():
-            pass
+        wrapper_id, can_prove_absence, can_execute_wrapper = rows[0]
+        if cursor.nextset():
+            raise RuntimeError("Unexpected backup route inspection result.")
+        wrapper = wrapper_id is not None
+        if wrapper and can_execute_wrapper != 1:
+            raise RuntimeError("The visible backup wrapper is not executable.")
+        if not wrapper and can_prove_absence != 1:
+            raise RuntimeError("Backup wrapper absence is not established.")
         method = "wrapper" if wrapper else "job_id" if job_id else "job_name"
         result["used_method"] = method
         # Every failure after this boundary is outcome-unknown.

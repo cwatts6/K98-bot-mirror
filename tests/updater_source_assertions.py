@@ -28,9 +28,18 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+def before_d4_backup_route_hash(root, path):
+    """Test-only source bridge; D4's combined installed release is still required."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path == "log_backup.py":
+        assert actual == "37ec41d36a1f62f9cad569fbaea58cad524fe8887a4525474c585d4d3b929cec", path
+        return "bd6a99fbd5eab29ac31528fe2e137b0e1dc1d411ff336b19ec380efeb04dac50"
+    return actual
+
+
 def before_d3_cleanup_hash(root, path):
     """Authenticate D3 cleanup before exposing the unchanged prior release assertion."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_d4_backup_route_hash(root, path)
     if path not in prepare_k98_update.P02_D3_CLEANUP_CUSTODY_PATHS:
         return actual
     successor = next(
