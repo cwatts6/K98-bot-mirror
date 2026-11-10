@@ -113,6 +113,17 @@ changes. No predicate, exception type, registry, hash or admission policy change
 This follow-up has a precise security skip for diagnostic text and documentation;
 the private PR retains the final-head CI and comment-cycle receipts.
 
+A final sweep also reconciled late comments on the already-merged slice PRs.
+The native fixture already uses IF EXISTS for both tables and has no intervening
+foreign key; Python text reads already normalize CRLF; current SQL source is
+authenticated against all 23 fixed pins before historical P0/Phase 1 comparisons.
+The pending worker result and durable pipeline observation already expose the
+non-complete outcome. Extra telemetry, a duplicate procedure field and hoisting
+a four-entry test mapping were optional consistency suggestions, not demonstrated
+correctness gaps, and were not added. Remaining archive-title/spacing and SQL
+native-test opt-in documentation were clarified. Exact replies and dispositions
+remain on the original review threads; no runtime or test behavior changed.
+
 The updater has 87 fixed entries; prior 86 digest is
 `49752cc86f05563aeb7b04111c050e2730548e0a32654e757b5b24e7d7991d90`.
 D3g has twelve members, six changed. The 232448-byte registry cap is unchanged.
