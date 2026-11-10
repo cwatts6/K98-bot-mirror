@@ -1086,7 +1086,18 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
             raise
         finally:
             if cleanup:
-                shutil.rmtree(staging)
+                import sys
+
+                original_error = sys.exc_info()[1]
+                try:
+                    shutil.rmtree(staging)
+                except Exception as cleanup_error:
+                    if original_error is None:
+                        raise
+                    original_error.add_note(
+                        f"Cache staging cleanup also failed: {type(cleanup_error).__name__}"
+                    )
+                    logger.exception("Cache staging cleanup failed; original failure retained")
         return dict(
             sha256=hashlib.sha256(raw).hexdigest(),
             verified_utc=_utc_now_iso(),
@@ -1249,18 +1260,9 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
 
 @bound_runtime
 async def build_player_stats_cache() -> dict[str, Any] | None:
-    from file_utils import run_blocking_in_thread
-    from services.legacy_export_snapshot_service import _writer_runtime, drain_thread
-    from services.player_stats_cache_service import _composition
+    from services.legacy_export_snapshot_service import drain_thread
 
-    if _writer_runtime() is not None or _composition.get() is not None:
-        output = await drain_thread(_build_and_persist_cache_sync)
-    else:
-        output = await run_blocking_in_thread(
-            _build_and_persist_cache_sync,
-            name="build_player_stats_cache",
-            meta={"cache_path": PLAYER_STATS_CACHE},
-        )
+    output = await drain_thread(_build_and_persist_cache_sync)
 
     if output is None:
         return None

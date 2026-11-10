@@ -4155,6 +4155,66 @@
           "after_sha256": "8addfd7a80941429a4cf23476585b605b3b52063c6e355fd2b59906baefdb6df"
         }
       ]
+    },
+    {
+      "id": "p02_d3a_file_ownership_v1",
+      "members": [
+        {
+          "path": "ark/state/ark_state.py",
+          "before_sha256": "96a4f90f16c0d99f617ff0bcad5b12b0538754c1cecb9286241190e79acde759",
+          "after_sha256": "e34ce0562d6f85ea8fc71f5615db305cc7e900c7a393ede76f6f4c2fa951f546"
+        },
+        {
+          "path": "ark/team_state.py",
+          "before_sha256": "2e3dbda102c7dd2ea6a5face37a6c29c4e5c28b839fd7c72bb5998cdd12966f6",
+          "after_sha256": "2e3dbda102c7dd2ea6a5face37a6c29c4e5c28b839fd7c72bb5998cdd12966f6"
+        },
+        {
+          "path": "core/file_lock.py",
+          "before_sha256": null,
+          "after_sha256": "8759696485c31d3a3456cf341466ac69ddc296f70e8933e439b1b5497dd85fc4"
+        },
+        {
+          "path": "core/operation_evidence.py",
+          "before_sha256": "d95e7f6f9031777b73c69611105e483e02580a22aea1705d2d6fd9f0bc52fe5b",
+          "after_sha256": "d95e7f6f9031777b73c69611105e483e02580a22aea1705d2d6fd9f0bc52fe5b"
+        },
+        {
+          "path": "core/operation_timing.py",
+          "before_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52",
+          "after_sha256": "21fe06a6bf5111e74a86a4eef66523fc73767c44cd631748b9755dcbc272cf52"
+        },
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f",
+          "after_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "afafac934b8f91dee485206fe4c16c57272315e008c72c7290c0eca6dffd0af2",
+          "after_sha256": "637f9b16c49452b85bdfcc15683f4b98e6d0ad9db0607c932a246b890daf34af"
+        },
+        {
+          "path": "player_stats_cache.py",
+          "before_sha256": "f583f5dfa4f5f14f61a0e105e8d16f61b84ffd9fa0dc1df1f9f98166e0013d4c",
+          "after_sha256": "6f3b5dc8fb814a9e3283bfbfe527684ebc9fbf9cd4a3254461c8229ee958207c"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "e9c4c1ffbdc13e89db394310114da592581e5d32e6a44ff734b8d00b8734fb60",
+          "after_sha256": "e9c4c1ffbdc13e89db394310114da592581e5d32e6a44ff734b8d00b8734fb60"
+        },
+        {
+          "path": "services/player_stats_startup.py",
+          "before_sha256": "eabb55780b7c07bf97a884704633ca559db30c50c8a2aa8c67a62ed0b53910ce",
+          "after_sha256": "1bcccf4ca40c047ff4160368af5c8a69b805cec9b56ffd45befb543f00a8ba25"
+        },
+        {
+          "path": "services/tracked_view_store.py",
+          "before_sha256": "0691c8912c3638402bd48769c37bf04b3a9b7cd92f51052b83eeeb9b30d713ab",
+          "after_sha256": "706b6d9d38bba13fb074ac4f3009333e3bf0d57bf9fa098914bf897d31a65d99"
+        }
+      ]
     }
   ]
 }

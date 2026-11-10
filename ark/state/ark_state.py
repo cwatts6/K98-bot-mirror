@@ -187,9 +187,6 @@ class ArkJsonState:
         await asyncio.to_thread(self.load)
 
     async def save_async(self) -> None:
-        if run_blocking_in_thread:
-            await run_blocking_in_thread(self.save, name="ark_state_save")
-            return
-        import asyncio
+        from core.owned_work import drain_thread
 
-        await asyncio.to_thread(self.save)
+        await drain_thread(self.save)

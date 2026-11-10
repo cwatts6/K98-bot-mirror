@@ -32,6 +32,12 @@ Use the existing [remaining-work handover](Startup%20Import%20Export%20Reliabili
 
 ## Reproduced baseline, before implementation
 
+Fresh continuation review: [D3a coverage delta](Startup%20Import%20Export%20Reliability%20-%20P02%20D3a%20Coverage%20Delta%20-%202026-11-10.md)
+records the source/caller reconciliation, additional cancellation/first-failure
+cases, platform ownership design and both configuration transaction contracts.
+D3a implementation and qualification are now in progress; all six maintenance
+boundaries and D4/D5 remain open.
+
 A disposable local fixture exercised the actual helper from the D3 starting snapshot, with inert test configuration and no SQL or network calls:
 
 | Case | Observed current behavior | Required correction |

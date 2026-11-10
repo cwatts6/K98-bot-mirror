@@ -616,6 +616,23 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P02_D3A_FILE_OWNERSHIP_PATHS = frozenset(
+    {
+        "core/file_lock.py",
+        "file_utils.py",
+        "player_stats_cache.py",
+        "services/player_stats_startup.py",
+        "services/tracked_view_store.py",
+        "ark/state/ark_state.py",
+        "ark/team_state.py",
+        "core/owned_work.py",
+        "core/operation_evidence.py",
+        "core/operation_timing.py",
+        "services/legacy_export_snapshot_service.py",
+    }
+)
+
+
 P02_D2L_OPERATION_POLICY_PATHS = frozenset(
     {
         "player_stats_cache.py",
@@ -1109,7 +1126,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 81:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 82:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -1219,6 +1236,9 @@ def reviewed_transitions():
             )
             fixed_p02_phase1 = (
                 item["id"] == "p02_phase1_sql_exports_v1" and path in P02_PHASE1_SQL_EXPORT_PATHS
+            )
+            fixed_p02_d3a = (
+                item["id"] == "p02_d3a_file_ownership_v1" and path in P02_D3A_FILE_OWNERSHIP_PATHS
             )
             fixed_p02_d2l = (
                 item["id"] == "p02_d2l_operation_policy_v1"
@@ -1392,6 +1412,7 @@ def reviewed_transitions():
                     or fixed_p016
                     or fixed_p021
                     or fixed_p02_phase1
+                    or fixed_p02_d3a
                     or fixed_p02_d2l
                     or fixed_p02_d2k
                     or fixed_p02_d2j
@@ -1574,6 +1595,8 @@ def reviewed_transitions():
             and paths != P02_D2K_HOLDER_DIAGNOSTICS_PATHS
         ):
             raise ValueError("Complete fixed P02 D2k holder diagnostics transition required.")
+        if item["id"] == "p02_d3a_file_ownership_v1" and paths != P02_D3A_FILE_OWNERSHIP_PATHS:
+            raise ValueError("Complete fixed P02 D3a file ownership transition required.")
         if item["id"] == "p02_d2l_operation_policy_v1" and paths != P02_D2L_OPERATION_POLICY_PATHS:
             raise ValueError("Complete fixed P02 D2l operation policy transition required.")
         if item["id"] == "p02_d2i_sql_lifecycle_v1" and paths != P02_D2I_SQL_LIFECYCLE_PATHS:

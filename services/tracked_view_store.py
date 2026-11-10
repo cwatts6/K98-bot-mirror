@@ -7,6 +7,7 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
+import sys
 from typing import Any, Literal
 
 from file_utils import acquire_lock, atomic_write_json
@@ -27,14 +28,9 @@ def fingerprint(entry: Any) -> str:
 
 @contextmanager
 def tracker_lock(path, *, timeout, poll):
-    """Release the legacy lock even when the protected operation raises."""
-    lock = acquire_lock(path, timeout=timeout, poll=poll)
-    lock.__enter__()
-    try:
+    """Use the shared ownership contract, including the real body failure."""
+    with acquire_lock(path, timeout=timeout, poll=poll):
         yield
-    finally:
-        # acquire_lock's generator releases on normal exit, not on a thrown body error.
-        lock.__exit__(None, None, None)
 
 
 class TrackedViewStore:
@@ -75,7 +71,15 @@ class TrackedViewStore:
             yield
         finally:
             if acquired:
-                await drain_thread(lock.__exit__, None, None, None)
+                failure = sys.exc_info()
+                try:
+                    await drain_thread(lock.__exit__, *failure)
+                except BaseException as cleanup:
+                    if failure[1] is None:
+                        raise
+                    failure[1].add_note(
+                        f"Tracked-view release also interrupted: {type(cleanup).__name__}"
+                    )
 
     @staticmethod
     def matches(data, key, expected) -> bool:

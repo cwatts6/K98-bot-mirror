@@ -740,44 +740,16 @@ def read_csv_rows_safe(path: Path | str) -> list[list[str]]:
 def acquire_lock(
     path: Path | str, timeout: float = 5.0, poll: float = DEFAULT_LOCK_RETRY_INTERVAL
 ) -> Iterator[Path]:
-    lock_path = Path(str(path))
-    _ensure_parent(lock_path)
-    deadline = time.time() + float(timeout)
-    fd = None
-    while True:
-        try:
-            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            try:
-                os.write(fd, f"{os.getpid()}\n".encode())
-            except Exception:
-                pass
-            yield lock_path
-            break
-        except FileExistsError:
-            if time.time() > deadline:
-                raise TimeoutError(f"Timed out acquiring lock {lock_path!s}")
-            time.sleep(poll)
-        finally:
-            if fd is not None:
-                try:
-                    os.close(fd)
-                except Exception:
-                    pass
-                fd = None
-    try:
-        if lock_path.exists():
-            lock_path.unlink()
-    except Exception:
-        pass
+    """Compatibility entry point for exact physical file-lock ownership."""
+    from core.file_lock import acquire_lock as owned_lock
+
+    with owned_lock(path, timeout=timeout, poll=poll):
+        yield Path(path)
 
 
 def release_lock(path: Path | str) -> None:
-    p = Path(path)
-    try:
-        if p.exists():
-            p.unlink()
-    except Exception:
-        pass
+    """A pathname is not proof of ownership; exit acquire_lock's context."""
+    raise RuntimeError("Path-only file lock release is unsupported; exit the owning context")
 
 
 async def append_csv_line(file_path, values):

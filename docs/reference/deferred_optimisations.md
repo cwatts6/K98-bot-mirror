@@ -486,6 +486,17 @@ prove current Production behaviour; Production evidence remains an explicit depe
 - Last verified: 2026-08-31
 
 ### Deferred Optimisation
+- Area: `ark/team_state.py::ArkTeamStateStore`, `ark/state/ark_state.py::ArkJsonState`
+- Type: consistency
+- Description: D3a source review confirms that locking each atomic save does not merge separately loaded whole-store snapshots, and Ark message/reminder files commit independently. A second-file failure can leave the first committed. D3a preserves and regression-tests this existing outcome; no production lost update is asserted.
+- Suggested Fix: Include stale-instance concurrent saves and two-file crash/restart outcomes in the existing Ark domain lifecycle review; choose authoritative transaction or version-checked merge semantics there before changing domain behavior.
+- Impact: medium
+- Risk: medium
+- Dependencies: Existing deferred Ark domain/lifecycle scope after P01-P05; D3a shared ownership correction does not authorize a storage migration or atomic multi-file redesign.
+- Status: captured from D3a caller review; domain follow-up
+- Last verified: 2026-11-10
+
+### Deferred Optimisation
 - Area: `singleton_lock.py::acquire_singleton_lock`, `release_singleton_lock`, and `DL_bot.py` process ownership
 - Type: consistency
 - Description: Phase 2F audit confirmed the singleton helper checks existing process metadata before writing a lock file; it does not exclusively acquire ownership. Simultaneous starts can both pass, and release unlinks without checking the owning PID. This is a process-lifecycle reliability observation, not a claim of an established production overlap or exploitable vulnerability.
