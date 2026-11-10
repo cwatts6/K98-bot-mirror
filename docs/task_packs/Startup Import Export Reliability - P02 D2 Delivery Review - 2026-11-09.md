@@ -6,11 +6,9 @@ The integrated plan, original action census and delivered Phase 1 evidence remai
 authoritative within their stated limits. Production deployment and retained-work
 recovery are separate. This review does not authorize another full-scale rehearsal.
 
-D2a–l implementation and local qualification are complete. The final mirror PR
-supplies the review/merge gate; no D2 production promotion or deployment occurred.
-The next implementation boundary is D3, followed by D4 and combined D5 business
-qualification. The evidence below distinguishes the broad regression checkpoint,
-its corrected test fixtures, and the passing native resource-boundary cases.
+D2a–l is complete and promoted: mirror PRs 499–510 and test-hygiene PR 511 are merged; private PR 738 merged on 10 November at `cd04ed5e494adf5bf40f607798b38abb8df1b836`. All private checks and exact-head reviews passed. Final private local tests: 12,951 passed, 1,184 skipped, one warning, eight subtests; Linux CI: 12,772 passed, 1,363 skipped, 19 warnings, eight subtests. Both local log-isolation checks passed. Consolidated Changes scan `783aa032-d4d3-4b19-898f-ca2bd037ebcf` found zero issues. No D2 deployment occurred.
+
+The [D3 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) records final promotion evidence, D3a next steps, existing authorization and deployment held until after D5. D4 must resolve the refused direct combined updater jump before the final candidate is deployable. Earlier per-slice pending promotion/qualification statements below are historical checkpoints; preserve their evidence and limitations.
 
 ## Refreshed caller, resource and SQL matrix
 
