@@ -50,6 +50,21 @@ signatures, synonyms, and candidate SQL Agent step bindings. Job command bodies
 are hashed, not copied. Raw module definitions and principal names stay private.
 The receipt includes the collector's own SHA-256 and collection times.
 
+Collector version 2 also records object creation dates, cached procedure execution
+statistics with cache times, SQL Server start time, and Query Store configuration
+and retained statement activity. These are read-only observations: alteration dates
+are not execution dates; cache eviction/recompilation can remove older execution
+evidence; Query Store counts are statement observations, not procedure invocation
+counts. Missing, unavailable or empty history never establishes non-use.
+
+Version 2 includes all bounded SQL Agent jobs/steps with job IDs, including jobs
+without steps. The earlier database/name filter could miss a wrapper that targets
+a job only by GUID. Step command bodies remain excluded. The same row/byte/time
+bounds apply; exceeding them leaves the section unavailable, not complete.
+Verify the receipt's internal version and collector hash, not its filename: naming
+an original-collector receipt `v2` does not add these sections. Use a new output
+filename on each run; the private receipt is never overwritten.
+
 Limits: five-second connection timeout, three-second statement timeout, zero
 row-lock wait, low deadlock priority, 512 rows per query with a 513th-row overflow
 sentinel, 1 MiB per cell, 4 MiB aggregate cell data and 8 MiB serialized output.

@@ -33,7 +33,7 @@ $output = New-Object IO.FileStream($outputPath, [IO.FileMode]::CreateNew,
 $timer = [Diagnostics.Stopwatch]::StartNew()
 $script:cellsBytes = 0L
 $record = [ordered]@{
-    version=1; kind='p02_d4_installed_metadata'; phase='collecting'
+    version=2; kind='p02_d4_installed_metadata'; phase='collecting'
     startedUtc=[DateTime]::UtcNow.ToString('o'); computer=$env:COMPUTERNAME
     collectorSHA256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash
     sections=@(); limitations=@(
@@ -41,6 +41,8 @@ $record = [ordered]@{
         'Collector identity is not proof of effective runtime-principal rights.',
         'Manual, external, dynamic and Windows scheduled consumers require separate disposition.',
         'Missing or hidden metadata is unresolved, never proof of retirement.',
+        'Creation/alteration dates are not execution dates; cached activity is not lifetime history.',
+        'Query Store observations cover retained statements, not a complete procedure invocation audit.',
         'Definitions and principal names are private; do not commit this receipt.'
     )
 }
@@ -102,7 +104,7 @@ WITH roots(name) AS (
 $queries = @(
     @{name='objects'; sql=($roots + @'
 SELECT TOP(513) r.name AS requested_name,s.name AS schema_name,o.type_desc,
- o.object_id,o.modify_date,USER_NAME(o.principal_id) AS object_owner,
+ o.object_id,o.create_date,o.modify_date,USER_NAME(o.principal_id) AS object_owner,
  USER_NAME(s.principal_id) AS schema_owner,m.execute_as_principal_id,
  m.uses_ansi_nulls,m.uses_quoted_identifier,m.is_schema_bound,
  DATALENGTH(m.definition) AS definition_bytes,
@@ -165,19 +167,52 @@ FROM sys.crypt_properties cp
 WHERE cp.class=1 AND EXISTS(SELECT 1 FROM roots r WHERE r.name=OBJECT_NAME(cp.major_id))
 ORDER BY cp.major_id,cp.thumbprint;
 '@)},
+    @{name='procedure_activity'; sql=($roots + @'
+SELECT TOP(513) OBJECT_SCHEMA_NAME(p.object_id) AS schema_name,
+ OBJECT_NAME(p.object_id) AS module_name,p.cached_time,p.last_execution_time,
+ p.execution_count
+FROM sys.dm_exec_procedure_stats p
+WHERE p.database_id=DB_ID() AND EXISTS(
+ SELECT 1 FROM roots r WHERE r.name=OBJECT_NAME(p.object_id))
+ORDER BY p.object_id,p.cached_time;
+'@)},
+    @{name='server_start'; sql=@'
+SELECT TOP(513) sqlserver_start_time FROM sys.dm_os_sys_info;
+'@},
+    @{name='query_store_options'; sql=@'
+SELECT TOP(513) actual_state_desc,desired_state_desc,query_capture_mode_desc,
+ stale_query_threshold_days,interval_length_minutes
+FROM sys.database_query_store_options;
+'@},
+    @{name='query_store_activity'; sql=($roots + @'
+SELECT TOP(513) OBJECT_SCHEMA_NAME(q.object_id) AS schema_name,
+ OBJECT_NAME(q.object_id) AS module_name,
+ MIN(s.first_execution_time) AS first_retained_statement_execution,
+ MAX(s.last_execution_time) AS last_retained_statement_execution,
+ SUM(CONVERT(bigint,s.count_executions)) AS retained_statement_executions,
+ s.execution_type_desc
+FROM sys.query_store_query q
+JOIN sys.query_store_plan p ON p.query_id=q.query_id
+JOIN sys.query_store_runtime_stats s ON s.plan_id=p.plan_id
+WHERE EXISTS(SELECT 1 FROM roots r WHERE r.name=OBJECT_NAME(q.object_id))
+GROUP BY q.object_id,s.execution_type_desc
+ORDER BY q.object_id,s.execution_type_desc;
+'@)},
     @{name='synonyms'; sql=@'
 SELECT TOP(513) SCHEMA_NAME(schema_id) AS schema_name,name,base_object_name
 FROM sys.synonyms ORDER BY schema_id,name;
 '@}
 )
 $jobs = $roots + @'
-SELECT TOP(513) j.name AS job_name,j.enabled,SUSER_SNAME(j.owner_sid) AS owner_name,
+SELECT TOP(513) CONVERT(varchar(36),j.job_id) AS job_id,
+ j.name AS job_name,j.enabled,j.start_step_id,SUSER_SNAME(j.owner_sid) AS owner_name,
  st.step_id,st.step_name,st.subsystem,st.database_name,st.proxy_id,
  CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(varbinary(max),st.command)),2) AS command_hash,
  r.name AS root_candidate
-FROM dbo.sysjobs j JOIN dbo.sysjobsteps st ON st.job_id=j.job_id
+FROM dbo.sysjobs j LEFT JOIN dbo.sysjobsteps st ON st.job_id=j.job_id
 LEFT JOIN roots r ON CHARINDEX(LOWER(r.name),LOWER(st.command))>0
-WHERE st.database_name=N'ROK_TRACKER' OR r.name IS NOT NULL
+-- Include every bounded step: wrappers may address jobs only by GUID, and
+-- jobs running in master may contain no D4 root name. Bodies stay private.
 ORDER BY j.job_id,st.step_id,r.name;
 '@
 $connection = $null
@@ -203,7 +238,7 @@ SELECT @@SERVERNAME AS server_name,DB_NAME() AS database_name,
             [void]$setup.ExecuteNonQuery()
         } finally { $setup.Dispose() }
         $selected = if ($database -eq 'msdb') {
-            @($queries[0],$queries[4],$queries[5],$queries[6],@{name='jobs';sql=$jobs})
+            @($queries[0],$queries[4],$queries[5],$queries[6],$queries[7],$queries[8],@{name='jobs';sql=$jobs})
         } else { $queries }
         foreach ($query in $selected) {
             try {
@@ -235,5 +270,5 @@ SELECT @@SERVERNAME AS server_name,DB_NAME() AS database_name,
         $output.Flush($true)
     } finally { $output.Dispose() }
 }
-Write-Host ('D4 metadata receipt saved: ' + $outputPath)
+Write-Host ('D4 metadata receipt version 2 saved: ' + $outputPath)
 Write-Host 'Manual/external consumers and effective runtime permissions remain unqualified.'
