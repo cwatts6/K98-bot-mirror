@@ -86,8 +86,13 @@ Those remain named D4a/b/d inputs. Empty job results do not retire a route.
 
 ## F31 supported contract
 
-Until installed/operator evidence explicitly retires a named route, UPDATE_ALL,
-its nested UPDATE_RALLY_DATA call and direct Rally calls remain in scope.
+The operator has now approved retirement of UPDATE_ALL, UPDATE_RALLY_DATA and
+TEST **if the remaining caller checks pass**. This is conditional approval, not
+proof of non-use or authorization to alter production. Retirement means a clear
+refusal before effects, retaining original source history and existing data.
+UPDATE_ALL2 and the separate daily/all-time Rally importers remain supported.
+Until the caller condition is established, UPDATE_ALL, its nested
+UPDATE_RALLY_DATA call and direct Rally calls remain in scope.
 The existing CSV and XLSX paths are distinct; F29 XLSX filename/error deduplication
 remains P03 and is not closed by F31.
 
@@ -112,6 +117,42 @@ orders; denied principals; original-error preservation. Existing XLSX tests and
 synthetic sequence definitions cannot stand in for this matrix.
 
 ## Validation and remaining closure
+
+The third supplied SQL receipt used collector version 2 and completed all 21
+sections on 10 November. It resolves the missing creation-date and fixed-job-ID
+observations. Neither cached procedure statistics nor retained Query Store rows
+showed the three proposed retirement roots. This is limited negative evidence:
+the server restarted on 8 November and Query Store uses AUTO capture. It does
+not prove non-use or thirty days of complete coverage. The separate daily Rally
+importer has retained activity on 10 November. Raw receipts remain private.
+
+`scripts/collect_p02_d4_host.ps1` supplies the separate Windows evidence. It reads
+scheduled tasks including hidden tasks, hashes arguments, records script-path
+candidates, and keeps non-executable actions explicitly opaque. It inventories
+Python/PowerShell/batch source under the installed Bot and SQL deployment-script
+trees, excluding named data, dependency, documentation, test and history folders.
+It collects protected startup/seed/updater hashes and known SQL contract fields,
+Git HEAD without invoking Git, and a strict allowlist of database identity settings
+from the installed `.env`. Passwords, tokens and full command lines are omitted;
+the receipt is private and must never be committed or posted to a public PR.
+
+The host collector never runs inspected code, imports the application, connects to
+SQL or changes a task. Its only write is a new private receipt, protected for the
+collecting identity and SYSTEM before the first byte. Bounds are 2048 tasks,
+512 task folders, 32 actions per task, 8192 source files, 16384 source-tree entries,
+2 MiB per source/seed file, 8 MiB per updater member (at most 64), 128 MiB aggregate
+reads and 8 MiB output. The three-minute budget is checked between items/reads;
+an individual filesystem or scheduler operation may outlast it. Partial/denied
+sections are unavailable, never accepted as an empty inventory. Reparse and
+non-local input paths refuse. Use Windows PowerShell 5.1 on MINI_AMD with existing
+operator read access and a new output filename in an existing directory.
+
+Host results still require reconciliation against reviewed source. Hashes are
+observations, not automatically accepted pins. Source scanning is scoped, lexical
+matches can be comments, and indirect, opaque, service, remote or external callers
+remain unresolved until reviewed. File settings do not establish the running
+process's inherited environment or effective SQL permissions. Neither this
+collector nor the SQL receipt substitutes for D6's fresh deployment-custody gate.
 
 The inventory tests cover missing definitions, retained unknown consumers,
 non-disclosure of source text, tracked-file selection, missing/escaping files,
