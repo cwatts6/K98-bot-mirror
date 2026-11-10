@@ -16,6 +16,7 @@ from core import file_lock as locks
 @pytest.fixture(autouse=True)
 def custody(monkeypatch):
     monkeypatch.setattr(locks, "_uncertain", {})
+    monkeypatch.setattr(locks, "_active", set())
 
 
 def available(path):
@@ -166,6 +167,49 @@ def test_close_failure_does_not_retry_reused_handle(tmp_path, monkeypatch):
     with pytest.raises(locks.LockCleanupError):
         available(tmp_path / "lock")
     assert calls == [1]
+
+
+@pytest.mark.parametrize("lost_acknowledgement", [False, True])
+def test_local_admission_waits_for_close_acknowledgement(
+    tmp_path, monkeypatch, lost_acknowledgement
+):
+    cls = locks._WindowsOwner if os.name == "nt" else locks._PosixOwner
+    real_close = cls.close
+    closed, acknowledge = threading.Event(), threading.Event()
+    path = tmp_path / "lock"
+    calls = []
+
+    def delayed_close(owner):
+        real_close(owner)
+        calls.append(1)
+        closed.set()
+        assert acknowledge.wait(5)
+        if lost_acknowledgement:
+            raise OSError("close acknowledgement lost")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(cls, "close", delayed_close)
+        with ThreadPoolExecutor(1) as executor:
+            future = executor.submit(available, path)
+            try:
+                assert closed.wait(5)
+                # The OS object is already released, but its owner has not yet
+                # received confirmation. A local successor must remain blocked.
+                with pytest.raises(TimeoutError):
+                    available(path)
+            finally:
+                acknowledge.set()
+            if lost_acknowledgement:
+                with pytest.raises(locks.LockCleanupError):
+                    future.result(timeout=5)
+            else:
+                future.result(timeout=5)
+    assert calls == [1]
+    if lost_acknowledgement:
+        with pytest.raises(locks.LockCleanupError):
+            available(path)
+    else:
+        available(path)
 
 
 def child(path, mode):

@@ -64,6 +64,14 @@ permission and parent errors, partial metadata initialization, wall-clock jumps,
 body `FileExistsError`/ordinary error/`BaseException`, missing/replaced paths,
 close/disposition uncertainty, successor at close, and cleanup on success/failure.
 Retain uncertain owners without blindly retrying a potentially reused handle.
+Keep a process-local admission claim through acknowledged physical cleanup, not
+merely until the operating-system handle closes. A deterministic close-then-wait
+fixture reproduced a successor entering before a lost acknowledgement was
+recorded; the local claim now blocks that window and remains fenced on failure.
+This is same-process custody, not a promise of cross-process fencing after an
+ambiguous physical release. Capture its canonical key once at admission.
+Diagnostic logging failures during staging cleanup must also preserve the
+original readback failure. Both cases have pre-fix failing regressions.
 Caller tests must exercise actual locks and atomic writes with disposable paths.
 
 ## Six maintenance boundaries retained
@@ -104,7 +112,7 @@ Run architecture, deferred, selector, security-routing, imports, registration an
 lint gates. Authenticate exact protected-source updater changes while preserving
 all predecessor transitions. Require Bot Changes security review against this
 base and the final candidate, Deep off; no SQL scan for an unchanged SQL tree.
-Native POSIX execution is pending (local WSL enumeration currently refuses access);
-Linux CI must exercise its platform cases. No renewed implementation approval is
+Native Windows and Ubuntu CI exercise platform cases with only pytest installed;
+the pure ownership suite bypasses application test fixtures. No renewed implementation approval is
 required under the handover. Actual host custody, installation and provider
 acceptance are not claimed.

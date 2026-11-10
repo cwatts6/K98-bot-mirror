@@ -103,7 +103,8 @@ def test_cleanup_after_cache_commit_does_not_erase_or_replay(monkeypatch, tmp_pa
             release(owner)
 
 
-def test_guided_staging_cleanup_preserves_readback_failure(monkeypatch, tmp_path):
+@pytest.mark.parametrize("logging_failure", [False, True])
+def test_guided_staging_cleanup_preserves_readback_failure(monkeypatch, tmp_path, logging_failure):
     import shutil
 
     cache, target, _ = cache_setup(monkeypatch, tmp_path)
@@ -112,11 +113,17 @@ def test_guided_staging_cleanup_preserves_readback_failure(monkeypatch, tmp_path
         cache, "_atomic_write_json_with_retries", lambda path, _: Path(path).write_bytes(b"{}")
     )
     monkeypatch.setattr(shutil, "rmtree", lambda *a: (_ for _ in ()).throw(OSError("cleanup")))
+    if logging_failure:
+        monkeypatch.setattr(
+            cache.logger, "exception", lambda *a, **k: (_ for _ in ()).throw(OSError("logging"))
+        )
     with pytest.raises(
         cache.CacheSnapshotValidationError, match="cache_readback_differs"
     ) as caught:
         cache.rebuild_validated_cache_only()
     assert "staging cleanup" in caught.value.__notes__[0]
+    if logging_failure:
+        assert "diagnostic also failed" in caught.value.__notes__[1]
     assert target.read_bytes() == before
     assert_available(cache._cache_lock_path())
 

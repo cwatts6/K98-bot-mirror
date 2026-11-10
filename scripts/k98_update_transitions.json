@@ -4172,7 +4172,7 @@
         {
           "path": "core/file_lock.py",
           "before_sha256": null,
-          "after_sha256": "8759696485c31d3a3456cf341466ac69ddc296f70e8933e439b1b5497dd85fc4"
+          "after_sha256": "8730a2637098bd8770dc26962ea10c0ef1a5a919547437581cd287ef4afc4593"
         },
         {
           "path": "core/operation_evidence.py",
@@ -4197,7 +4197,7 @@
         {
           "path": "player_stats_cache.py",
           "before_sha256": "f583f5dfa4f5f14f61a0e105e8d16f61b84ffd9fa0dc1df1f9f98166e0013d4c",
-          "after_sha256": "6f3b5dc8fb814a9e3283bfbfe527684ebc9fbf9cd4a3254461c8229ee958207c"
+          "after_sha256": "68a0061fdaacabfe0c288b700681905e4b75b83f6700352c1e918856c6d186b4"
         },
         {
           "path": "services/legacy_export_snapshot_service.py",

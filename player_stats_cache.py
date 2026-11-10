@@ -1097,7 +1097,10 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
                     original_error.add_note(
                         f"Cache staging cleanup also failed: {type(cleanup_error).__name__}"
                     )
-                    logger.exception("Cache staging cleanup failed; original failure retained")
+                    try:
+                        logger.exception("Cache staging cleanup failed; original failure retained")
+                    except Exception:
+                        original_error.add_note("Cache staging cleanup diagnostic also failed")
         return dict(
             sha256=hashlib.sha256(raw).hexdigest(),
             verified_utc=_utc_now_iso(),

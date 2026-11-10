@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 _FREE = b"K98:file-lock:v1:released\n"
 _HELD = b"K98:file-lock:v1:held\n"
 _uncertain = {}
+_active = set()
 _custody = threading.Lock()
 
 
@@ -39,16 +40,25 @@ def _key(path):
     return os.path.normcase(os.path.realpath(path))
 
 
-def _retain(path, owner, error):
+def _retain(key, owner, error):
     # Never retry an uncertain close: the numeric handle may already be reused.
     with _custody:
-        _uncertain.setdefault(_key(path), []).append((owner, error))
+        _uncertain.setdefault(key, []).append((owner, error))
 
 
-def _check_custody(path):
+def _claim(key):
     with _custody:
-        if _key(path) in _uncertain:
+        if key in _uncertain:
             raise LockCleanupError("File lock cleanup remains unconfirmed")
+        if key in _active:
+            return False
+        _active.add(key)
+        return True
+
+
+def _release_claim(key):
+    with _custody:
+        _active.remove(key)
 
 
 def _secondary(primary, cleanup):
@@ -196,14 +206,14 @@ class _WindowsOwner:
         self.handle = None
 
 
-def _cleanup(path, owner, *, release, primary=None):
+def _cleanup(key, owner, *, release, primary=None):
     try:
         if release:
             owner.release()
         else:
             owner.close()
     except BaseException as error:
-        _retain(path, owner, error)
+        _retain(key, owner, error)
         if primary is not None:
             _secondary(primary, error)
         else:
@@ -212,6 +222,11 @@ def _cleanup(path, owner, *, release, primary=None):
             raise LockCleanupError(
                 "File lock cleanup unconfirmed; protected work must not be replayed"
             ) from error
+    else:
+        # A physically closed handle can precede a failed acknowledgement.
+        # Keep local admission owned until cleanup is positively confirmed;
+        # never release this claim when retaining an uncertain owner.
+        _release_claim(key)
 
 
 @contextmanager
@@ -221,19 +236,22 @@ def acquire_lock(path, timeout=5.0, poll=0.1):
     timeout, poll = float(timeout), float(poll)
     if not math.isfinite(timeout) or not math.isfinite(poll) or timeout < 0 or poll <= 0:
         raise ValueError("File lock timeout must be finite/nonnegative and poll positive")
-    _check_custody(path)
+    key = _key(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + timeout
     owner = None
     acquired = False
+    claimed = False
     try:
         while True:
-            _check_custody(path)
             admission_error = None
             try:
-                if owner is None:
-                    owner = _WindowsOwner(path) if os.name == "nt" else _PosixOwner(path)
-                acquired = owner.attempt()
+                if not claimed:
+                    claimed = _claim(key)
+                if claimed:
+                    if owner is None:
+                        owner = _WindowsOwner(path) if os.name == "nt" else _PosixOwner(path)
+                    acquired = owner.attempt()
             except _Busy as busy:
                 acquired = False
                 admission_error = busy.error
@@ -248,13 +266,15 @@ def acquire_lock(path, timeout=5.0, poll=0.1):
         owner.initialize()
     except BaseException as primary:
         if owner is not None:
-            _cleanup(path, owner, release=acquired, primary=primary)
+            _cleanup(key, owner, release=acquired, primary=primary)
+        elif claimed:
+            _release_claim(key)
         raise
 
     try:
         yield Path(path)
     except BaseException as primary:
-        _cleanup(path, owner, release=True, primary=primary)
+        _cleanup(key, owner, release=True, primary=primary)
         raise
     else:
-        _cleanup(path, owner, release=True)
+        _cleanup(key, owner, release=True)
