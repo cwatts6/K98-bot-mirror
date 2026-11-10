@@ -156,11 +156,40 @@ mypy and Ruff caches and divides the unchanged 16384-entry allowance into 12288
 Bot entries and 4096 SQL deployment entries. Recursive calls share their own tree's
 counter. Global file, byte, time and output limits remain in place. A fixture proves
 that exhausting one tree marks it unavailable while the next tree can still finish.
-The completed first-receipt sections remain useful observations; the source caller
-census requires a replacement receipt and reconciliation against reviewed source.
+The completed first-receipt sections remain useful observations. The replacement
+host receipt used collector version 2 from reviewed Bot PR530 and completed all
+six sections on 10 November. Its 874 scanned Bot source files reconcile to the
+recorded installed revision `97abcce1b2a9e71b3959eff74525c57930a703e6` after the
+collector's documented newline normalization. All 50 SQL deployment files are
+accounted for: 48 match the reviewed SQL baseline, and two validators match their
+historical source revisions. This is scoped source identity evidence, not proof
+that every possible caller has been inventoried.
 
-Host results still require reconciliation against reviewed source. Hashes are
-observations, not automatically accepted pins. Source scanning is scoped, lexical
+The protected policy and Bot template contain identical 841-member source maps;
+every raw source hash matches that same installed Git revision. This check is
+distinct from the actual installed-file census. All 14 updater members also
+reconcile: 11 source/JSON members, the empty Git configuration, the generated
+manifest and its deterministic 36-member verifier archive. The last two were
+independently reconstructed from the reviewed baseline without importing or
+executing application code. D4d must still qualify the exact final combined
+transition and all three startup contracts; this baseline is not that successor.
+
+The observed shutdown task's argument resolves to the inventoried shutdown helper,
+which has no legacy SQL invocation. The remaining backup-pruning Agent step has
+only a command hash and a broad TEST substring match in the supplied SQL receipt;
+its body still needs inspection. That match is not evidence that it calls dbo.TEST.
+The configured database identities are known from file observations, while their
+effective permissions and the running process's inherited settings remain open.
+
+SQL [PR152](https://github.com/cwatts6/K98-bot-SQL-Server/pull/152) records the
+observed sequence structure and fixed backup-wrapper body as qualification
+references. The live sequence counter and private job binding are excluded. The
+references live outside the generated schema folder so routine exports preserve
+them. Two disposable native metadata/permission tests and both SQL validation
+runs passed; the final-head review returned no findings. This closes the missing
+source-definition portion, not installed capability, migration or D4b as a whole.
+
+Hashes are observations, not automatically accepted pins. Source scanning is scoped, lexical
 matches can be comments, and indirect, opaque, service, remote or external callers
 remain unresolved until reviewed. File settings do not establish the running
 process's inherited environment or effective SQL permissions. Neither this
@@ -180,8 +209,9 @@ validators apply. Full Bot tests, application imports and command registration a
 no relevant coverage to this standalone collector; use the focused tests here,
 then the normal broader gates for runtime/release slices.
 
-Open closure inputs: completed installed source inventory; explicit used/unused/unknown
-consumer dispositions; sequence/wrapper source reconciliation; effective runtime
-identities; reconciliation of the observed scheduler and release tuple. D4a is not complete merely because the
-collector passes or the source-only matrix exists. D4b's independent direct-child
-correction may proceed while these inputs are collected.
+Open closure inputs: remaining exact catalog/job and alternate backup-queue caller
+dispositions; effective runtime identities and permissions; and the final combined
+migration/startup/updater contracts. Conditional retirement has not been applied.
+D4a is not complete merely because the collector passes or the source identity
+reconciles. D4b's direct-child correction, backup-route correction and dependency
+references are merged source slices; D4b/c/d/e and the combined Prod PR remain open.
