@@ -1,5 +1,11 @@
 # P02 D4 scope and handover
 
+> **Scope review, 10 November:** Read the [independent obligation reconciliation](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20Review%20-%202026-11-10.md)
+> for the refreshed Bot/SQL caller matrix, F01-F32 and exact 73-pair action census,
+> new direct-child/backup/legacy admission items, registry capacity and concrete D4a
+> slice/test plan. D4a-e remains the sequence; installed evidence and D4/D5 closure
+> are still outstanding. No runtime or production action occurred.
+
 ## Current decision and authority
 
 On 10 November 2026 the operator requested: merge production PR739, prepare D4

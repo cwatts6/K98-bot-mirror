@@ -1,5 +1,10 @@
 # P02 D4 new-chat starter
 
+The [10 November scope review](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20Review%20-%202026-11-10.md)
+now supplies the source/caller/obligation matrix and first D4a deliverable. Carry
+R01-R07, all 32 findings and all 73 policy pairs forward; do not repeat the entry
+review or confuse documentation refinement with runtime implementation.
+
 Begin the D4 scope review now, using [the complete scope and handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20and%20Handover%20-%202026-11-10.md).
 The operator explicitly requested this new chat and a double-check for missed/new
 items. The first deliverable is review/scope, not runtime implementation or deployment.
