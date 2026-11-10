@@ -10,6 +10,7 @@ from core.sql_connection_custody import (
     preserve_failure,
     require_sql_admission,
     retain_connection,
+    retain_connection_resource,
 )
 from kvk.dal.new_source_import_dal import SourceConflict, UncertainCommit, one
 from services.export_coordination_dal import _cas, _mutex, bounded_json, identity
@@ -27,7 +28,7 @@ def capture_cursor(connection):
         failure = error
     finally:
         try:
-            if not connection_retained(connection):
+            if not retain_connection_resource(connection, cursor):
                 cursor.close()
         except BaseException as error:
             failure = preserve_failure(failure, error, "capture_cursor_close")
@@ -117,7 +118,7 @@ class ImportCaptureRecoveryDAL:
         except BaseException as error:
             failure = error
         finally:
-            if connection_retained(connection):
+            if retain_connection_resource(connection, cursor):
                 cleanup_failed = True
                 failure = failure or SqlCleanupUnknown("Capture connection remains retained.")
             if cursor is not None and not connection_retained(connection):

@@ -74,6 +74,7 @@ def test_capture_inner_cleanup_fences_outer_session(monkeypatch, phase):
     if phase != "session_cursor":
         session.close.assert_not_called()
         assert not any("sp_releaseapplock" in c.args[0] for c in session.execute.call_args_list)
+        assert next(iter(custody._holds.values())).retained_connection.resource is session
 
 
 @pytest.mark.parametrize("entry", [True, False])
@@ -118,3 +119,59 @@ def test_writer_honors_an_inner_diagnostic_hold(tmp_path):
         runtime._close_writer(owner)
     dal.connect.return_value.close.assert_not_called()
     assert custody.custody_snapshot()["unconfirmed"] == 1
+    assert next(iter(custody._holds.values())).retained_connection.resource is owner
+
+
+def test_attached_resource_survives_collection_without_changing_first_evidence():
+    import gc
+    import weakref
+
+    class Resource:
+        pass
+
+    cn, cursor = Resource(), Resource()
+    error = ValueError("first")
+    custody.retain_connection(cn, effect="unknown", first_failure=error, cleanup_error=error)
+    outcome = next(iter(custody._holds.values()))
+    evidence = outcome.public()
+    reference = weakref.ref(cursor)
+    assert custody.retain_connection_resource(cn, cursor)
+    del cursor
+    gc.collect()
+    assert reference() is not None
+    assert outcome.public() == evidence
+    assert custody.custody_snapshot()["unconfirmed"] == 1
+    assert not custody.retain_connection_resource(Resource(), reference())
+
+
+@pytest.mark.parametrize("phase", ["rollback", "close"])
+def test_player_unknown_commit_remains_primary_when_outer_cleanup_fails(monkeypatch, phase):
+    from kvk.dal.new_source_import_dal import UncertainCommit
+
+    cn = Mock()
+    first = UncertainCommit("commit outcome unknown")
+    getattr(cn, phase).side_effect = OSError("cleanup")
+    monkeypatch.setattr("file_utils.get_conn_with_retries", lambda **_: cn)
+    with pytest.raises(UncertainCommit) as caught:
+        with player_connection(operation="guided_player_report"):
+            raise first
+    assert caught.value is first
+    assert custody.connection_retained(cn)
+
+
+def test_player_inner_raw_connection_hold_retains_cursor_without_closing(monkeypatch):
+    cn = Mock(timeout=15)
+    first = OSError("rollback")
+    monkeypatch.setattr("file_utils.get_conn_with_retries", lambda **_: cn)
+    with pytest.raises(OSError) as caught:
+        with player_connection(operation="guided_player_report"):
+            with player_report_cursor(cn, requested=15) as (cursor, _):
+                custody.retain_connection(
+                    cn, effect="unknown", first_failure=first, cleanup_error=first
+                )
+                raise first
+    assert caught.value is first
+    cursor.close.assert_not_called()
+    cn.rollback.assert_not_called()
+    cn.close.assert_not_called()
+    assert next(iter(custody._holds.values())).retained_connection.resource is cursor

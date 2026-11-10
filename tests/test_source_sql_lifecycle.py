@@ -25,7 +25,11 @@ def test_source_cleanup_keeps_first_cause_and_fences_failed_rollback(failure, cl
     assert caught.value.__cause__ is failure
     cn.rollback.assert_called_once()
     if cleanup in {"rollback", "both"}:
+        from core import sql_connection_custody as custody
+
         cn.close.assert_not_called()
+        held = next(iter(custody._holds.values())).retained_connection
+        assert held.resource is cn.cursor.return_value
     else:
         cn.close.assert_called_once()
     cn.commit.assert_not_called()

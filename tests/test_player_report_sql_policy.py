@@ -100,7 +100,10 @@ def test_uncertain_or_cancelled_report_never_retries(connection, phase):
     with pytest.raises(expected) as caught:
         unwrap(cache._execute_sp_with_retries)(cn, retries=3)
     assert cn.cursor.call_count == 1
-    cur.close.assert_called_once()
+    if phase == "rollback":
+        cur.close.assert_not_called()
+    else:
+        cur.close.assert_called_once()
     cache.time.sleep.assert_not_called()
     if phase in {"rollback", "post_commit_close"}:
         assert custody_snapshot()["unconfirmed"]

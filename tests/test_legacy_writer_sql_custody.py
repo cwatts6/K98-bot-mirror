@@ -34,7 +34,10 @@ def test_session_guard_preserves_first_failure_and_checks_lost_grant(failure_pha
                 raise first
     assert (caught.value is first) if expected is OSError else (caught.value.__cause__ is first)
     assert any("APPLOCK_MODE" in call.args[0] for call in cur.execute.call_args_list)
-    cur.close.assert_called_once()
+    if failure_phase == "release":
+        cur.close.assert_not_called()
+    else:
+        cur.close.assert_called_once()
     cn.close.assert_not_called()  # Caller owns this connection.
     assert bool(custody.custody_snapshot()["unconfirmed"]) is (
         failure_phase in {"release", "cursor_close"}
@@ -52,7 +55,7 @@ def test_unacknowledged_guard_mode_is_not_physical_release():
     assert custody.custody_snapshot()["unconfirmed"] == 1
 
 
-def test_runtime_attempts_both_closes_preserves_first_and_retains_owner():
+def test_runtime_fences_failed_guard_cleanup_preserves_first_and_retains_owner():
     runtime = LegacyExportRuntime.__new__(LegacyExportRuntime)
     cn, guard = Mock(), Mock()
     first = OSError("guard")
@@ -62,7 +65,7 @@ def test_runtime_attempts_both_closes_preserves_first_and_retains_owner():
     with pytest.raises(OSError) as caught:
         runtime._close_writer(owner)
     assert caught.value is first and owner.closed
-    cn.close.assert_called_once()
+    cn.close.assert_not_called()
     assert next(iter(custody._holds.values())).retained_connection is owner
     with pytest.raises(custody.SqlCleanupUnknown):
         custody.require_sql_admission()
@@ -79,4 +82,4 @@ def test_uncertainty_write_failure_is_not_replaced_by_cleanup_failure():
     with pytest.raises(OSError) as caught:
         runtime.uncertain_writer(owner)
     assert caught.value is first
-    cn.close.assert_called_once()
+    cn.close.assert_not_called()

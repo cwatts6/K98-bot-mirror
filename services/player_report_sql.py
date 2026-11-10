@@ -9,6 +9,7 @@ from core.sql_connection_custody import (
     preserve_failure,
     require_sql_admission,
     retain_connection,
+    retain_connection_resource,
 )
 from core.sql_operation_policy import player_statement_seconds
 
@@ -42,7 +43,10 @@ def player_connection(*, operation):
                 connection, effect="unknown", first_failure=failure, cleanup_error=cleanup_error
             )
     if cleanup_error is not None and isinstance(failure, Exception):
-        raise SqlCleanupUnknown("Player SQL cleanup remains unconfirmed.") from failure
+        from kvk.dal.new_source_import_dal import UncertainCommit
+
+        if not isinstance(failure, UncertainCommit):
+            raise SqlCleanupUnknown("Player SQL cleanup remains unconfirmed.") from failure
     if failure is not None:
         raise failure
 
@@ -72,6 +76,9 @@ def player_report_cursor(connection, *, requested):
             ),
             ("cursor_close", cursor.close if cursor is not None else None),
         ):
+            if retain_connection_resource(connection, cursor):
+                failure = failure or SqlCleanupUnknown("Player SQL connection remains retained.")
+                break
             if action is None:
                 continue
             try:

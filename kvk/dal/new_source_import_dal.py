@@ -111,15 +111,16 @@ def rows(cursor):
 def transaction(connect):
     from core.sql_connection_custody import (
         SqlCleanupUnknown,
-        connection_retained,
         preserve_failure,
         require_sql_admission,
         retain_connection,
+        retain_connection_resource,
     )
     from core.sql_observation import ObservationBusy, lock_contention, observing
 
     require_sql_admission()
     connection = diagnostic_call("connect", connect)
+    cursor = None
     failure = None
     cleanup_failed = False
     commit_attempted = False
@@ -151,7 +152,7 @@ def transaction(connect):
         # The owning connection closes its cursors. A nested admin adapter can
         # borrow the outer cursor, so this helper must not close that cursor.
         try:
-            if not connection_retained(connection):
+            if not retain_connection_resource(connection, cursor):
                 diagnostic_call("close", connection.close)
         except BaseException as cleanup:
             cleanup_failed = True

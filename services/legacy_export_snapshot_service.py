@@ -1087,13 +1087,14 @@ class LegacyExportRuntime:
             connection_retained,
             preserve_failure,
             retain_connection,
+            retain_connection_resource,
         )
 
         self._require_writer(owner)
         owner.closed = True
         failure = None
         try:
-            if connection_retained(owner.connection):
+            if retain_connection_resource(owner.connection, owner):
                 raise SqlCleanupUnknown("Writer SQL connection remains retained.")
             owner.session_guard.__exit__(None, None, None)
         except BaseException as error:

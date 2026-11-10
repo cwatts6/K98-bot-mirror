@@ -144,8 +144,13 @@ a connection already retained by an inner cursor, rollback or diagnostic helper.
 Healthy cleanup and unrelated connections retain their existing semantics. No
 business replay, automatic cleanup retry, new SQL object or permission is added.
 
-Focused regression: 304 passed, including transition authentication and injected
-cursor/reset/rollback/guard/close failures, cancellation and nested ownership.
+Focused regression: 315 passed plus eight disposable-local native SQL cases,
+including transition authentication and injected cursor/reset/rollback/guard/close
+failures, cancellation and nested ownership. Nested cursor/guard resources remain
+strongly referenced without replacing the first custody evidence or incrementing
+its owner count; an original UncertainCommit remains the primary error if outer
+cleanup also fails. The first follow-up Changes review found no security candidates
+but exposed these reliability gaps; they were corrected before merge acceptance.
 The correction adds one eight-member updater transition, taking the registry to 88
 entries. All prior 87 entries remain immutable (digest
 `3f164e60c4398e9f4b1f2404b15cc0863b97ee658572824dd02b3e67f9597879`);

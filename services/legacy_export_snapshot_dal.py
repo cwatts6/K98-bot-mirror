@@ -720,9 +720,10 @@ class LegacySnapshotDAL:
                 connection_retained,
                 preserve_failure,
                 retain_connection,
+                retain_connection_resource,
             )
 
-            if connection_retained(connection):
+            if retain_connection_resource(connection, cursor):
                 failure = failure or SqlCleanupUnknown("Writer SQL connection remains retained.")
             if attempted and not connection_retained(connection):
                 try:

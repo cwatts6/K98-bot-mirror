@@ -5,6 +5,7 @@ handle release, provider replay or claim settlement is performed here.
 """
 
 from threading import Lock
+from types import SimpleNamespace
 
 from event_calendar.sql_lifecycle import SqlOutcome, error_facts
 
@@ -38,6 +39,20 @@ def connection_retained(connection):
             or getattr(outcome.retained_connection, "connection", None) is connection
             for outcome in _holds.values()
         )
+
+
+def retain_connection_resource(connection, resource):
+    """Attach an outer handle to existing custody without replacing first evidence."""
+    with _guard:
+        for outcome in _holds.values():
+            owner = outcome.retained_connection
+            if owner is connection or getattr(owner, "connection", None) is connection:
+                if resource is not None and resource is not owner:
+                    outcome.retained_connection = SimpleNamespace(
+                        connection=connection, owner=owner, resource=resource
+                    )
+                return True
+    return False
 
 
 def retain_connection(connection, *, effect, first_failure, cleanup_error):
