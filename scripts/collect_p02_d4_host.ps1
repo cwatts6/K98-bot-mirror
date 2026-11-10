@@ -26,11 +26,10 @@ $output=New-Object IO.FileStream($outputPath,[IO.FileMode]::CreateNew,
     4096,[IO.FileOptions]::None,$acl)
 $timer=[Diagnostics.Stopwatch]::StartNew()
 $script:readBytes=0L
-$script:visited=0
 $script:files=New-Object 'Collections.Generic.List[object]'
 $script:seen=@{}
 $record=[ordered]@{
-    version=1;kind='p02_d4_host_metadata';phase='collecting'
+    version=2;kind='p02_d4_host_metadata';phase='collecting'
     computer=$env:COMPUTERNAME;startedUtc=[DateTime]::UtcNow.ToString('o')
     collectorSHA256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash
     identitySID=$identity.User.Value
@@ -106,19 +105,28 @@ function Read-SourceFile([string]$Path){
         root_candidates=@(Find-Roots $text)})
     $script:seen[$full]=$true
 }
-function Read-SourceTree([string]$Path){
+function Read-SourceTree([string]$Path,[hashtable]$Budget=@{visited=0;limit=16384}){
     $full=Assert-LocalPath $Path
     foreach($entry in [IO.Directory]::EnumerateFileSystemEntries($full)){
         Check-Budget
-        $script:visited++
-        if($script:visited -gt 16384){throw 'entry_count_bound'}
+        $Budget.visited++
+        if($Budget.visited -gt $Budget.limit){throw 'entry_count_bound'}
         $item=Get-Item -LiteralPath $entry -Force
         if($item.PSIsContainer){
             if($item.Name -in @('.git','.venv','venv','.codex_artifacts','.codex','.agents','.pytest_cache',
+                '.pre-commit-home','.pre-commit-cache','.mypy_cache','.ruff_cache',
                 '__pycache__','node_modules','tests','docs','logs','data','backups','local_artifacts','archive')){continue}
-            Read-SourceTree $item.FullName
+            Read-SourceTree $item.FullName $Budget
         } elseif($item.Extension -in @('.py','.ps1','.bat','.cmd')){Read-SourceFile $item.FullName}
     }
+}
+function Read-SourceInventory([string]$Path,[int]$EntryLimit){
+    # Reserve a separate share for each tree so one exhausted walk cannot consume
+    # the other's entry allowance. Global byte/file/time/output bounds still apply.
+    $budget=@{visited=0;limit=$EntryLimit}
+    Read-SourceTree $Path $budget
+    return @{scope='code extensions excluding named data/dependency/history directories'
+        root=$Path;visited_entries=$budget.visited;entry_limit=$EntryLimit}
 }
 function Read-IdentitySettings([string]$Path){
     $text=Decode-Text (Read-Bounded $Path 256KB)
@@ -227,8 +235,8 @@ function Read-ProtectedRelease {
 try {
     Add-Section 'scheduled_tasks' {Read-Tasks}
     Add-Section 'protected_release' {Read-ProtectedRelease}
-    Add-Section 'bot_source' {Read-SourceTree 'C:\discord_file_downloader';@{scope='code extensions excluding named data/dependency/history directories'}}
-    Add-Section 'sql_deploy_source' {Read-SourceTree 'C:\K98-bot-SQL-Server\deploy';@{scope='deployment scripts only'}}
+    Add-Section 'bot_source' {Read-SourceInventory 'C:\discord_file_downloader' 12288}
+    Add-Section 'sql_deploy_source' {Read-SourceInventory 'C:\K98-bot-SQL-Server\deploy' 4096}
     Add-Section 'identity_settings' {Read-IdentitySettings 'C:\discord_file_downloader\.env'}
     Add-Section 'git_head' {
         $git='C:\discord_file_downloader\.git'
@@ -262,5 +270,5 @@ try {
         $output.Write($bytes,0,$bytes.Length);$output.Flush($true)
     } finally {$output.Dispose()}
 }
-Write-Host ('D4 host receipt version 1: '+$outputPath)
+Write-Host ('D4 host receipt version 2: '+$outputPath)
 Write-Host 'Private metadata only; no application, SQL or task changes were made.'

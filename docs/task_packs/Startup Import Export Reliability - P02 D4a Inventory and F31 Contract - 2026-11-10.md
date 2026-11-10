@@ -147,6 +147,18 @@ sections are unavailable, never accepted as an empty inventory. Reparse and
 non-local input paths refuse. Use Windows PowerShell 5.1 on MINI_AMD with existing
 operator read access and a new output filename in an existing directory.
 
+The first host receipt completed task, protected-release, identity-setting and
+Git-head sections. Both source sections were unavailable: the Bot walk exhausted
+the shared entry limit inside `.pre-commit-home`, and the SQL deployment walk
+inherited that exhausted counter. This is incomplete source evidence, not an empty
+caller inventory. Collector version 2 excludes the repository's named pre-commit,
+mypy and Ruff caches and divides the unchanged 16384-entry allowance into 12288
+Bot entries and 4096 SQL deployment entries. Recursive calls share their own tree's
+counter. Global file, byte, time and output limits remain in place. A fixture proves
+that exhausting one tree marks it unavailable while the next tree can still finish.
+The completed first-receipt sections remain useful observations; the source caller
+census requires a replacement receipt and reconciliation against reviewed source.
+
 Host results still require reconciliation against reviewed source. Hashes are
 observations, not automatically accepted pins. Source scanning is scoped, lexical
 matches can be comments, and indirect, opaque, service, remote or external callers
@@ -168,8 +180,8 @@ validators apply. Full Bot tests, application imports and command registration a
 no relevant coverage to this standalone collector; use the focused tests here,
 then the normal broader gates for runtime/release slices.
 
-Open closure inputs: fresh installed receipt; explicit used/unused/unknown consumer
-dispositions; sequence/wrapper source reconciliation; effective runtime identities;
-installed scheduler and release tuple. D4a is not complete merely because the
+Open closure inputs: completed installed source inventory; explicit used/unused/unknown
+consumer dispositions; sequence/wrapper source reconciliation; effective runtime
+identities; reconciliation of the observed scheduler and release tuple. D4a is not complete merely because the
 collector passes or the source-only matrix exists. D4b's independent direct-child
 correction may proceed while these inputs are collected.
