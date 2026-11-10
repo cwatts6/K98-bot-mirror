@@ -12,7 +12,7 @@ from tests.updater_source_assertions import before_p016_hash
 
 def test_all_64_historical_transitions_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 81
+    assert len(entries) == 82
     assert (
         hashlib.sha256(json.dumps(entries[:64], sort_keys=True).encode()).hexdigest()
         == "a5807e2a3f3e7e2eade256b4118630c78887b74bd3584d245ce0e286fda9c763"

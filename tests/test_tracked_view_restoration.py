@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 import json
-from pathlib import Path
 import threading
 
 import pytest
@@ -17,6 +16,13 @@ from services.tracked_view_rehydration_service import (
     restore_tracked_views,
 )
 from services.tracked_view_store import EDIT_RECEIPT, TrackedViewStore, fingerprint
+
+
+def assert_lock_released(path):
+    from file_utils import acquire_lock
+
+    with acquire_lock(path, timeout=0):
+        pass
 
 
 @pytest.fixture
@@ -161,7 +167,7 @@ async def test_unavailable_tracker_is_not_empty_and_bytes_are_preserved(tracker,
     assert tracker.read_text() == contents
     with pytest.raises((ValueError, json.JSONDecodeError)):
         views.save_view_tracker("k", entry())
-    assert not Path(str(tracker) + ".lock").exists()
+    assert_lock_released(str(tracker) + ".lock")
     assert tracker.read_text() == contents
 
 
@@ -285,7 +291,7 @@ async def test_cancellation_during_edit_retains_intent_and_releases_lock(tracker
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert not Path(str(tracker) + ".lock").exists()
+    assert_lock_released(str(tracker) + ".lock")
     assert json.loads(tracker.read_text())["k"][EDIT_RECEIPT]["state"] == "prepared"
     other = Bot(fallback=True)
     result = await views.rehydrate_tracked_views(other)
@@ -379,7 +385,7 @@ async def test_prune_failure_preserves_entry_and_releases_lock(tracker, monkeypa
     with pytest.raises(OSError):
         await store.prune("k", saved)
     assert json.loads(tracker.read_text())["k"] == saved
-    assert not Path(str(tracker) + ".lock").exists()
+    assert_lock_released(str(tracker) + ".lock")
 
 
 @pytest.mark.asyncio
@@ -401,7 +407,7 @@ async def test_edit_receipt_write_failure_never_repeats_edit(tracker, monkeypatc
     result = await views.rehydrate_tracked_views(bot)
     assert bot.edits == fail_at - 1
     assert result["failed" if fail_at == 1 else "outcome_unconfirmed"] == 1
-    assert not Path(str(tracker) + ".lock").exists()
+    assert_lock_released(str(tracker) + ".lock")
     if fail_at == 2:
         next_bot = Bot(fallback=True)
         assert (await views.rehydrate_tracked_views(next_bot))["outcome_unconfirmed"] == 1
@@ -449,7 +455,7 @@ async def test_cancelled_lock_acquisition_releases_late_acquired_lock(tracker):
     blocker.__exit__(None, None, None)
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert not Path(lock_path).exists()
+    assert_lock_released(lock_path)
 
 
 @pytest.mark.asyncio

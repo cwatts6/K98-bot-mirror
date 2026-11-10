@@ -1,0 +1,30 @@
+name: File Lock Ownership
+
+on:
+  pull_request:
+    paths:
+      - "core/file_lock.py"
+      - "tests/test_owned_file_lock.py"
+      - ".github/workflows/file-lock-ownership.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-file-lock:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install isolated test dependency
+        run: python -m pip install pytest
+      - name: Qualify native handles and separate processes
+        run: python -m pytest --noconftest -q tests/test_owned_file_lock.py

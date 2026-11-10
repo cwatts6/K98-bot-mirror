@@ -390,7 +390,7 @@ def test_build_and_persist_unexpected_write_failure_propagates(monkeypatch, tmp_
 
 
 @pytest.mark.asyncio
-async def test_async_build_uses_run_blocking_in_thread(monkeypatch, tmp_path):
+async def test_async_build_uses_owned_thread_drain(monkeypatch, tmp_path):
     import player_stats_cache as mod
 
     cache_path = tmp_path / "player_stats_cache.json"
@@ -398,12 +398,13 @@ async def test_async_build_uses_run_blocking_in_thread(monkeypatch, tmp_path):
 
     called = {"n": 0, "func": None}
 
-    async def fake_run_blocking_in_thread(func, *args, **kwargs):
+    async def fake_drain_thread(func, *args, **kwargs):
         called["n"] += 1
         called["func"] = func
         return func()
 
-    monkeypatch.setattr("file_utils.run_blocking_in_thread", fake_run_blocking_in_thread)
+    monkeypatch.setattr("services.legacy_export_snapshot_service.drain_thread", fake_drain_thread)
+    monkeypatch.setattr(mod, "_build_last_kvk_cache_sync", lambda: None)
 
     # IMPORTANT: do NOT monkeypatch _build_and_persist_cache_sync.
     # Patch its dependencies so it can run without DB/disk concerns.

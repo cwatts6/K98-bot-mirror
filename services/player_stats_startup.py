@@ -39,10 +39,12 @@ def _verify_completion(output):
     with acquire_lock(_cache_lock_path(), timeout=_CACHE_LOCK_TIMEOUT):
         with open(PLAYER_STATS_CACHE, "rb") as source:
             raw = source.read(64 * 1024 * 1024 + 1)
-        if len(raw) > 64 * 1024 * 1024:
-            raise CacheSnapshotValidationError("cache_snapshot_too_large")
-        if json.loads(raw) != output:
-            raise CacheSnapshotValidationError("startup_cache_readback_differs")
+    # These immutable bytes identify the observed generation even if a successor
+    # replaces the path during decoding. Never reopen/adopt that newer snapshot.
+    if len(raw) > 64 * 1024 * 1024:
+        raise CacheSnapshotValidationError("cache_snapshot_too_large")
+    if json.loads(raw) != output:
+        raise CacheSnapshotValidationError("startup_cache_readback_differs")
     return {
         "kind": "player_cache_readback",
         "sha256": hashlib.sha256(raw).hexdigest(),

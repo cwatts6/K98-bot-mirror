@@ -1,6 +1,6 @@
 # P02 D3: ownership and maintenance delivery review
 
-Current continuation instructions: [D3 handover and scope](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md). The operator explicitly requested a new chat to double-check coverage, edge cases and examples before beginning D3a. No D3 runtime change has been made at this handover; the new chat owns implementation after that check.
+D3a is implemented and qualified for mirror review in PR [513](https://github.com/cwatts6/K98-bot-mirror/pull/513), following the requested fresh bounded coverage review. No outstanding D3a review finding remains. The six maintenance boundaries and D4/D5 remain open. The [D3 handover and scope](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) and starting-point sections below preserve the earlier handover evidence.
 
 ## Authorization and starting point
 
@@ -30,7 +30,52 @@ Use the existing [remaining-work handover](Startup%20Import%20Export%20Reliabili
 
 **Open Questions / Approval Needed.** No renewed implementation approval is needed within the agreed D3 scope. The exact race-safe Windows/POSIX release design and handling of cleanup uncertainty require engineering verification before implementation, not a new product decision. A change to lock recovery policy, backup schedules or deferred domain behavior would be outside this scope.
 
+## D3a implementation and qualification
+
+Mirror PR [513](https://github.com/cwatts6/K98-bot-mirror/pull/513) implements the
+shared owner, preserves the facade, drains ordinary cache/Ark saves, passes real
+tracked-view failures through release, and verifies startup from the same bounded
+immutable bytes. Windows releases its exact handle; POSIX keeps the rendezvous
+inode. No age/PID recovery or path-only deletion is permitted. Local admission
+remains claimed until cleanup is acknowledged, including a physically closed
+handle whose acknowledgement is delayed or lost. An uncertain close is never
+retried against a potentially reused handle.
+
+The bounded [coverage delta](Startup%20Import%20Export%20Reliability%20-%20P02%20D3a%20Coverage%20Delta%20-%202026-11-10.md)
+records caller census, review corrections and the six remaining SQL boundaries.
+The baseline failure artifact remains intact. Two additional regressions failed
+before the local admission/ancillary logging corrections and pass afterward.
+
+The exact D3a updater family has eleven members (six changed, five retained
+dependencies), with 82 total entries. All 81 predecessor definitions and the
+registry byte bound remain unchanged. Historical tests now expect the added
+entry while retaining their original history digests. This single-slice contract
+does not solve the D4 combined deployment jump.
+
+| Gate | Evidence / current result |
+| --- | --- |
+| Native Windows and Linux | [CI run 42781962660](https://github.com/cwatts6/K98-bot-mirror/actions/runs/42781962660) at `d8490eb476ba08812c077b1ed685de9be082a48c`: Windows 29 passed / 6 POSIX skips; Ubuntu 32 passed / 3 Windows skips. Pure helper suite uses no application fixtures. |
+| Focused final corrections | 128 passed, 6 platform skips, covering helper, real callers, exact D3a updater, ordinary cache and foreign-lock timeout. |
+| Full repository | 13,051 passed, 1,191 skipped, 1 warning, 8 subtests passed in 1,505.19 seconds. Operational-log isolation passed: production operational logs unchanged. The earlier 18 failures were stale registry-count assertions; their historical digest checks remain intact. |
+| Static/repository gates | Architecture (43 Python files), deferred validation (3 Markdown files), security routing, selector, import smoke, command registration and applicable pre-commit checks passed. |
+| Security Changes | Final runtime range `402151f8c1a63015c2ad5dd02f8599997cba01d6..d8490eb476ba08812c077b1ed685de9be082a48c`; scan `66f03e2e-5201-4e2b-9a13-4f959800ed76`, complete coverage of all nine source-like files, zero findings, Deep off. Subsequent changes are test-count assertions and delivery documentation only; no repeated security scan for those non-runtime edits. |
+
+Qualification uses disposable local paths and native CI surrogates. Production
+filesystem type, parent custody/ACLs, installation and provider behavior are not
+requalified here. Trusted local parent directories and cooperating writers remain
+prerequisites; same-process uncertain-close custody does not establish
+cross-process quarantine after an ambiguous physical release. Ark independent
+two-file saves and stale-instance merge behavior remain a recorded domain
+follow-up. No SQL changes/execution, private promotion, deployment, restart or
+retained recovery occurred. D3a does not close D3, D4, D5 or P05 acceptance.
+
 ## Reproduced baseline, before implementation
+
+Fresh continuation review: [D3a coverage delta](Startup%20Import%20Export%20Reliability%20-%20P02%20D3a%20Coverage%20Delta%20-%202026-11-10.md)
+records the source/caller reconciliation, additional cancellation/first-failure
+cases, platform ownership design and both configuration transaction contracts.
+D3a implementation and qualification are recorded above; all six maintenance
+boundaries and D4/D5 remain open.
 
 A disposable local fixture exercised the actual helper from the D3 starting snapshot, with inert test configuration and no SQL or network calls:
 

@@ -1042,6 +1042,7 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
         candidate, backup = staging / "candidate.json", staging / "previous.json"
         published = False
         cleanup = True
+        original_error = None
 
         def read_bounded(path):
             with open(path, "rb") as source:
@@ -1070,8 +1071,9 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
             published = True
             if read_bounded(target) != raw:
                 raise CacheSnapshotValidationError("cache_readback_differs")
-        except Exception:
-            if published:
+        except BaseException as error:
+            original_error = error
+            if isinstance(error, Exception) and published:
                 try:
                     if previous is None:
                         os.replace(target, candidate)
@@ -1080,13 +1082,25 @@ def rebuild_validated_cache_only() -> dict[str, Any]:
                 except Exception as restore_error:
                     # Keep the exact prior bytes if storage will not permit rollback.
                     cleanup = False
-                    raise CacheSnapshotValidationError(
+                    original_error = CacheSnapshotValidationError(
                         "cache_restore_failed_prior_bytes_retained"
-                    ) from restore_error
+                    )
+                    raise original_error from restore_error
             raise
         finally:
             if cleanup:
-                shutil.rmtree(staging)
+                try:
+                    shutil.rmtree(staging)
+                except Exception as cleanup_error:
+                    if original_error is None:
+                        raise
+                    original_error.add_note(
+                        f"Cache staging cleanup also failed: {type(cleanup_error).__name__}"
+                    )
+                    try:
+                        logger.exception("Cache staging cleanup failed; original failure retained")
+                    except Exception:
+                        original_error.add_note("Cache staging cleanup diagnostic also failed")
         return dict(
             sha256=hashlib.sha256(raw).hexdigest(),
             verified_utc=_utc_now_iso(),
@@ -1249,18 +1263,9 @@ def _build_and_persist_cache_sync() -> dict[str, Any] | None:
 
 @bound_runtime
 async def build_player_stats_cache() -> dict[str, Any] | None:
-    from file_utils import run_blocking_in_thread
-    from services.legacy_export_snapshot_service import _writer_runtime, drain_thread
-    from services.player_stats_cache_service import _composition
+    from services.legacy_export_snapshot_service import drain_thread
 
-    if _writer_runtime() is not None or _composition.get() is not None:
-        output = await drain_thread(_build_and_persist_cache_sync)
-    else:
-        output = await run_blocking_in_thread(
-            _build_and_persist_cache_sync,
-            name="build_player_stats_cache",
-            meta={"cache_path": PLAYER_STATS_CACHE},
-        )
+    output = await drain_thread(_build_and_persist_cache_sync)
 
     if output is None:
         return None
