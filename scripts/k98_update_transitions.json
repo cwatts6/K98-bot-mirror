@@ -4280,6 +4280,46 @@
           "after_sha256": "d3d1acc9f50e1d0b3ab30036f40ed6f2d74542c6f8733c5f164fc07b98c60ec5"
         }
       ]
+    },
+    {
+      "id": "p02_d3c_import_maintenance_v1",
+      "members": [
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "fa4ffbc5efcdf3202d28b30727c9606a9c6001f4bd2bec2fadd4918ab87faab2",
+          "after_sha256": "572eb6c563823238da39cb15c8336da8a507f4fe629e044ca3aa0d73e33b7ee7"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91",
+          "after_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91"
+        },
+        {
+          "path": "core/sql_observation.py",
+          "before_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130",
+          "after_sha256": "5925a90b87905340434a72169ecf4f980f6b58c733f355c1ccd22f65bd645130"
+        },
+        {
+          "path": "core/sql_operation_policy.py",
+          "before_sha256": "8b1a30cbb638cb84deab68a509eb62a2a86749eb5988662326d37f15ddd5a4be",
+          "after_sha256": "8b1a30cbb638cb84deab68a509eb62a2a86749eb5988662326d37f15ddd5a4be"
+        },
+        {
+          "path": "kvk/dal/source_sql_diagnostics.py",
+          "before_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e",
+          "after_sha256": "50afc55bb39e99ea8edf6d62906b8e297678fef75caf490a2e105fe4274ce46e"
+        },
+        {
+          "path": "services/maintenance_dal.py",
+          "before_sha256": "6fd333f436cb21dee32410f7eb364c24a5f5e9754958528004d29a6eb2a448e2",
+          "after_sha256": "3abf2a140a3cb313b80aa03c04bbbfbb5b7bd0a064bc4cbba6d6a8410f21d63c"
+        },
+        {
+          "path": "services/maintenance_service.py",
+          "before_sha256": "6e3bde001b825b421581cda2faf01b57c7cffe2bc3be294ac472518c6fcab581",
+          "after_sha256": "6e3bde001b825b421581cda2faf01b57c7cffe2bc3be294ac472518c6fcab581"
+        }
+      ]
     }
   ]
 }

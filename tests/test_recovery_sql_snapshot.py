@@ -13,6 +13,20 @@ def connection():
     return Mock(autocommit=False, timeout=15)
 
 
+def assert_no_producer_locks(statements):
+    """Only the shared maintenance schema guard is allowed in an observation."""
+    statements = [sql.upper() for sql in statements]
+    assert not any("UPDLOCK" in sql or "HOLDLOCK" in sql for sql in statements)
+    guards = [sql for sql in statements if "SP_GETAPPLOCK" in sql]
+    assert len(guards) == 1
+    guard = guards[0]
+    assert guard.count("SP_GETAPPLOCK") == 1
+    assert "@RESOURCE='K98:MAINTENANCE-SCHEMA:V1'" in guard
+    assert "@LOCKMODE='SHARED'" in guard
+    assert "@LOCKOWNER='TRANSACTION'" in guard
+    assert "@LOCKTIMEOUT=0" in guard
+
+
 def test_owned_read_rolls_back_restores_and_closes_without_commit():
     cn = connection()
     with recovery_snapshot(lambda: cn) as cursor:
@@ -45,8 +59,13 @@ def test_first_failure_survives_failed_cleanup_and_every_cleanup_is_attempted(ph
     assert caught.value.__cause__ is first
     assert "private cleanup detail" not in str(caught.value)
     assert cn.rollback.call_count == 2
-    cn.cursor.return_value.close.assert_called_once()
-    cn.close.assert_called_once()
+    if phase == "rollback":
+        cn.cursor.return_value.close.assert_not_called()
+        cn.close.assert_not_called()
+        assert cn.set_attr.call_count == 1
+    else:
+        cn.cursor.return_value.close.assert_called_once()
+        cn.close.assert_called_once()
     cn.commit.assert_not_called()
 
 

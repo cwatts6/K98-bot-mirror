@@ -9,6 +9,7 @@ import pytest
 from core.recovery_sql_snapshot import RecoveryObservationCleanupUnknown
 from kvk.dal.new_source_import_dal import SourceConflict
 from services import config_preparation_recovery_dal as module
+from tests.test_recovery_sql_snapshot import assert_no_producer_locks
 
 
 @pytest.fixture
@@ -45,8 +46,9 @@ def test_all_read_routes_own_snapshot_without_writer_locks(reader, operation):
         r.dal.target_data(r.target.preparation_id, account="a", storage_owner="local")
     else:
         r.dal.snapshot(r.target)
-    sql = " ".join(call.args[0].upper() for call in r.cn.cursor.return_value.execute.call_args_list)
-    assert all(term not in sql for term in ("SP_GETAPPLOCK", "UPDLOCK", "HOLDLOCK"))
+    assert_no_producer_locks(
+        call.args[0] for call in r.cn.cursor.return_value.execute.call_args_list
+    )
     assert r.cn.timeout == 3
     assert [call.args for call in r.cn.set_attr.call_args_list] == [(1227, 0x20), (1227, 0x02)]
     assert r.cn.rollback.call_count == 2

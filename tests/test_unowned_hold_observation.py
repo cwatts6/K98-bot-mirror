@@ -9,6 +9,7 @@ import pytest
 from core.recovery_sql_snapshot import RecoveryObservationCleanupUnknown
 from kvk.dal.new_source_import_dal import SourceConflict
 from services import unowned_sql_hold_dal as module
+from tests.test_recovery_sql_snapshot import assert_no_producer_locks
 
 
 @pytest.fixture
@@ -43,9 +44,7 @@ def test_read_paths_own_snapshot_without_commit_or_writer_locks(reader, operatio
             "disposition": None,
         }
     statements = [call.args[0].upper() for call in r.cn.cursor.return_value.execute.call_args_list]
-    assert not any(
-        "SP_GETAPPLOCK" in sql or "UPDLOCK" in sql or "HOLDLOCK" in sql for sql in statements
-    )
+    assert_no_producer_locks(statements)
     assert r.cn.timeout == 3
     assert [call.args for call in r.cn.set_attr.call_args_list] == [(1227, 0x20), (1227, 0x02)]
     assert r.cn.rollback.call_count == 2

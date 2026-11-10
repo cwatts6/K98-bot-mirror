@@ -7,6 +7,7 @@ import pytest
 from kvk.dal import season_source_dal as seasons, source_routing_dal as routing
 from services import export_coordination_dal as queue
 from tests.test_kvk_public_routing import RoutingStore
+from tests.test_recovery_sql_snapshot import assert_no_producer_locks
 
 
 def test_public_resolution_is_one_short_noncommitting_read():
@@ -15,7 +16,7 @@ def test_public_resolution_is_one_short_noncommitting_read():
     read = routing.resolve_season_read(16, connect=lambda: connection)
     assert read.availability == "current"
     sql = [sql for _, sql, _ in store.events]
-    assert not any("sp_getapplock" in s or "UPDLOCK" in s for s in sql)
+    assert_no_producer_locks(sql)
     assert not any("FROM KVK.SourceSelection " in s for s in sql)
     assert connection.timeout == 3
     connection.commit.assert_not_called()
@@ -27,7 +28,7 @@ def test_season_read_owns_snapshot_without_writer_locks(monkeypatch):
     monkeypatch.setattr("kvk.dal.new_source_import_dal.one", lambda _: {"SeasonVersion": 1})
     assert seasons.SeasonSourceDAL(lambda: connection).read(16) == {"SeasonVersion": 1}
     queries = [c.args[0] for c in connection.cursor.return_value.execute.call_args_list]
-    assert not any("sp_getapplock" in s or "UPDLOCK" in s for s in queries)
+    assert_no_producer_locks(queries)
     assert connection.timeout == 3
     connection.commit.assert_not_called()
 
