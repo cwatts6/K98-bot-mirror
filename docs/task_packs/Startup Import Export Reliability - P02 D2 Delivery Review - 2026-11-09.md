@@ -8,7 +8,7 @@ recovery are separate. This review does not authorize another full-scale rehears
 
 D2a–l is complete and promoted: mirror PRs 499–510 and test-hygiene PR 511 are merged; private PR 738 merged on 10 November at `cd04ed5e494adf5bf40f607798b38abb8df1b836`. All private checks and exact-head reviews passed. Final private local tests: 12,951 passed, 1,184 skipped, one warning, eight subtests; Linux CI: 12,772 passed, 1,363 skipped, 19 warnings, eight subtests. Both local log-isolation checks passed. Consolidated Changes scan `783aa032-d4d3-4b19-898f-ca2bd037ebcf` found zero issues. No D2 deployment occurred.
 
-The [D3 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) records final promotion evidence, D3a next steps, existing authorization and deployment held until after D5. D4 must resolve the refused direct combined updater jump before the final candidate is deployable. Earlier per-slice pending promotion/qualification statements below are historical checkpoints; preserve their evidence and limitations.
+The [D3 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) records D3 source completion, combined private PR authorization and the remaining D4/D5 obligations. Deployment remains held until after D5. D4 must resolve the refused direct combined updater jump before the final candidate is deployable. Earlier per-slice pending promotion/qualification statements below are historical checkpoints; preserve their evidence and limitations.
 
 ## Refreshed caller, resource and SQL matrix
 
