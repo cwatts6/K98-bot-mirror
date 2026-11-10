@@ -1,4 +1,4 @@
-# P02 D3g â€” final-report maintenance
+# P02 D3g — final-report maintenance
 
 Implementation, focused qualification, Bot/SQL mirror PRs and review are authorized
 by the continuing D3 instruction. Deployment remains held through D4/D5. No production

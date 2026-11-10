@@ -1722,9 +1722,7 @@ def reviewed_transitions():
             item["id"] == "p02_d3g_final_report_maintenance_v1"
             and paths != P02_D3G_FINAL_REPORT_MAINTENANCE_PATHS
         ):
-            raise ValueError(
-                "Complete fixed P02 D3g player report maintenance transition required."
-            )
+            raise ValueError("Complete fixed P02 D3g final report maintenance transition required.")
         if item["id"] == "p02_d3b_maintenance_ownership_v1" and paths != P02_D3B_MAINTENANCE_PATHS:
             raise ValueError("Complete fixed P02 D3b maintenance transition required.")
         if item["id"] == "p02_d2l_operation_policy_v1" and paths != P02_D2L_OPERATION_POLICY_PATHS:
