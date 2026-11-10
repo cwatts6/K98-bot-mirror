@@ -1,113 +1,145 @@
-# P02 D3: ownership and maintenance delivery review
+# P02 D3: source delivery closeout
 
-D3a is implemented and qualified for mirror review in PR [513](https://github.com/cwatts6/K98-bot-mirror/pull/513), following the requested fresh bounded coverage review. No outstanding D3a review finding remains. The six maintenance boundaries and D4/D5 remain open. The [D3 handover and scope](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) and starting-point sections below preserve the earlier handover evidence.
+D3a–D3g are implemented, individually reviewed and merged in the Bot mirror;
+the six SQL companion slices are merged in the authoritative SQL repository.
+This closes D3 source delivery and its bounded qualification. It does not close
+D4/D5, establish installed compatibility, or authorize deployment/restart.
+The operator authorized the combined private production PR and its review cycle.
 
-## Authorization and starting point
+## Delivered scope and expected impact
 
-The operator authorized completing and merging the D2 production PR, holding deployment until after D5, then starting D3. D2 private PR [738](https://github.com/cwatts6/k98-bot/pull/738) merged on 10 November 2026 at `cd04ed5e494adf5bf40f607798b38abb8df1b836`. Its exact reviewed head was `e02c2d37daffc46dcfb5a5b1521f809bfdab3efd`. All five CI checks passed, automated code review completed without findings, and Changes security review `783aa032-d4d3-4b19-898f-ca2bd037ebcf` completed with zero findings. Local tests: 12,951 passed, 1,184 skipped, one warning, eight subtests passed; both operational-log isolation checks passed. Linux CI: 12,772 passed, 1,363 skipped, 19 warnings, eight subtests passed. Windows updater and release-identity checks passed. The two-file test hygiene correction is merged in mirror PR 511.
-
-D3 begins from the resulting scrubbed mirror snapshot `4455bfcacc3c2c5e60216cf80ef84adc42e0d397`, on `codex/p02-d3-file-ownership`. SQL source is clean at `7a3dec1326b2bcc86455626849b373d1123232a2`. No deployment, updater installation, restart, production SQL, provider or retained-recovery action occurred. This record starts the already-approved D3 scope; it does not claim D3 implementation or qualification complete.
-
-Use the existing [remaining-work handover](Startup%20Import%20Export%20Reliability%20-%20P02%20Remaining%20Work%20Handover%20-%202026-11-09.md), [integrated plan](Startup%20Import%20Export%20Reliability%20-%20P02%20Integrated%20Analysis%20and%20Delivery%20Plan%20-%202026-11-07.md), and [D2 delivery review](Startup%20Import%20Export%20Reliability%20-%20P02%20D2%20Delivery%20Review%20-%202026-11-09.md). The operator's later promotion authorization supersedes the handover's historical promotion restriction. The deployment hold remains current.
-
-## D3a scope: shared file ownership
-
-**Scope Summary.** Fix F20 at the shared file-lock boundary before separating SQL maintenance. Acquisition errors, protected-body failures and cleanup outcomes must remain distinct. Release only the exact owned lock; never remove a foreign/replaced sentinel or infer abandonment from age. Retain the original failure when cleanup also fails. Keep admission closed when physical cleanup cannot be established.
-
-**Affected Areas.** `file_utils.acquire_lock` is used by ordinary and guided player-cache publication, startup completion readback, `ark/team_state.py`, `ark/state/ark_state.py`, and `services/tracked_view_store.py`. The tracked-view wrapper currently calls `__exit__(None, None, None)` to compensate for the helper's body-error leak; replace that workaround only together with a verified shared contract. `file_utils.release_lock` has no current repository caller; it must not provide a path-only bypass around new ownership checks. The separately named governor-session DAL lock is SQL-backed and outside this file-lock correction.
-
-**Architecture Direction.** Preserve the public context-manager entry point and existing timeout defaults. Put any substantial platform ownership implementation in a focused `core/` helper rather than expanding the legacy utility module. Separate acquisition retry from the single protected-body execution. Use a monotonic acquisition deadline. Define an exact descriptor/file identity and release contract, including Windows behavior, before coding; a path existence check followed by unlink is insufficient. Prove replacement/close races, not just a normal `finally` path. Keep state writes atomic and drain physical work after cancellation. Do not add automatic stale-lock deletion or widen filesystem permissions.
-
-**SQL / Persistence Review.** D3a changes file ownership only, with no schema, grants, SQL procedures or state-format migration planned. State must remain protected across competing writers and exceptions. A process restart does not authorize deleting an old sentinel. Subsequent D3 maintenance slices require authoritative SQL and durable due/claim/completion evidence. Current SQL object locations for all six stages were confirmed in `C:/K98-bot-SQL-Server/sql_schema`; no business SQL was executed.
-
-**Refactor Triggers.** Fix the duplicated tracked-view cleanup workaround as part of the shared contract. Keep Ark behavior unchanged apart from lock cleanup and regressions. Do not expand into Ark redesign, broader import orchestration, or P01.6 cache decode/rebuild optimisation. Review moving immutable snapshot parsing outside the writer lock as a separate narrowly proved follow-up, preserving generation identity.
-
-**Security Review Decision.** The eventual D3a implementation touches filesystem ownership and restart-sensitive state: require a Changes scan of the exact Bot base/head, Deep off. SQL maintenance changes need their own SQL diff review. This initial document and disposable diagnostic evidence have no runtime change; no new scan is needed solely for this scope record. Root SECURITY.md and shared-helper guidance were consulted.
-
-**Test Strategy.** Regressions must cover normal release, competing acquisition, a body `FileExistsError`, ordinary failures, `BaseException` cancellation, failed descriptor close, cleanup failure preserving the first error, replaced/missing/foreign/symlink sentinels, and replacement at the close/unlink boundary. Exercise player-cache ordinary/guided/startup, Ark team/state and tracked-view callers with isolated paths. Native Windows and a separate process must qualify the actual ownership/release behavior; no production files or locks may be used. Preserve timeout values. Run architecture, deferred, selector and security-routing gates, focused caller regressions, and exact updater transition checks before PR.
-
-**Conditional References.** Shared-helper review guide applies. Startup/shutdown and Windows ownership contracts apply when the final descriptor-lifetime design is selected. No Discord command or public UI redesign is in this slice.
-
-**Open Questions / Approval Needed.** No renewed implementation approval is needed within the agreed D3 scope. The exact race-safe Windows/POSIX release design and handling of cleanup uncertainty require engineering verification before implementation, not a new product decision. A change to lock recovery policy, backup schedules or deferred domain behavior would be outside this scope.
-
-## D3a implementation and qualification
-
-Mirror PR [513](https://github.com/cwatts6/K98-bot-mirror/pull/513) implements the
-shared owner, preserves the facade, drains ordinary cache/Ark saves, passes real
-tracked-view failures through release, and verifies startup from the same bounded
-immutable bytes. Windows releases its exact handle; POSIX keeps the rendezvous
-inode. No age/PID recovery or path-only deletion is permitted. Local admission
-remains claimed until cleanup is acknowledged, including a physically closed
-handle whose acknowledgement is delayed or lost. An uncertain close is never
-retried against a potentially reused handle.
-
-The bounded [coverage delta](Startup%20Import%20Export%20Reliability%20-%20P02%20D3a%20Coverage%20Delta%20-%202026-11-10.md)
-records caller census, review corrections and the six remaining SQL boundaries.
-The baseline failure artifact remains intact. Two additional regressions failed
-before the local admission/ancillary logging corrections and pass afterward.
-
-The exact D3a updater family has eleven members (six changed, five retained
-dependencies), with 82 total entries. All 81 predecessor definitions and the
-registry byte bound remain unchanged. Historical tests now expect the added
-entry while retaining their original history digests. This single-slice contract
-does not solve the D4 combined deployment jump.
-
-| Gate | Evidence / current result |
-| --- | --- |
-| Native Windows and Linux | [CI run 42781962660](https://github.com/cwatts6/K98-bot-mirror/actions/runs/42781962660) at `d8490eb476ba08812c077b1ed685de9be082a48c`: Windows 29 passed / 6 POSIX skips; Ubuntu 32 passed / 3 Windows skips. Pure helper suite uses no application fixtures. |
-| Focused final corrections | 128 passed, 6 platform skips, covering helper, real callers, exact D3a updater, ordinary cache and foreign-lock timeout. |
-| Full repository | 13,051 passed, 1,191 skipped, 1 warning, 8 subtests passed in 1,505.19 seconds. Operational-log isolation passed: production operational logs unchanged. The earlier 18 failures were stale registry-count assertions; their historical digest checks remain intact. |
-| Static/repository gates | Architecture (43 Python files), deferred validation (3 Markdown files), security routing, selector, import smoke, command registration and applicable pre-commit checks passed. |
-| Security Changes | Final runtime range `402151f8c1a63015c2ad5dd02f8599997cba01d6..d8490eb476ba08812c077b1ed685de9be082a48c`; scan `66f03e2e-5201-4e2b-9a13-4f959800ed76`, complete coverage of all nine source-like files, zero findings, Deep off. Subsequent changes are test-count assertions and delivery documentation only; no repeated security scan for those non-runtime edits. |
-
-Qualification uses disposable local paths and native CI surrogates. Production
-filesystem type, parent custody/ACLs, installation and provider behavior are not
-requalified here. Trusted local parent directories and cooperating writers remain
-prerequisites; same-process uncertain-close custody does not establish
-cross-process quarantine after an ambiguous physical release. Ark independent
-two-file saves and stale-instance merge behavior remain a recorded domain
-follow-up. No SQL changes/execution, private promotion, deployment, restart or
-retained recovery occurred. D3a does not close D3, D4, D5 or P05 acceptance.
-
-## Reproduced baseline, before implementation
-
-Fresh continuation review: [D3a coverage delta](Startup%20Import%20Export%20Reliability%20-%20P02%20D3a%20Coverage%20Delta%20-%202026-11-10.md)
-records the source/caller reconciliation, additional cancellation/first-failure
-cases, platform ownership design and both configuration transaction contracts.
-D3a implementation and qualification are recorded above; all six maintenance
-boundaries and D4/D5 remain open.
-
-A disposable local fixture exercised the actual helper from the D3 starting snapshot, with inert test configuration and no SQL or network calls:
-
-| Case | Observed current behavior | Required correction |
+| Slice | Coverage and change | Practical effect |
 | --- | --- | --- |
-| Body raises `ValueError` | Original error survives, lock remains | Release exact owned lock in cleanup |
-| Body raises `FileExistsError` | Original error becomes `TimeoutError`; lock remains | Retry acquisition only; preserve body failure |
-| Body raises `asyncio.CancelledError` | Cancellation survives, lock remains | Cleanup runs for cancellation and preserves it |
-| Replacement injected after descriptor close, before path unlink | Foreign successor is deleted | Release must bind to original ownership through physical cleanup |
-| Foreign sentinel exists before acquisition | Times out and preserves foreign sentinel | Preserve this behavior |
+| D3a — shared file ownership | Exact physical lock ownership across ordinary/guided player cache, startup readback, Ark team/state and tracked views; body errors, cancellation, foreign successors and uncertain cleanup | Original errors survive; cleanup cannot delete another operation's lock or silently permit unsafe reuse. |
+| D3b — maintenance ownership | Six fixed kinds; coalesced durable generations, exact claims, first/current failure, unknown outcome; fresh dedicated SQL connection and verified physical release | Optional work has its own durable outcome; process cancellation or a pooled connection close cannot manufacture completion. |
+| D3c — import | Phase A sampled statistics and conditional KS4 upkeep moved behind committed import intent; required scan/history/metadata work retained; managed snapshot reader/schema exclusion | Shorter required import work; maintenance cannot overlap the managed recovery reader's schema-sensitive snapshot. |
+| D3d — configuration | Actual CREATE_DELTA_TABLES upkeep, original large-batch/168-hour eligibility, typed outer transaction and optional log handling | Configuration publication and maintenance remain distinct; a failed timing log cannot erase successful upkeep or the first failure. |
+| D3e — player report | FULLSCAN moved after transactional report publication; provenance, capture, name publication and D2 statement cap retained; all worker kinds take player-publication guard | Consistent report publication without coupling its commit to FULLSCAN. |
+| D3f — KVK output | Required schema/unique indexes/calculations/views/exact receipt retained; post-output nonunique index upkeep and FULLSCAN deferred; typed per-KVK generation plus object/header identity, one target per pass | Bounded optional work cannot accidentally act on a replaced output or report incomplete multi-target work as complete. |
+| D3g — final reports and backup | Dashboard/summary intent at each actual stage commit; optional statistics/completion CHECKPOINT moved; exact final success receipt preserved; one durable backup request with no fallback after uncertain dispatch | Final report success no longer waits for optional backup work. Backup relief remains eligible from committed summary demand even when statistics are deferred by high log usage. |
 
-These are reproduced defects, not passing candidate tests. Private fixture evidence is retained with the D2 promotion work. No application source or test suite has been changed at this scope checkpoint.
+All six maintenance boundaries are represented: import, configuration, player report,
+KVK output, final stats and explicit post-import. Required business calculations,
+output identities, receipts and pre-admission checks remain. Backup acknowledgement
+means a request was accepted; it does not prove a backup completed. Historical
+unowned backup queue rows are held for reconciliation, never adopted or expired by age.
 
-Scope-record validation: deferred-item validation passed for this document; architecture reported zero changed Python files; test selection and security-routing validation passed. Repeating runtime, SQL or command-registration tests for this document-only checkpoint is skipped because it changes no executable behavior; the completed D2 candidate evidence remains applicable. Implementation tests and review gates above remain mandatory for D3a.
+Expected benefits are fewer false business failures, shorter required commit paths,
+truthful recovery evidence and controlled maintenance ownership. No latency percentage,
+throughput gain or production resource saving is claimed: D5 measures the combined cost.
 
-## Remaining D3 maintenance packages
+## Merged source receipts
 
-Scope each package against real children, required business effects and existing durable maintenance machinery before changing it. Slice boundaries may combine tightly coupled contracts; this is not a promise to create six unrelated PRs.
-
-| Boundary | Owning procedures / service | Required distinction |
+| Slice | Bot mirror PR / merge | SQL PR / merge |
 | --- | --- | --- |
-| Import Phase A | `UPDATE_ALL2`, `IMPORT_STAGING_PROC_CORE` | Keep claim, typed input, history, allocation, receipt and archive integrity; separately qualify sampled statistics and conditional KS4 maintenance |
-| Configuration | `sp_TARGETS_MASTER` -> `CREATE_DELTA_TABLES` | Keep atomic delta publication and identity; separate eligible statistics/rebuild/reorganise and optional timing logs |
-| Player report | `SP_Stats_for_Upload` | Keep consistent result and capture; separately qualify FULLSCAN, preserving D2's actual statement budget |
-| KVK output | `sp_ExcelOutput_ByKVK` and children | Preserve required schema, unique indexes, views, output and receipt; distinguish nonessential upkeep |
-| Final stats reports | `usp_S11CompleteStatsReportsCore` | Keep stage completion/output; distinguish admission headroom from post-success CHECKPOINT, statistics and backup waits |
-| Explicit post-import | Python maintenance owner and `usp_update_stats` | Preserve committed outcome and physical worker ownership; durable maintenance due/claim/completion, bounded backlog and headroom |
+| D3a | [513](https://github.com/cwatts6/K98-bot-mirror/pull/513) / `1e001aad` | No SQL change |
+| D3b | [514](https://github.com/cwatts6/K98-bot-mirror/pull/514) / `f910fa83` | [142](https://github.com/cwatts6/K98-bot-SQL-Server/pull/142) / `8ba5850a` |
+| D3c | [515](https://github.com/cwatts6/K98-bot-mirror/pull/515) / `2d1103df` | [143](https://github.com/cwatts6/K98-bot-SQL-Server/pull/143) / `faddbd12` |
+| D3d | [516](https://github.com/cwatts6/K98-bot-mirror/pull/516) / `b80c5813` | [144](https://github.com/cwatts6/K98-bot-SQL-Server/pull/144) / `adb5f8a7` |
+| D3e | [517](https://github.com/cwatts6/K98-bot-mirror/pull/517) / `04223144` | [145](https://github.com/cwatts6/K98-bot-SQL-Server/pull/145) / `2af0a70e` |
+| D3f | [518](https://github.com/cwatts6/K98-bot-mirror/pull/518) / `aee7d882` | [146](https://github.com/cwatts6/K98-bot-SQL-Server/pull/146) / `6504865e` |
+| D3g | [519](https://github.com/cwatts6/K98-bot-mirror/pull/519) / `4bdf3151` | [147](https://github.com/cwatts6/K98-bot-SQL-Server/pull/147) / `0d93e228` |
 
-Maintenance failure after a business commit must not relabel the import as failed or authorize replay. Test real child failures, restart, cancellation, competing owners, cleanup, capacity and both reader/writer arrival orders. Preserve the recorded raw-history SNAPSHOT versus index REBUILD SQL 3961 failure until its D3 reader/maintenance boundary is actually qualified. Keep RCSI off, existing timeouts and resource thresholds unchanged, and backup schedule policy separate.
+D3g final reviewed heads: Bot `738a702dd7958ce1be108e226b922a64b2871710`,
+SQL `9cb0895cb2dc1d9bf59cf7c898b36ddbe7e17d89`. Both code reviews completed
+without findings or unresolved threads; SQL CI passed twice (3m08s and 4m25s).
+The earlier D3 scope/documentation PR512 is included in combined promotion.
+SQL plans are reconciled in documentation PR148, merged at `6d88e09a`.
 
-## Mandatory D4 release-compatibility carry-forward
+The full regression exposed one stale updater-history test dispatcher after the
+runtime slices merged. [Mirror PR520](https://github.com/cwatts6/K98-bot-mirror/pull/520)
+adds the missing D3c/D3d/D3e/D3g mappings to existing authenticated predecessor
+bridges. Runtime, transition entries, bridge implementations and historical hashes
+are unchanged. All 243 focused updater/history checks passed after the correction.
+The preceding full run retained 13,319 passes, 1,262 skips and that one failure;
+the clean full result below is the repeat on the corrected stable tree.
 
-D2's promotion check found a concrete deployment condition: recorded installed Bot `97abcce1b2a9e71b3959eff74525c57930a703e6` to the combined D2 candidate returns `COORDINATED_RELEASE_REQUIRED`, even with the newly packaged updater. The twelve individually pinned transitions do not authorize a direct jump across all intermediate slice versions. All 69 pre-D2 definitions are preserved; registry occupancy is 81. The offline package's hashes and contents were verified, but it was not installed and does not make the combined target deployable.
+## Qualification and evidence limits
 
-D4 already owns final source/SQL/startup/updater compatibility. It must add and qualify an exact final combined transition or supported coordinated release for the actual final target, preserve predecessor definitions and dependency pins, reject mixed/missing/foreign bytes, and regenerate the updater package. Do not weaken matching, infer arbitrary transition chaining or deploy intermediate slices to bypass the refusal. D5 must qualify the resulting combined candidate. Refresh installed identities and changed-path/ancestor custody at the later deployment checkpoint; historical host evidence is insufficient. D2 is merged, but immediate combined deployment readiness is explicitly not claimed.
+Stable final full Bot regression: **13320 passed, 1262 skipped, 1 warning, 8 subtests passed in 1579.22s (0:26:19)**.
+The operational-log isolation check confirmed production logs unchanged.
+
+Focused D3g qualification: 122 combined native/Python cases passed before the
+review correction; all 14 final native D3g cases passed after it, including injected
+75-percent log observation with actual dispatch/claim SQL and simulated backup.
+133 updater/history checks and final pre-commit/repository gates passed.
+The final-report continuation fixture executes real guards and receipts with simulated
+large calculations; separate exact-source checks preserve the actual business body.
+Disposable native coverage includes both ownership orders, outer commit/rollback,
+real statistics/index children, partial KVK progress, stale output identity, first
+failure, failed ACK and unknown physical absence. D3a additionally has native
+Windows/POSIX and separate-process evidence in its archived delivery review.
+
+One unrelated opt-in native continuation assertion remains recorded: the changed
+exception-chain test expects only exception_types/observed_utc to differ, although
+fingerprint also differs. Its assertion was not relaxed and unrelated runtime code
+was not changed. The remaining continuation selection passed. The earlier D3g full
+run was stopped before source edits after review found the backup eligibility coupling;
+that partial log is retained, not counted as acceptance. The stable result above
+supersedes it. Actual provider/SQL Agent delivery was never invoked by these tests.
+
+Review found and corrected the backup-relief/statistics-headroom coupling before
+merge. Historical failed fixtures and initial evidence remain separate from final
+results. There is no claim that every possible edge case or production topology
+has been exercised.
+
+Security Changes reviews covered every slice; Deep was off. D3g Bot scan
+`d7883c6d-b020-4b4e-b797-dfc482cbc2a1` covered all 51 paths at runtime head
+`0ce80f19`; SQL scan `3276c65e-3ec5-43d3-ab80-acc48bb8c59a` covered all 17 paths
+at `f2712a8`; SQL correction scan `4b1addf0-1e6d-4dfc-a427-cbbcd9563cc9` covered
+all four changed paths through `9cb0895`. All had zero security findings. Bot's
+final follow-up is tests/evidence only, with a precise security skip.
+The first two recorded identical overlapping usage windows: 2,638,109 total tokens
+(2,630,650 input, 2,603,776 cached, 7,459 output). Correction: 341,058 total
+(340,328 input, 339,840 cached, 730 output). Do not sum overlapping windows as billing.
+Earlier slice scans and receipts remain in their archived packs.
+
+Combined private candidate Changes scan `c3802c0c-ffee-44c4-a3e0-afea83f57f7e`
+reviewed exact private `cd04ed5e..5b2eb398`: all 112 changed paths, zero findings.
+Its measured window was 2,690,463 total tokens (2,681,144 input, 2,630,400 cached,
+9,319 output; 1,484 reasoning output). This is scan-reported usage, not a sum or
+billing claim. The final closeout/archive follow-up is Markdown only, with a
+documented security skip and exact runtime/test equivalence retained.
+
+The updater has 87 fixed entries; prior 86 digest is
+`49752cc86f05563aeb7b04111c050e2730548e0a32654e757b5b24e7d7991d90`.
+D3g has twelve members, six changed. The 232448-byte registry cap is unchanged.
+Exact per-slice transitions are not authority for the installed combined jump.
+
+## Remaining programme obligations
+
+D4 owns current installed/manual/legacy bindings (including UPDATE_ALL/Rally/TEST),
+permissions/signing and final Bot/SQL/startup pins, plus the demonstrated
+`COORDINATED_RELEASE_REQUIRED` combined transition. It must reconcile the missing
+authoritative `KS4_UNO_SEQ` definition and installed msdb backup wrapper, direct
+child guard expectations and historical backup queue outcomes. No guessed objects,
+new grants, TRUSTWORTHY switch or automatic replay substitutes for this evidence.
+
+D5 owns final scale, cost and whole-programme fault/restart/concurrency qualification.
+Keep RCSI off; preserve 8 GiB free memory/disk reserves, log below 70 percent for
+optional statistics, version store below 512 MiB and the existing balanced cost
+limits. The single 21-input rehearsal allowance remains consumed. No timeout,
+input-cap or backup-schedule increase is implied.
+
+After D5, separately controlled deployment must refresh actual installed identity
+and changed-file/ancestor custody. SQL ledger/child/producer and Bot changes form a
+coordinated release; reverting Bot alone is not a sufficient rollback policy.
+Preserve committed imports, output captures and provider effects. P03 actual
+blockers plus essential P04 corrections precede the first standard import/export;
+zero incidents and waiting merely for P05 are not prerequisites.
+
+The active D3 handover carries these remaining obligations. Completed slice packs
+and original scope evidence are archived with links retained through mirror/private
+promotion. This closeout performs no production SQL, deployment, restart or recovery.
+
+## Archived slice evidence
+
+- [Startup Import Export Reliability - P02 D3a Coverage Delta - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3a%20Coverage%20Delta%20-%202026-11-10.md)
+- [Startup Import Export Reliability - P02 D3b Maintenance Ownership - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3b%20Maintenance%20Ownership%20-%202026-11-10.md)
+- [Startup Import Export Reliability - P02 D3c Import Maintenance - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3c%20Import%20Maintenance%20-%202026-11-10.md)
+- [Startup Import Export Reliability - P02 D3d Configuration Maintenance - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3d%20Configuration%20Maintenance%20-%202026-11-10.md)
+- [Startup Import Export Reliability - P02 D3e Player Report Maintenance - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3e%20Player%20Report%20Maintenance%20-%202026-11-10.md)
+- [Startup Import Export Reliability - P02 D3f KVK Output Maintenance - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3f%20KVK%20Output%20Maintenance%20-%202026-11-10.md)
+- [Startup Import Export Reliability - P02 D3g Final Report Maintenance - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3g%20Final%20Report%20Maintenance%20-%202026-11-10.md)
+- [Startup Import Export Reliability - P02 D3a Delivery Review - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3a%20Delivery%20Review%20-%202026-11-10.md)
+- [Startup Import Export Reliability - P02 D3 Original Handover and Scope - 2026-11-10](archive/Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Original%20Handover%20and%20Scope%20-%202026-11-10.md)
