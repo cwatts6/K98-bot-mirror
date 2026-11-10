@@ -43,7 +43,7 @@ def fixture_functions(powershell, tmp_path, body):
         "if($s -is [Management.Automation.Language.FunctionDefinitionAst]){"
         ". ([scriptblock]::Create($s.Extent.Text))}}\n"
         "$timer=[Diagnostics.Stopwatch]::StartNew();$script:readBytes=0L\n"
-        "$script:visited=0;$script:seen=@{}\n"
+        "$script:seen=@{}\n"
         "$script:files=New-Object 'Collections.Generic.List[object]'\n" + body,
         encoding="utf-8",
     )
@@ -110,6 +110,9 @@ def test_source_tree_exclusions_hashes_and_exact_root_names(powershell, tmp_path
     (root / "secrets.json").write_text('{"password":"not-source"}')
     (root / "venv").mkdir()
     (root / "venv" / "ignore.py").write_text("UPDATE_RALLY_DATA")
+    for name in (".pre-commit-home", ".pre-commit-cache", ".mypy_cache", ".ruff_cache"):
+        (root / name).mkdir()
+        (root / name / "ignore.py").write_text("UPDATE_RALLY_DATA")
     output = fixture_functions(
         powershell,
         tmp_path,
@@ -123,6 +126,30 @@ def test_source_tree_exclusions_hashes_and_exact_root_names(powershell, tmp_path
     # TEST is intentionally a lexical candidate (Test-Path is not a SQL caller).
     assert rows["old.ps1"]["root_candidates"] == ["UPDATE_ALL", "TEST"]
     assert "not-source" not in output
+
+
+def test_source_budgets_are_recursive_and_independent(powershell, tmp_path):
+    bot = tmp_path / "bot"
+    (bot / "nested").mkdir(parents=True)
+    for name in ("one.py", "two.py", "three.py"):
+        (bot / "nested" / name).write_text("UPDATE_ALL2")
+    sql = tmp_path / "sql"
+    sql.mkdir()
+    (sql / "entry.ps1").write_text("UPDATE_ALL2")
+    output = fixture_functions(
+        powershell,
+        tmp_path,
+        "$record=[ordered]@{sections=@()}\n"
+        "Add-Section 'bot' {Read-SourceInventory (Join-Path $Fixture 'bot') 2}\n"
+        "Add-Section 'sql' {Read-SourceInventory (Join-Path $Fixture 'sql') 2}\n"
+        "$record|ConvertTo-Json -Depth 5\n",
+    )
+    bot_section, sql_section = json.loads(output)["sections"]
+    assert bot_section["status"] == "unavailable"
+    assert bot_section["error_code"] == "entry_count_bound"
+    assert sql_section["status"] == "complete"
+    assert sql_section["value"]["visited_entries"] == 1
+    assert sql_section["value"]["entry_limit"] == 2
 
 
 def test_file_bounds_and_partial_section_are_not_success(powershell, tmp_path):
