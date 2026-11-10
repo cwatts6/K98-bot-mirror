@@ -1,3 +1,5 @@
+> **Current continuation:** Private D3 PR739 is merged, not deployed. [D4 scope and handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20and%20Handover%20-%202026-11-10.md) supersedes earlier next-chat and approval checkpoints; retain the unresolved obligations and lessons below. D4/D5 and separate deployment authority remain required.
+
 # P02 remaining work: approved scope and delivery handover
 
 > **10 November continuation:** The [D3 handover](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) is the current entry point. D3a-D3g source delivery and individual mirror/SQL reviews are complete; the operator authorized the combined private production PR and review cycle. D2 private PR 738 is merged. Neither D2 nor D3 is deployed. D4 must resolve installed/manual/legacy and combined updater compatibility; D5 owns final integrated qualification. Deployment remains held until after D5. The original scope and lessons below remain active where not superseded.
