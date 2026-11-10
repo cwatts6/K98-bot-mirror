@@ -138,7 +138,16 @@ function Read-IdentitySettings([string]$Path){
 }
 function Add-Section([string]$Name,[scriptblock]$Read){
     try {Check-Budget;$value=& $Read;$record.sections+=@{name=$Name;status='complete';value=$value}}
-    catch {$record.sections+=@{name=$Name;status='unavailable';error_type=$_.Exception.GetType().Name}}
+    catch {
+        # Only our fixed sentinel codes are public within this private receipt.
+        # Never copy arbitrary exception messages, even if they look like tokens.
+        $safeCodes=@('time_bound','local_path_required','reparse_path','byte_bound','file_changed',
+            'file_count_bound','entry_count_bound','folder_count_bound','task_count_bound',
+            'action_count_bound','arguments_bound','updater_count_bound','startup_action_shape',
+            'seed_path_shape','ref_shape','ref_unresolved','head_shape')
+        $code=if($_.Exception.Message -cin $safeCodes){$_.Exception.Message}else{'read_failed'}
+        $record.sections+=@{name=$Name;status='unavailable';error_type=$_.Exception.GetType().Name;error_code=$code}
+    }
 }
 function Read-Tasks {
     $scheduler=New-Object -ComObject 'Schedule.Service'
@@ -151,6 +160,7 @@ function Read-Tasks {
         Check-Budget
         if(++$folderCount -gt 512){throw 'folder_count_bound'}
         $folder=$folders.Dequeue()
+        # GetFolders flags are reserved and must be zero; hidden TASKS use 1 below.
         foreach($child in $folder.GetFolders(0)){$folders.Enqueue($child)}
         foreach($task in $folder.GetTasks(1)){
             Check-Budget

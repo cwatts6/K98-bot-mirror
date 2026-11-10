@@ -134,12 +134,13 @@ def test_file_bounds_and_partial_section_are_not_success(powershell, tmp_path):
         "Add-Section 'bounded' {Read-Bounded (Join-Path $Fixture 'large.txt') 10}\n"
         "$script:readBytes=128MB\n"
         "Add-Section 'aggregate' {Read-Bounded (Join-Path $Fixture 'large.txt')}\n"
+        "Add-Section 'private_error' {throw 'never_export_this_secret'}\n"
         "$record|ConvertTo-Json -Depth 5\n",
     )
-    assert [s["status"] for s in json.loads(output)["sections"]] == [
-        "unavailable",
-        "unavailable",
-    ]
+    sections = json.loads(output)["sections"]
+    assert all(s["status"] == "unavailable" for s in sections)
+    assert [s["error_code"] for s in sections] == ["byte_bound", "byte_bound", "read_failed"]
+    assert "never_export_this_secret" not in output
 
 
 def test_reparse_and_nonlocal_reads_refuse(powershell, tmp_path):
@@ -170,7 +171,7 @@ $task=[pscustomobject]@{Path='\Fixture';Enabled=$true;State=3;LastRunTime=[datet
 $script:taskFixture=$task
 $script:folderFixture=New-Object psobject
 $script:folderFixture|Add-Member ScriptMethod GetTasks {param($flags);if($flags -ne 1){throw 'hidden tasks omitted'};return @($script:taskFixture)}
-$script:folderFixture|Add-Member ScriptMethod GetFolders {param($flags);return @()}
+$script:folderFixture|Add-Member ScriptMethod GetFolders {param($flags);if($flags -ne 0){throw 'reserved folder flag'};return @()}
 $script:schedulerFixture=New-Object psobject
 $script:schedulerFixture|Add-Member ScriptMethod Connect {}
 $script:schedulerFixture|Add-Member ScriptMethod GetFolder {param($path);return $script:folderFixture}
