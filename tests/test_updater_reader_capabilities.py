@@ -25,6 +25,10 @@ from tests.updater_source_assertions import (
     before_d2l_hash,
     before_d3a_hash,
     before_d3b_hash,
+    before_d3c_hash,
+    before_d3d_hash,
+    before_d3e_hash,
+    before_d3g_hash,
     before_event_delivery_hash,
     before_finalisation_hash,
     before_monitoring_hash,
@@ -111,6 +115,19 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     )
 
     for transition in update.reviewed_transitions():
+        d3_successors = {
+            "p02_d3c_import_maintenance_v1": before_d3c_hash,
+            "p02_d3d_configuration_maintenance_v1": before_d3d_hash,
+            "p02_d3e_player_report_maintenance_v1": before_d3e_hash,
+            "p02_d3g_final_report_maintenance_v1": before_d3g_hash,
+        }
+        if transition["id"] in d3_successors:
+            # Each bridge authenticates the delivered successor before exposing
+            # the immutable predecessor. Do not feed newer families into the
+            # original pre-D3 terminal-image comparison below.
+            for member in transition["members"]:
+                d3_successors[transition["id"]](root, member["path"])
+            continue
         if transition["id"] == "p02_d3b_maintenance_ownership_v1":
             for member in transition["members"]:
                 before_d3b_hash(root, member["path"])
