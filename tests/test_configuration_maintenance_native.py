@@ -175,7 +175,8 @@ def test_actual_child_and_optional_log_remain_after_business_commit(database, lo
     assert owner.execute("SELECT COUNT(*) FROM dbo.DeltaMetrics").fetchval() == 1
 
 
-def test_optional_log_failure_preserves_business_and_upkeep_evidence(database):
+@pytest.mark.parametrize("diagnostic_failure", [False, True])
+def test_optional_log_failure_preserves_business_and_upkeep_evidence(database, diagnostic_failure):
     owner, _ = database
     install_log(owner)
     owner.execute(
@@ -183,6 +184,11 @@ def test_optional_log_failure_preserves_business_and_upkeep_evidence(database):
     )
     insert_scan(owner)
     drain(owner.execute("EXEC dbo.CREATE_DELTA_TABLES"))
+    if diagnostic_failure:
+        owner.execute(
+            "CREATE TRIGGER RejectLogEvidence ON dbo.MaintenanceConfigurationWork AFTER UPDATE AS "
+            "IF UPDATE(FirstLogErrorNumber) THROW 50043,'Fixture diagnostic failure',1;"
+        )
     with pytest.raises(Exception, match="547"):
         drain(owner.execute("EXEC dbo.usp_RunMaintenance 'configuration'"))
     assert state(owner) == (1, 0, "failed")
@@ -190,7 +196,13 @@ def test_optional_log_failure_preserves_business_and_upkeep_evidence(database):
         owner.execute(
             "SELECT UpkeepCompletedGeneration,FirstLogErrorNumber FROM dbo.MaintenanceConfigurationWork"
         ).fetchone()
-    ) == (1, 547)
+    ) == (1, None if diagnostic_failure else 547)
+    assert (
+        owner.execute(
+            "SELECT FirstErrorNumber FROM dbo.MaintenanceWork WHERE Kind='configuration'"
+        ).fetchval()
+        == 547
+    )
     assert owner.execute("SELECT COUNT(*) FROM dbo.DeltaMetrics").fetchval() == 1
     # Exact failed packet is not automatically replayed to repair a timing log.
     drain(owner.execute("EXEC dbo.usp_RunMaintenance 'configuration'"))

@@ -47,3 +47,21 @@ There are 85 entries, with the byte bound and combined-jump refusal unchanged.
 Source/mutation checks authenticate eleven SQL candidates; historical contracts
 remain immutable. Separate Bot/SQL Changes review and PR review remain required.
 D3e-g, D4 installed/manual/signing compatibility and D5 combined cost remain open.
+
+Review correction: optional timing-log diagnostic persistence now has a nested
+error boundary, so a secondary failure cannot replace the original log error.
+The actual child regression injects a second SQL error via an owned fixture
+trigger; all 19 configuration-native cases pass, including original error 547
+retained in MaintenanceWork while the diagnostic field remains unavailable.
+Initial restricted-token SQL authentication failed before fixture creation;
+the same unchanged test command passed using Windows authentication outside
+that restriction. This was an environment failure, not a product failure.
+
+Initial Changes reviews completed and sealed: Bot fc51aa8c-82b0-4341-8208-e93aa78e2ffe
+(2d1103df..0a090850, 40 changed paths), SQL b6881538-fbc4-44fd-815e-1cab4215549c
+(faddbd12..2233fd94, 13 changed paths). Both found zero security candidates.
+Both report overlapping rollout usage of 1,122,795 total tokens (1,118,754 input,
+1,085,952 cached input, 4,041 output); these are not additive cost totals.
+The narrow SQL diagnostic correction receives a separate Changes review.
+Bot follow-up contains only this evidence and the disposable SQL regression;
+no additional Bot runtime/configuration/permission surface changed.
