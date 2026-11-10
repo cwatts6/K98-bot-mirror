@@ -173,6 +173,15 @@ function Read-Tasks {
     }
     return @{tasks=$rows.ToArray();folders=$folderCount}
 }
+function Read-UpdaterMembers([string]$Directory){
+    $members=@()
+    foreach($entry in [IO.Directory]::EnumerateFiles((Assert-LocalPath $Directory))){
+        if($members.Count -ge 64){throw 'updater_count_bound'}
+        $raw=Read-Bounded $entry 8MB
+        $members+=@{name=[IO.Path]::GetFileName($entry);sha256=(Hash-Bytes $raw);bytes=$raw.Length}
+    }
+    return ,$members
+}
 function Read-ProtectedRelease {
     $scheduler=New-Object -ComObject 'Schedule.Service';$scheduler.Connect()
     $actions=$scheduler.GetFolder('\').GetTask('StartDLBotAfterSQL').Definition.Actions
@@ -194,15 +203,12 @@ function Read-ProtectedRelease {
     $botRaw=Read-Bounded (Join-Path $seedDirectory 'bot-template.json')
     $bot=(Decode-Text $botRaw)|ConvertFrom-Json
     $updater='C:\ProgramData\K98\S11\updater'
-    $updaterFiles=@()
-    foreach($entry in [IO.Directory]::EnumerateFiles((Assert-LocalPath $updater))){
-        if($updaterFiles.Count -ge 64){throw 'updater_count_bound'}
-        $raw=Read-Bounded $entry 8MB
-        $updaterFiles+=@{name=[IO.Path]::GetFileName($entry);sha256=(Hash-Bytes $raw);bytes=$raw.Length}
-    }
+    $updaterFiles=Read-UpdaterMembers $updater
+    # Original supported policies have no predecessor; later release policies do.
+    $predecessor=if($null -ne $policy.PSObject.Properties['predecessor']){$policy.predecessor}else{$null}
     # Return only known contract fields, never arbitrary template properties.
     return @{gate=$gate;policy_path=$policyPath;policy_sha256=(Hash-Bytes $policyRaw)
-        policy=@{version=$policy.version;predecessor=$policy.predecessor;seed_plan=$policy.seed_plan
+        policy=@{version=$policy.version;predecessor=$predecessor;seed_plan=$policy.seed_plan
             source_hashes=$policy.source_hashes;flags=$policy.flags;state_directory=$policy.state_directory}
         seed_directory=$seedDirectory;seed_members=$members;updater=$updaterFiles
         bot_contracts=@{sql_contract=$bot.sql_contract;legacy_sql_contract=$bot.legacy_sql_contract

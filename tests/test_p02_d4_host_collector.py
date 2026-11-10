@@ -189,3 +189,84 @@ Read-Tasks|ConvertTo-Json -Depth 10
     assert len(tasks[0]["actions"][0]["arguments_sha256"]) == 64
     assert tasks[0]["actions"][1]["status"] == "opaque"
     assert "never-export-this" not in output
+
+
+@pytest.mark.parametrize("has_predecessor", [False, True])
+def test_protected_release_supports_both_policy_shapes(powershell, tmp_path, has_predecessor):
+    seed = r"C:\ProgramData\K98\S11\runtime\12345678-1234-1234-1234-123456789012"
+    policy = {
+        "version": 1,
+        "seed_plan": {"path": seed + r"\ManualProcessPairPlan-CANDIDATE.json", "sha256": "a" * 64},
+        "source_hashes": {"DL_bot.py": "b" * 64},
+        "flags": {},
+        "state_directory": r"C:\ProgramData\K98\S11\state",
+    }
+    if has_predecessor:
+        policy["predecessor"] = {"policy_sha256": "c" * 64}
+    (tmp_path / "AutomaticStartupPolicy.json").write_text(json.dumps(policy))
+    bot = {
+        key: {"version": 1}
+        for key in ("sql_contract", "legacy_sql_contract", "application_sql_contract")
+    }
+    bot["source_hashes"] = {"DL_bot.py": "b" * 64}
+    # Only selected fields are retained even when a fixture includes another field.
+    bot["unselected"] = "never-export-this"
+    (tmp_path / "bot-template.json").write_text(json.dumps(bot))
+    for name in (
+        "ManualProcessPairPlan-CANDIDATE.json",
+        "authority-template.json",
+        "host_acl.json",
+        "bot_identity.json",
+        "identity_issuance.json",
+        "file_access.json",
+        "key_inventory.json",
+        "writer_drain.json",
+        "sql_installation.json",
+    ):
+        (tmp_path / name).write_text("{}")
+    updater = tmp_path / "updater"
+    updater.mkdir()
+    (updater / "update-tool.json").write_text('{"version":1}')
+    output = fixture_functions(
+        powershell,
+        tmp_path,
+        r"""
+$script:fixtureRoot=$Fixture
+$script:nativeRead=${function:Read-Bounded}
+$script:nativeUpdater=${function:Read-UpdaterMembers}
+function Read-Bounded {
+    param([string]$Path,[int]$Limit=2MB)
+    if($Path.StartsWith($script:fixtureRoot)){& $script:nativeRead $Path $Limit;return}
+    if($Path -cnotmatch '^C:\\ProgramData\\K98\\S11\\runtime\\12345678-1234-1234-1234-123456789012\\[^\\]+$'){throw 'unexpected fixture path'}
+    & $script:nativeRead (Join-Path $script:fixtureRoot ([IO.Path]::GetFileName($Path))) $Limit
+}
+function Read-SourceFile {param([string]$Path);$script:observedGate=$Path}
+function Read-UpdaterMembers {
+    param([string]$Directory)
+    if($Directory -cne 'C:\ProgramData\K98\S11\updater'){throw 'updater path'}
+    & $script:nativeUpdater (Join-Path $script:fixtureRoot 'updater')
+}
+$script:actionFixture=[pscustomobject]@{Type=0;Arguments='-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\ProgramData\K98\S11\runtime\12345678-1234-1234-1234-123456789012\Start-ReviewedAutomaticStartup.ps1"'}
+$actions=[pscustomobject]@{Count=1}
+$actions|Add-Member ScriptMethod Item {param($index);if($index -ne 1){throw 'index'};return $script:actionFixture}
+$script:taskFixture=[pscustomobject]@{Definition=[pscustomobject]@{Actions=$actions}}
+$script:folderFixture=New-Object psobject
+$script:folderFixture|Add-Member ScriptMethod GetTask {param($name);if($name -ne 'StartDLBotAfterSQL'){throw 'task name'};return $script:taskFixture}
+$script:schedulerFixture=New-Object psobject
+$script:schedulerFixture|Add-Member ScriptMethod Connect {}
+$script:schedulerFixture|Add-Member ScriptMethod GetFolder {param($path);return $script:folderFixture}
+function New-Object {
+    param([string]$TypeName,[object[]]$ArgumentList,[string]$ComObject)
+    if($ComObject){if($ComObject -ne 'Schedule.Service'){throw 'unexpected COM'};return $script:schedulerFixture}
+    Microsoft.PowerShell.Utility\New-Object -TypeName $TypeName -ArgumentList $ArgumentList
+}
+Read-ProtectedRelease|ConvertTo-Json -Depth 12
+""",
+    )
+    result = json.loads(output)
+    assert result["policy"]["predecessor"] == policy.get("predecessor")
+    assert len(result["seed_members"]) == 10
+    assert result["updater"][0]["name"] == "update-tool.json"
+    assert len(result["updater"][0]["sha256"]) == 64
+    assert result["bot_contracts"]["sql_contract"] == {"version": 1}
+    assert "never-export-this" not in output
