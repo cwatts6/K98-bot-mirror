@@ -4365,6 +4365,51 @@
           "after_sha256": "d3d1acc9f50e1d0b3ab30036f40ed6f2d74542c6f8733c5f164fc07b98c60ec5"
         }
       ]
+    },
+    {
+      "id": "p02_d3e_player_report_maintenance_v1",
+      "members": [
+        {
+          "path": "core/owned_work.py",
+          "before_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f",
+          "after_sha256": "1280a964707596260fc693b0df3f377bfd649358a6a93160db80ba7f7d42794f"
+        },
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "572eb6c563823238da39cb15c8336da8a507f4fe629e044ca3aa0d73e33b7ee7",
+          "after_sha256": "572eb6c563823238da39cb15c8336da8a507f4fe629e044ca3aa0d73e33b7ee7"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91",
+          "after_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91"
+        },
+        {
+          "path": "file_utils.py",
+          "before_sha256": "dc013fc8c2cf65143e7d4cd030e2e724a62316e00e447e4938ee44df39c7378d",
+          "after_sha256": "dc013fc8c2cf65143e7d4cd030e2e724a62316e00e447e4938ee44df39c7378d"
+        },
+        {
+          "path": "maintenance_worker.py",
+          "before_sha256": "c7166a5fc671f7807ce21f28adae08d76cca703b2678ef7fac55ea385e681733",
+          "after_sha256": "c7166a5fc671f7807ce21f28adae08d76cca703b2678ef7fac55ea385e681733"
+        },
+        {
+          "path": "services/maintenance_dal.py",
+          "before_sha256": "1fb028ac39c73dd331b0d742592d3f0e794ac0d70fec0da58723b5de4a5424ca",
+          "after_sha256": "94dd87504cdfda32f1f283a24f03d5ac329c6df3ca7a9847703df8c9b5658a82"
+        },
+        {
+          "path": "services/maintenance_service.py",
+          "before_sha256": "6e3bde001b825b421581cda2faf01b57c7cffe2bc3be294ac472518c6fcab581",
+          "after_sha256": "6e3bde001b825b421581cda2faf01b57c7cffe2bc3be294ac472518c6fcab581"
+        },
+        {
+          "path": "services/processing_pipeline_receipts.py",
+          "before_sha256": "d3d1acc9f50e1d0b3ab30036f40ed6f2d74542c6f8733c5f164fc07b98c60ec5",
+          "after_sha256": "d3d1acc9f50e1d0b3ab30036f40ed6f2d74542c6f8733c5f164fc07b98c60ec5"
+        }
+      ]
     }
   ]
 }

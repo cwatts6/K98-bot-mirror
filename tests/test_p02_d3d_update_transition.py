@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
-from tests.updater_source_assertions import before_d3d_hash
+from tests.updater_source_assertions import before_d3d_hash, before_d3e_hash
 
 
 def transition():
@@ -21,7 +21,7 @@ def transition():
 
 def test_prior_84_transitions_are_immutable():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 85
+    assert len(entries) == 86
     assert hashlib.sha256(json.dumps(entries[:84], sort_keys=True).encode()).hexdigest() == (
         "67b4604add045e736faff4ed7598db5c6c5d2bbde112878961dbd558e2d4c493"
     )
@@ -34,7 +34,10 @@ def pair(monkeypatch):
     for member in transition()["members"]:
         path = member["path"]
         after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert updater.sha256(after[path]) == member["after_sha256"], path
+        assert before_d3e_hash(root, path) == member["after_sha256"], path
+        if updater.sha256(after[path]) != member["after_sha256"]:
+            after[path] = ("inert D3d reference:" + path).encode()
+            known[after[path]] = member["after_sha256"]
         assert before_d3d_hash(root, path) == member["before_sha256"]
         if member["before_sha256"] is None:
             before[path] = None

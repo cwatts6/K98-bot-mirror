@@ -28,12 +28,15 @@ SESSION_STATE = (
     "APPLOCK_MODE('public','K98:post-import-stats:v1','Session'),"
     "APPLOCK_MODE('public','k98-legacy-output-snapshot','Session'),"
     "APPLOCK_MODE('public','K98:maintenance-schema:v1','Session'),"
-    "APPLOCK_MODE('public','K98:TargetPublication:DeltaPreprocessing','Session')"
+    "APPLOCK_MODE('public','K98:TargetPublication:DeltaPreprocessing','Session'),"
+    "APPLOCK_MODE('public','K98:StatsForUpload:Publish','Session')"
 )
 RELEASE_SESSION = (
     "SET NOCOUNT ON; IF @@TRANCOUNT>0 ROLLBACK; "
     "IF APPLOCK_MODE('public','K98:maintenance-schema:v1','Session')='Exclusive' "
     "EXEC sys.sp_releaseapplock @Resource='K98:maintenance-schema:v1',@LockOwner='Session'; "
+    "IF APPLOCK_MODE('public','K98:StatsForUpload:Publish','Session')='Exclusive' "
+    "EXEC sys.sp_releaseapplock @Resource='K98:StatsForUpload:Publish',@LockOwner='Session'; "
     "IF APPLOCK_MODE('public','K98:TargetPublication:DeltaPreprocessing','Session')='Exclusive' "
     "EXEC sys.sp_releaseapplock @Resource='K98:TargetPublication:DeltaPreprocessing',@LockOwner='Session'; "
     "IF APPLOCK_MODE('public','k98-legacy-output-snapshot','Session')='Exclusive' "
@@ -65,7 +68,7 @@ def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
         connection.timeout = timeout_seconds
         cursor = connection.cursor()
         cursor.execute(SESSION_STATE)
-        if tuple(cursor.fetchone() or ()) != (0, "NoLock", "NoLock", "NoLock", "NoLock"):
+        if tuple(cursor.fetchone() or ()) != (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock"):
             retain_open = True
             raise SqlCleanupUnknown("Maintenance connection has pre-existing SQL ownership.")
         owned_session = True
@@ -97,7 +100,14 @@ def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
                 # locks remain held. A command on this still-owned session must
                 # acknowledge quiescence before either handle can be returned.
                 cursor.execute(RELEASE_SESSION)
-                if tuple(cursor.fetchone() or ()) != (0, "NoLock", "NoLock", "NoLock", "NoLock"):
+                if tuple(cursor.fetchone() or ()) != (
+                    0,
+                    "NoLock",
+                    "NoLock",
+                    "NoLock",
+                    "NoLock",
+                    "NoLock",
+                ):
                     raise SqlCleanupUnknown("Maintenance SQL release was not acknowledged.")
                 while cursor.nextset():
                     pass

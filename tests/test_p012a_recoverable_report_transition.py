@@ -12,7 +12,7 @@ from tests.updater_source_assertions import before_p013_hash
 
 def test_all_60_deployed_transitions_remain_immutable():
     transitions = updater.reviewed_transitions()
-    assert len(transitions) == 85
+    assert len(transitions) == 86
     assert (
         hashlib.sha256(json.dumps(transitions[:60], sort_keys=True).encode()).hexdigest()
         == "d068edca6274cef68a292b4eefaa04a946f755b576cf45dd6b13c5f9739a03fd"

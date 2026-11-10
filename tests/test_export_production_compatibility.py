@@ -40,6 +40,43 @@ def historical_source_bytes(module, raw, outcome_source):
     Neither historical manifests nor runtime allowlists are rewritten.
     """
     name = module["name"]
+    # Authenticate D3 successors before reconstructing immutable historical
+    # permission evidence. This test-only bridge supplies no installed authority.
+    if name == "dbo.UPDATE_ALL2":
+        validate_legacy_permission_source(outcome_source)
+        normalized = raw.decode("utf-8-sig").replace("\r\n", "\n")
+        assert hashlib.sha256(normalized.encode()).hexdigest() == (
+            "07b56ac1e0d96a9f2a4d4ded0422c26dae4c0ed78e536cb754790eb4273b7c49"
+        ), "D3 import source drift"
+        raw = (SQL_ROOT / "deploy/source_baselines/UPDATE_ALL2-before-d3c.txt").read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == (
+            "4b2e2472461fa3a11aac03a1b81901783a9495959ef7bcd1a7ef477c473a3978"
+        ), "D3 import predecessor drift"
+    elif name == "dbo.CREATE_DELTA_TABLES":
+        normalized = raw.decode("utf-8-sig").replace("\r\n", "\n")
+        assert hashlib.sha256(normalized.encode()).hexdigest() == (
+            "8b8757bc34e2ca46208ffbd6f0655cc2f49d9aa789517fdd10c71b9458bdd4f6"
+        ), "D3 configuration source drift"
+        raw = json.loads(
+            (Path(__file__).parent / "fixtures/sql/CREATE_DELTA_TABLES-before-d3d.json").read_text()
+        )["source"].encode()
+        assert (
+            hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+            == "57ee6b05d7902ccac98f36f9b0c98d0b10c775d11cdd7085080abca1f938448d"
+        ), "D3 configuration predecessor drift"
+        raw = raw.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    elif name == "dbo.SP_Stats_for_Upload":
+        normalized = raw.decode("utf-8-sig").replace("\r\n", "\n")
+        assert hashlib.sha256(normalized.encode()).hexdigest() == (
+            "afbe2873e06d68e3aedd4e7a2da52692cd0f9e63f8b6e176f9b9fc6e6536cb12"
+        ), "D3 player report source drift"
+        raw = normalized.replace(
+            "        SET @FailureStage = N'maintenance-registration';\n"
+            "        EXEC dbo.usp_MaintenanceDue @Kind='player_report';",
+            "        SET @FailureStage = N'target-statistics';\n"
+            "        UPDATE STATISTICS dbo.STATS_FOR_UPLOAD WITH FULLSCAN;",
+            1,
+        ).encode()
     # Phase 1 source is authenticated before checking the original immutable
     # permission forms. This test reference does not extend runtime allowlists
     # or authorize installing the new SQL under an old signing profile.
@@ -338,7 +375,7 @@ def test_amendment_reconstruction_rejects_changed_forward_image(permission_sourc
     assert before in raw
     with pytest.raises(
         AssertionError,
-        match=r"Outcome source drift|File visibility definition drift|Atomic configuration source drift|Phase 1 source drift: shared names",
+        match=r"D3 import source drift|Outcome source drift|File visibility definition drift|Atomic configuration source drift|Phase 1 source drift: shared names",
     ):
         historical_source_bytes(module, raw.replace(before, after, 1), outcome)
 
@@ -503,3 +540,14 @@ def test_shared_names_reference_rejects_modified_bundle(permission_sources, monk
     monkeypatch.setattr(Path, "read_bytes", read)
     with pytest.raises(AssertionError, match="Shared names historical reference drift"):
         historical_source_bytes(module, raw, outcome)
+
+
+@pytest.mark.parametrize(
+    "name", ["dbo.UPDATE_ALL2", "dbo.SP_Stats_for_Upload", "dbo.CREATE_DELTA_TABLES"]
+)
+def test_d3_historical_bridge_refuses_successor_drift(permission_sources, name):
+    manifest, outcome = permission_sources
+    module = next(m for m in manifest["modules"] if m["name"] == name)
+    raw = (SQL_ROOT / module["path"]).read_bytes()
+    with pytest.raises(AssertionError, match=r"D3 .* source drift"):
+        historical_source_bytes(module, raw + b"-- unreviewed\n", outcome)
