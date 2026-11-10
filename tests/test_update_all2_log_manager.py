@@ -159,6 +159,27 @@ SUMMARY = (
     ],
     [(415, 415, 17, 1000, 1, 2, False, "SUCCESS")],
 )
+
+
+def test_success_never_runs_optional_queries_dispatch_or_wait(isolated_wrapper, monkeypatch):
+    usage, triggers, _ = isolated_wrapper
+    usage.side_effect = [12, RuntimeError("optional query must not run")]
+    monkeypatch.setattr(mgr.time, "sleep", Mock(side_effect=AssertionError("wait after success")))
+    result = mgr.execute_update_all2_with_log_management(
+        _FakeCursor([SUMMARY]),
+        completed_filename="stats_0123456789abcdef0123456789abcdef.ready.csv",
+    )
+    assert result["success"] and result["trigger_results"]["outcome"] == "maintenance_deferred"
+    assert usage.call_count == 1
+    triggers.assert_not_called()
+
+
+def test_legacy_queue_processor_is_held_without_read_or_mutation():
+    cursor = Mock()
+    assert mgr.process_log_backup_triggers(cursor)["outcome"] == "held"
+    assert cursor.mock_calls == []
+
+
 PHASE_A = (["a", "b", "c", "d", "e", "ArchivedFilePath"], [(1, 415, 415, 0, 415, "archive")])
 
 

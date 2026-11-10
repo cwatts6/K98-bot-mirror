@@ -362,19 +362,11 @@ def _get_job_last_run_status(cur, job_name: str = "ROK_TRACKER - LOG Backup") ->
 
 
 def _trigger_log_backup(cur) -> bool:
-    try:
-        cur.execute("EXEC msdb.dbo.usp_start_rok_tracker_log_backup;")
-        logger.info("Requested msdb.dbo.usp_start_rok_tracker_log_backup (wrapper) successfully.")
-        return True
-    except Exception as e:
-        logger.info("Wrapper unavailable/failed: %s", e)
-    try:
-        cur.execute("EXEC msdb.dbo.sp_start_job @job_name = ?", "ROK_TRACKER - LOG Backup")
-        logger.info("Requested SQL Agent job 'ROK_TRACKER - LOG Backup'.")
-        return True
-    except Exception as e:
-        logger.warning("sp_start_job fallback failed: %s", e)
-        return False
+    from log_backup import request_once
+
+    result = request_once(cur)
+    logger.info("Pre-admission backup request outcome: %s", result["outcome"])
+    return result["ok"]
 
 
 def _emit_json_telemetry(event: str, data: dict):
