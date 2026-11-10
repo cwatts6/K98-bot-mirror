@@ -1,3 +1,5 @@
+> **Superseded handover checkpoint:** PR739 is now merged at `5ec55e3b`. The operator requested a new [D4 scope review](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20and%20Handover%20-%202026-11-10.md). Deployment remains held for D4/D5 and separate release authorization. Original D3 authorization and no-new-chat wording below is historical; remaining obligations carry forward.
+
 # P02 D3 closeout and remaining-work handover
 
 D3a-D3g source delivery is complete and individually merged in Bot mirror PRs
@@ -24,7 +26,8 @@ The original D3a-first instructions are historical and must not restart complete
 
 The installed-to-combined transition previously returned COORDINATED_RELEASE_REQUIRED.
 It is still an explicit D4 obligation; do not bypass it or deploy intermediate slices.
-The current updater contains 87 fixed entries, with historical definitions preserved.
+The final updater contains 88 fixed entries, including the eight-member cleanup
+custody successor; all prior 87 definitions and the 232448-byte cap are preserved.
 
 ## Invariants and acceptance limits
 
