@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
-from tests.updater_source_assertions import before_d2d_hash, before_d2i_hash, before_d2e_hash
+from tests.updater_source_assertions import before_d2d_hash, before_d2e_hash
 
 
 def transition():

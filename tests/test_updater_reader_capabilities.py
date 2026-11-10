@@ -189,28 +189,24 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             continue
         if transition["id"] == "p014_upload_outcomes_optional_io_v1":
             for member in transition["members"]:
-                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert before_p015_hash(root, member["path"]) == member["after_sha256"], member[
                     "path"
                 ]
             continue
         if transition["id"] in {"p013_passive_health_v1", "p013_health_archive_v1"}:
             for member in transition["members"]:
-                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert before_p014_hash(root, member["path"]) == member["after_sha256"], member[
                     "path"
                 ]
             continue
         if transition["id"] == "p012a_recoverable_reports_v1":
             for member in transition["members"]:
-                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert before_p013_hash(root, member["path"]) == member["after_sha256"], member[
                     "path"
                 ]
             continue
         if transition["id"] == "p012a_evidence_contract_v1":
             for member in transition["members"]:
-                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert before_p013_hash(root, member["path"]) == member["after_sha256"], member[
                     "path"
                 ]
