@@ -1,0 +1,258 @@
+# tests/conftest.py
+# Ensure the repository root is on sys.path during pytest collection so tests can `import event_utils` etc.
+# This is a small, safe helper used only for the test environment.
+import asyncio
+import os
+import sys
+import types
+
+import pytest
+
+os.environ.setdefault("K98_TEST_MODE", "1")
+os.environ.setdefault("PYTEST_RUNNING", "1")
+os.environ.setdefault("PYTHON_DOTENV_DISABLED", "1")
+os.environ.setdefault("OUR_KINGDOM", "98")
+os.environ.setdefault("DISCORD_BOT_TOKEN", "test-token")
+os.environ.setdefault("TIMELINE_SHEET_ID", "test-timeline-sheet")
+os.environ.setdefault("GOOGLE_TIMELINE_ID", "test-timeline-sheet")
+os.environ.setdefault("EVENT_CALENDAR_SHEET_ID", "test-event-calendar-sheet")
+os.environ.setdefault("SQL_SERVER", "test-sql-server")
+os.environ.setdefault("SQL_DATABASE", "test-db")
+os.environ.setdefault("IMPORT_SQL_USERNAME", "test-user")
+os.environ.setdefault("IMPORT_SQL_PASSWORD", "test-password")
+os.environ.setdefault("PREKVK_IMPORT_HISTORY_DISABLED", "1")
+
+# Determine repository root (one directory up from tests/)
+_THIS_DIR = os.path.dirname(__file__)
+REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+
+if REPO_ROOT not in sys.path:
+    # Insert at front so local package modules shadow installed packages with same names.
+    sys.path.insert(0, REPO_ROOT)
+
+from tests.sql_snapshot_fixture import snapshot_database as snapshot_database
+
+
+@pytest.fixture(autouse=True)
+def isolated_sql_cleanup_custody(monkeypatch):
+    # Fault-injection cases retain their fake/owned test handles for the whole
+    # test, but must not close admission in an unrelated test's process context.
+    from core import sql_connection_custody
+
+    monkeypatch.setattr(sql_connection_custody, "_holds", {})
+
+
+# ----------------------------
+# Optional: lightweight fake heavy deps (opt-in)
+# ----------------------------
+# Set environment variable TEST_FAKE_HEAVY_DEPS=1 to enable injection of minimal
+# stub modules for heavy imports like pandas/pyodbc/openpyxl. This is intentionally
+# opt-in so CI or local dev environments that actually install these deps are not masked.
+if os.getenv("TEST_FAKE_HEAVY_DEPS", "0") == "1":
+    for _mod in ("pyodbc", "pandas", "openpyxl"):
+        if _mod not in sys.modules:
+            sys.modules[_mod] = types.ModuleType(_mod)
+
+
+# ----------------------------
+# Test helpers / fixtures
+# ----------------------------
+@pytest.fixture
+def legacy_optional_audit(monkeypatch):
+    """Opt-in compatibility tests; active worker behavior has separate coverage."""
+    from services import optional_import_audit_worker as worker
+
+    monkeypatch.setattr(worker, "QUALIFIED", False)
+    monkeypatch.setattr(worker, "_writer", None)
+    monkeypatch.setattr(worker, "_start_attempted", False)
+    monkeypatch.setattr(worker, "_stopped", False)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_upload_lifecycle(monkeypatch):
+    from services import upload_lifecycle
+
+    monkeypatch.setattr(upload_lifecycle, "_closed", False)
+    monkeypatch.setattr(upload_lifecycle, "_tasks", set())
+
+
+@pytest.fixture(autouse=True)
+def _isolate_configuration_attempt_receipts(monkeypatch, tmp_path):
+    from services import configuration_attempt_recovery as attempts
+
+    original = attempts.journal_root
+    monkeypatch.setattr(
+        attempts,
+        "journal_root",
+        lambda data_dir, runtime: original(tmp_path / "configuration-attempts", runtime),
+    )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_recovery_observation(monkeypatch):
+    module = sys.modules.get("services.recovery_health")
+    if module is not None:
+        for name in (
+            "_last_success",
+            "_failure",
+            "_failure_detail",
+            "_notification_failure",
+            "_cycle",
+            "_last_completed_cycle",
+            "_last_failed_cycle",
+            "_cycle_started",
+            "_progress_at",
+            "_stage_started",
+            "_notifications_started",
+            "_history",
+            "_episode_fingerprint",
+        ):
+            monkeypatch.setattr(module, name, None)
+        monkeypatch.setattr(module, "_checks", [])
+        monkeypatch.setattr(module, "_failure_streak", 0)
+        from services.health_observation import Observation
+
+        monkeypatch.setattr(
+            module,
+            "_health",
+            (Observation("recovery", "recovery monitor"), None, None, None, False, False),
+        )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_event_delivery_evidence(monkeypatch, tmp_path):
+    # New persistence must never reach developer/operational data during tests.
+    module = sys.modules.get("services.event_delivery_service")
+    if module is not None:
+        from services.event_delivery_store import EventDeliveryStore
+
+        monkeypatch.setattr(module, "store", EventDeliveryStore(tmp_path / "event-receipts.json"))
+        monkeypatch.setattr(module, "_locks", {})
+        monkeypatch.setattr(module, "_children", set())
+        monkeypatch.setattr(module, "_closed", False)
+    scheduler = sys.modules.get("event_scheduler")
+    if scheduler is not None:
+        monkeypatch.setattr(scheduler, "_unresolved_active", {})
+        monkeypatch.setattr(scheduler, "_active_load_failed", False)
+    registry = sys.modules.get("reminder_task_registry")
+    if registry is not None:
+        monkeypatch.setattr(registry, "_CLOSED", False)
+
+
+@pytest.fixture
+def async_return_factory():
+    """
+    Return a factory that wraps a value into an async function that returns that value.
+    Usage:
+        async_stub = async_return_factory((True, "ok"))
+        monkeypatch.setattr(..., async_stub)
+    """
+
+    def make_async_return(value):
+        async def _inner(*args, **kwargs):
+            # ensure we yield to the loop so behaviour resembles a real coroutine
+            await asyncio.sleep(0)
+            return value
+
+        return _inner
+
+    return make_async_return
+
+
+@pytest.fixture
+def async_noop():
+    """
+    Return an async no-op that yields and returns a benign tuple (True, 'ok').
+    Useful for monkeypatching async functions like run_maintenance_with_isolation.
+    """
+
+    async def _noop(*args, **kwargs):
+        await asyncio.sleep(0)
+        return True, "ok"
+
+    return _noop
+
+
+@pytest.fixture(autouse=True)
+def _clear_mge_undo_buffer():
+    try:
+        from mge import mge_roster_service
+    except (ImportError, ModuleNotFoundError):
+        yield
+        return
+
+    with mge_roster_service._UNDO_LOCK:
+        mge_roster_service._UNDO_BUFFER.clear()
+    yield
+    with mge_roster_service._UNDO_LOCK:
+        mge_roster_service._UNDO_BUFFER.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_registry_cache():
+    """Reset the in-process registry cache before every test to ensure isolation."""
+    try:
+        import registry.registry_cache as rc
+
+        with rc._cache_lock:
+            rc._cache_data = None
+            rc._cache_ts = 0.0
+            rc._last_invalidation_reason = "test_setup"
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _block_live_ark_db_access_in_unit_tests(monkeypatch):
+    """Fail fast if a normal Ark unit test accidentally reaches the live SQL DB."""
+    if os.getenv("RUN_DB_TESTS", "0") == "1":
+        yield
+        return
+
+    def _raise_live_db_access(*_args, **_kwargs):
+        raise AssertionError(
+            "Unit test attempted live DB access. Patch the DAL/service boundary "
+            "or run with RUN_DB_TESTS=1 for explicit integration coverage."
+        )
+
+    async def _raise_live_db_access_async(*_args, **_kwargs):
+        _raise_live_db_access()
+
+    try:
+        import ark.dal.ark_dal as ark_dal
+
+        for name in (
+            "run_query_async",
+            "run_query_strict_async",
+            "run_one_async",
+            "run_one_strict_async",
+            "execute_async",
+        ):
+            monkeypatch.setattr(ark_dal, name, _raise_live_db_access_async, raising=False)
+    except (ImportError, ModuleNotFoundError):
+        pass
+
+    yield
+
+
+@pytest.fixture(autouse=True)
+def isolate_private_operation_lifecycle(monkeypatch):
+    module = sys.modules.get("core.interaction_safety")
+    if module is not None:
+        monkeypatch.setattr(module, "_private_admission_closed", False)
+        monkeypatch.setattr(module, "_private_children", set())
+    module = sys.modules.get("mge.mge_embed_manager")
+    if module is not None:
+        from mge.mge_refresh_work import RefreshCoordinator
+
+        monkeypatch.setattr(module, "_refreshes", RefreshCoordinator())
+
+
+@pytest.fixture(autouse=True)
+def _isolate_report_admission(monkeypatch):
+    from services import recovery_evidence_bundle as bundle
+
+    monkeypatch.setattr(bundle, "_stopped", False)
+    monkeypatch.setattr(bundle, "_sessions", {})
+    monkeypatch.setattr(bundle, "_deliveries", {})
