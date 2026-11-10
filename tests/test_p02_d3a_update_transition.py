@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
-from tests.updater_source_assertions import before_d3a_hash
+from tests.updater_source_assertions import before_d3a_hash, before_d3b_hash
 
 
 def transition():
@@ -17,7 +17,7 @@ def transition():
 
 def test_prior_81_transitions_are_immutable():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 82
+    assert len(entries) == 83
     assert hashlib.sha256(json.dumps(entries[:81], sort_keys=True).encode()).hexdigest() == (
         "d02993eddbbc5d49ef60bd78ef1a864144009a100fde1ba63b0bc5f47cf258b3"
     )
@@ -30,7 +30,10 @@ def pair(monkeypatch):
     for member in transition()["members"]:
         path = member["path"]
         after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert updater.sha256(after[path]) == member["after_sha256"], path
+        assert before_d3b_hash(root, path) == member["after_sha256"], path
+        if updater.sha256(after[path]) != member["after_sha256"]:
+            after[path] = ("inert D3a reference:" + path).encode()
+            known[after[path]] = member["after_sha256"]
         assert before_d3a_hash(root, path) == member["before_sha256"]
         if member["before_sha256"] is None:
             before[path] = None

@@ -287,6 +287,7 @@ def test_reviewed_source_inventory_matches_current_runtime():
             "p02_d2k_holder_diagnostics_v1",
             "p02_d2l_operation_policy_v1",
             "p02_d3a_file_ownership_v1",
+            "p02_d3b_maintenance_ownership_v1",
         }:
             continue  # Authenticated separately before the historical assertion below.
         members = transition["members"]

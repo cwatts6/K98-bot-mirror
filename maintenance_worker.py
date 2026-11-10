@@ -325,6 +325,12 @@ def do_post_stats(
     try:
         logger.info("Starting post-import stats update for database=%s", database)
         res = fn(server, database, username, password)
+        from services.maintenance_service import result
+
+        complete, res = result(res)
+        if not complete:
+            _print_result_json("post_stats", "pending", returncode=3, result=res)
+            return 3
         logger.info("post-import stats update completed")
         emit_telemetry_event(
             {"event": "post_stats_worker", "status": "success", "database": database or ""}
