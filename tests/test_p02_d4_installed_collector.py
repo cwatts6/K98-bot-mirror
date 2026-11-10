@@ -17,6 +17,7 @@ SOURCE = Path(__file__).resolve().parents[1] / "scripts/collect_p02_d4_installed
 
 def test_installed_and_offline_root_inventory_match():
     source = SOURCE.read_text(encoding="utf-8")
+    assert "version=2; kind='p02_d4_installed_metadata'" in source
     roots = source.split("$roots = @'", 1)[1].split("'@", 1)[0]
     assert set(re.findall(r"\(N'([^']+)'\)", roots)) == set(ROOTS)
 
@@ -119,8 +120,8 @@ def catalog_queries(powershell, tmp_path):
 
 def test_fixed_queries_extract_without_running_collector(powershell, tmp_path):
     queries = catalog_queries(powershell, tmp_path)
-    assert len(queries) == 9
-    assert len({q["name"] for q in queries}) == 9
+    assert len(queries) == 13
+    assert len({q["name"] for q in queries}) == 13
     for query in queries:
         assert "TOP(513)" in query["sql"]
         # SQL text consists of fixed metadata reads. No application execution.
@@ -129,6 +130,18 @@ def test_fixed_queries_extract_without_running_collector(powershell, tmp_path):
             query["sql"],
             re.I,
         )
+
+
+def test_activity_is_metadata_only_and_jobs_include_id_only_bindings(powershell, tmp_path):
+    queries = {q["name"]: q["sql"] for q in catalog_queries(powershell, tmp_path)}
+    assert "o.create_date,o.modify_date" in queries["objects"]
+    assert "p.cached_time,p.last_execution_time" in queries["procedure_activity"]
+    assert "p.database_id=DB_ID()" in queries["procedure_activity"]
+    assert "sys.database_query_store_options" in queries["query_store_options"]
+    assert "retained_statement_executions" in queries["query_store_activity"]
+    assert "j.job_id) AS job_id" in queries["jobs"]
+    assert "WHERE st.database_name" not in queries["jobs"]
+    assert "st.command AS" not in queries["jobs"]
 
 
 def test_native_catalog_queries(powershell, tmp_path, snapshot_database):
@@ -141,6 +154,8 @@ def test_native_catalog_queries(powershell, tmp_path, snapshot_database):
         con.timeout = 3
         con.execute("CREATE SEQUENCE dbo.KS4_UNO_SEQ AS bigint START WITH 42 INCREMENT BY 2")
         con.execute("CREATE PROCEDURE dbo.UPDATE_ALL AS SELECT 1")
+        # Exercise only this inert disposable fixture, never an installed procedure.
+        con.execute("EXEC dbo.UPDATE_ALL").fetchall()
         con.execute("CREATE ROLE d4_reader")
         con.execute("GRANT EXECUTE ON dbo.UPDATE_ALL TO d4_reader")
         for query in queries:
@@ -155,6 +170,13 @@ def test_native_catalog_queries(powershell, tmp_path, snapshot_database):
             if query["name"] == "objects":
                 item = next(r for r in rows if r["requested_name"] == "UPDATE_ALL")
                 assert "SELECT 1" in item["definition"]
+                assert item["create_date"] is not None
+            if query["name"] == "procedure_activity":
+                item = next(r for r in rows if r["module_name"] == "UPDATE_ALL")
+                assert item["execution_count"] >= 1
+                assert item["last_execution_time"] >= item["cached_time"]
+            if query["name"] == "query_store_options":
+                assert len(rows) == 1 and rows[0]["actual_state_desc"]
             if query["name"] == "grants":
                 assert any(
                     r["grantee"] == "d4_reader" and r["permission_name"] == "EXECUTE" for r in rows
