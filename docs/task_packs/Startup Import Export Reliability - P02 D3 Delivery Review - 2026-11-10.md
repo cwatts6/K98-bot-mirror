@@ -56,7 +56,7 @@ the clean full result below is the repeat on the corrected stable tree.
 
 ## Qualification and evidence limits
 
-Stable final full Bot regression: **13320 passed, 1262 skipped, 1 warning, 8 subtests passed in 1579.22s (0:26:19)**.
+Pre-cleanup-correction full Bot regression: **13320 passed, 1262 skipped, 1 warning, 8 subtests passed in 1579.22s (0:26:19)**.
 The operational-log isolation check confirmed production logs unchanged.
 
 Focused D3g qualification: 122 combined native/Python cases passed before the
@@ -124,10 +124,35 @@ correctness gaps, and were not added. Remaining archive-title/spacing and SQL
 native-test opt-in documentation were clarified. Exact replies and dispositions
 remain on the original review threads; no runtime or test behavior changed.
 
-The updater has 87 fixed entries; prior 86 digest is
+The original D3g updater had 87 fixed entries; prior 86 digest is
 `49752cc86f05563aeb7b04111c050e2730548e0a32654e757b5b24e7d7991d90`.
 D3g has twelve members, six changed. The 232448-byte registry cap is unchanged.
 Exact per-slice transitions are not authority for the installed combined jump.
+
+## Late cleanup review correction
+
+The private review subsequently identified an actual ownership gap: snapshot
+isolation restoration or cursor-close failure could still reach connection.close,
+and maintenance cursor-close failure had the same path. Closing a handle can return
+a session to ODBC pooling; a retained reference afterwards is insufficient custody.
+
+The correction stops cleanup at its first unacknowledged boundary and preserves
+the first failure, connection and cursor. Coverage includes snapshot and maintenance
+owners, plus equivalent player-report, import-capture, source transaction and legacy
+writer callers. An exact-identity custody query prevents outer owners from closing
+a connection already retained by an inner cursor, rollback or diagnostic helper.
+Healthy cleanup and unrelated connections retain their existing semantics. No
+business replay, automatic cleanup retry, new SQL object or permission is added.
+
+Focused regression: 304 passed, including transition authentication and injected
+cursor/reset/rollback/guard/close failures, cancellation and nested ownership.
+The correction adds one eight-member updater transition, taking the registry to 88
+entries. All prior 87 entries remain immutable (digest
+`3f164e60c4398e9f4b1f2404b15cc0863b97ee658572824dd02b3e67f9597879`);
+the 232448-byte cap remains unchanged. Full CI, native qualification and the exact
+Changes review receipts for this follow-up are retained on its mirror PR and the
+combined production PR739. Earlier full-suite and security receipts above remain
+historical evidence for their recorded heads, not substitutes for this follow-up.
 
 ## Remaining programme obligations
 

@@ -13,7 +13,7 @@ from services.import_capture_recovery_dal import ImportCaptureRecoveryDAL
 
 @pytest.mark.parametrize("failure", [OSError("body"), KeyboardInterrupt()])
 @pytest.mark.parametrize("cleanup", ["rollback", "close", "both"])
-def test_source_cleanup_keeps_first_cause_and_attempts_close(failure, cleanup):
+def test_source_cleanup_keeps_first_cause_and_fences_failed_rollback(failure, cleanup):
     cn = Mock(autocommit=False)
     if cleanup in {"rollback", "both"}:
         cn.rollback.side_effect = OSError("rollback")
@@ -24,7 +24,10 @@ def test_source_cleanup_keeps_first_cause_and_attempts_close(failure, cleanup):
             raise failure
     assert caught.value.__cause__ is failure
     cn.rollback.assert_called_once()
-    cn.close.assert_called_once()
+    if cleanup in {"rollback", "both"}:
+        cn.close.assert_not_called()
+    else:
+        cn.close.assert_called_once()
     cn.commit.assert_not_called()
 
 
@@ -74,7 +77,7 @@ def test_unclosed_connection_is_retained_and_new_admission_refused(entry, monkey
         with context():
             pass
     assert custody.custody_snapshot()["unconfirmed"] == 1
-    assert next(iter(custody._holds.values())).retained_connection is cn
+    assert custody.connection_retained(cn)
     with pytest.raises(custody.SqlCleanupUnknown):
         with context():
             pytest.fail("Unconfirmed physical cleanup must not admit another operation")
@@ -83,7 +86,9 @@ def test_unclosed_connection_is_retained_and_new_admission_refused(entry, monkey
 
 
 @pytest.mark.parametrize("release_failure", [0, 1])
-def test_capture_tries_every_guard_release_and_preserves_body_failure(monkeypatch, release_failure):
+def test_capture_stops_at_unknown_guard_release_and_preserves_body_failure(
+    monkeypatch, release_failure
+):
     cn = Mock()
     cursor = cn.cursor.return_value
     monkeypatch.setattr(
@@ -103,9 +108,9 @@ def test_capture_tries_every_guard_release_and_preserves_body_failure(monkeypatc
         with ImportCaptureRecoveryDAL(SimpleNamespace(connect=lambda: cn)).session(str(uuid4())):
             raise first
     assert caught.value.__cause__ is first
-    assert len(releases) == 2
-    cursor.close.assert_called_once()
-    cn.close.assert_called_once()
+    assert len(releases) == release_failure + 1
+    cursor.close.assert_not_called()
+    cn.close.assert_not_called()
 
 
 def test_capture_lost_grant_ack_attempts_release_before_close(monkeypatch):
@@ -152,7 +157,7 @@ def test_capture_transaction_keeps_original_failure_when_rollback_and_cursor_clo
     while error.__cause__ is not None:
         error = error.__cause__
     assert error is first
-    cursor.close.assert_called_once()
+    cursor.close.assert_not_called()
 
 
 def test_borrowed_transaction_cannot_prove_physical_release():

@@ -136,6 +136,7 @@ def run_maintenance(connect, *, timeout_seconds=300, request_id=None):
             except BaseException as error:
                 failure = preserve_failure(failure, error, phase)
                 cleanup_error = cleanup_error or error
+                retain_open = True
         if cleanup_error is not None or retain_open:
             retain_connection(
                 SimpleNamespace(connection=connection, cursor=cursor),

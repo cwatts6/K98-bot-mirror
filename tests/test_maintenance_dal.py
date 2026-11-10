@@ -116,6 +116,8 @@ def test_cleanup_failure_retains_connection_and_blocks_admission(connection, mon
     with pytest.raises(OSError):
         dal.run_maintenance(lambda: c.owner, timeout_seconds=17)
     assert custody.custody_snapshot() == {"admission": "closed", "unconfirmed": 1}
+    assert "closed" not in c.events
+    assert custody.connection_retained(c.owner)
     with pytest.raises(custody.SqlCleanupUnknown):
         dal.run_maintenance(lambda: pytest.fail("must not connect"))
 

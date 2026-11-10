@@ -4475,6 +4475,51 @@
           "after_sha256": "2fb21b7af74ee31b3beb74c87e9ab7a637463c2fac0674a6d031c18ba0af1228"
         }
       ]
+    },
+    {
+      "id": "p02_d3_cleanup_custody_v1",
+      "members": [
+        {
+          "path": "core/recovery_sql_snapshot.py",
+          "before_sha256": "572eb6c563823238da39cb15c8336da8a507f4fe629e044ca3aa0d73e33b7ee7",
+          "after_sha256": "00b26a39a977a1492e7c4a55b6281484a597f76d04452c16ab09b5691f4225c2"
+        },
+        {
+          "path": "core/sql_connection_custody.py",
+          "before_sha256": "a545a9e3dcd7d7528d32e032e9be4c33e0b292adf057394f7ddbf71a8cf0bc91",
+          "after_sha256": "f6a87c8a41e533d27c5ce4c6ebb8dcff5d75d18fa2c729f20fac6bfedcff539b"
+        },
+        {
+          "path": "kvk/dal/new_source_import_dal.py",
+          "before_sha256": "367f58a4fa4f5b9b0841692855a200eebbef52acb21d287daed3d5f4795720b3",
+          "after_sha256": "451378ac00b49775b1b5b4622afc721aee9c34ac1ae2c805025b71cdbcfa7523"
+        },
+        {
+          "path": "services/import_capture_recovery_dal.py",
+          "before_sha256": "f7958567c6829b5e34bc1b58ce6cd47906ec15cb666268bfd65f779ddac6806c",
+          "after_sha256": "85db31019c10a17fcdd58fbd5d910c1c4d647f599b5e513e08a307133ef6a1f1"
+        },
+        {
+          "path": "services/legacy_export_snapshot_dal.py",
+          "before_sha256": "73292c3665c2801e89221f4300c179e93645f2941bb71ad861bbdd376eff02c7",
+          "after_sha256": "f3d8b2d7ae2ddd6d6ba391558a739ef726370fc6a2af7997e654b1630b21a942"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "before_sha256": "e9c4c1ffbdc13e89db394310114da592581e5d32e6a44ff734b8d00b8734fb60",
+          "after_sha256": "73899b1b7140d510109ebab99ee6998d19c4b13ad883b3326ff245ea976f529f"
+        },
+        {
+          "path": "services/maintenance_dal.py",
+          "before_sha256": "360a9f437354bbf408b2e2eb109056aad2319631e8e2fef63cdef70024a03bff",
+          "after_sha256": "588f00f691779af53075ce990e13949cf48a37daa85d93d724ca72a5b525514b"
+        },
+        {
+          "path": "services/player_report_sql.py",
+          "before_sha256": "a7b193fa34347282d763eb11586a20e2cc0992c7763f0a9044cb788713266fd5",
+          "after_sha256": "8cfd9d14e532f052276055f219f942860fc5b0de3c6de50cedb90b00c0f588de"
+        }
+      ]
     }
   ]
 }

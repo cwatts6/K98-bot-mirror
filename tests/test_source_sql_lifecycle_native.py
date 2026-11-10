@@ -183,6 +183,6 @@ def test_capture_unknown_ack_keeps_guard_or_cleanup_custody(state, lost):
         check.execute("EXEC sys.sp_releaseapplock @Resource=?,@LockOwner='Session'", key)
     finally:
         check.close()
-    if lost == "close":
+    if lost in {"release", "close"}:
         actual[0].close()  # Test fixture owns this still-open handle.
     assert_closed(actual[0])

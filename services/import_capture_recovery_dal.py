@@ -2,9 +2,11 @@
 
 from contextlib import contextmanager
 import json
+from types import SimpleNamespace
 
 from core.sql_connection_custody import (
     SqlCleanupUnknown,
+    connection_retained,
     preserve_failure,
     require_sql_admission,
     retain_connection,
@@ -25,9 +27,16 @@ def capture_cursor(connection):
         failure = error
     finally:
         try:
-            cursor.close()
+            if not connection_retained(connection):
+                cursor.close()
         except BaseException as error:
             failure = preserve_failure(failure, error, "capture_cursor_close")
+            retain_connection(
+                SimpleNamespace(connection=connection, cursor=cursor),
+                effect="unknown",
+                first_failure=failure,
+                cleanup_error=error,
+            )
             if not isinstance(failure, UncertainCommit):
                 raise SqlCleanupUnknown("Capture cursor cleanup was not acknowledged.") from failure
     if failure is not None:
@@ -52,6 +61,12 @@ def capture_transaction(connection):
             except BaseException as error:
                 rollback_failed = True
                 failure = preserve_failure(failure, error, "capture_rollback")
+                retain_connection(
+                    SimpleNamespace(connection=connection, cursor=cursor),
+                    effect="unknown",
+                    first_failure=failure,
+                    cleanup_error=error,
+                )
             if commit_attempted:
                 raise UncertainCommit(
                     "Read the durable capture operation before retrying."
@@ -102,7 +117,10 @@ class ImportCaptureRecoveryDAL:
         except BaseException as error:
             failure = error
         finally:
-            if cursor is not None:
+            if connection_retained(connection):
+                cleanup_failed = True
+                failure = failure or SqlCleanupUnknown("Capture connection remains retained.")
+            if cursor is not None and not connection_retained(connection):
                 for resource in reversed(resources):
                     try:
                         cursor.execute(
@@ -120,29 +138,30 @@ class ImportCaptureRecoveryDAL:
                         cleanup_failed = True
                         release_error = release_error or error
                         failure = preserve_failure(failure, error, "capture_guard_release")
+                        break
                 try:
-                    cursor.close()
+                    if release_error is None:
+                        cursor.close()
                 except BaseException as error:
                     cleanup_failed = True
+                    release_error = error
                     failure = preserve_failure(failure, error, "capture_cursor_close")
+            if release_error is not None:
+                retain_connection(
+                    SimpleNamespace(connection=connection, cursor=cursor),
+                    effect="unknown",
+                    first_failure=failure,
+                    cleanup_error=release_error,
+                )
             try:
-                connection.close()
+                if not connection_retained(connection):
+                    connection.close()
             except BaseException as error:
                 cleanup_failed = True
                 failure = preserve_failure(failure, error, "capture_connection_close")
                 retain_connection(
                     connection, effect="unknown", first_failure=failure, cleanup_error=error
                 )
-            else:
-                if release_error is not None:
-                    # Driver close may pool a session. A lost explicit guard
-                    # release acknowledgement is not proof that guard is gone.
-                    retain_connection(
-                        connection,
-                        effect="unknown",
-                        first_failure=failure,
-                        cleanup_error=release_error,
-                    )
         if failure is not None:
             if isinstance(failure, UncertainCommit):
                 raise failure

@@ -111,6 +111,7 @@ def rows(cursor):
 def transaction(connect):
     from core.sql_connection_custody import (
         SqlCleanupUnknown,
+        connection_retained,
         preserve_failure,
         require_sql_admission,
         retain_connection,
@@ -143,11 +144,15 @@ def transaction(connect):
             except BaseException as cleanup:
                 cleanup_failed = True
                 failure = preserve_failure(failure, cleanup, "rollback")
+                retain_connection(
+                    connection, effect="unknown", first_failure=failure, cleanup_error=cleanup
+                )
     finally:
         # The owning connection closes its cursors. A nested admin adapter can
         # borrow the outer cursor, so this helper must not close that cursor.
         try:
-            diagnostic_call("close", connection.close)
+            if not connection_retained(connection):
+                diagnostic_call("close", connection.close)
         except BaseException as cleanup:
             cleanup_failed = True
             failure = preserve_failure(failure, cleanup, "close")

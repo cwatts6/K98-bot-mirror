@@ -977,7 +977,11 @@ class LegacyExportRuntime:
     def begin_writer(self, kind):
         from uuid import uuid4
 
-        from core.sql_connection_custody import require_sql_admission, retain_connection
+        from core.sql_connection_custody import (
+            connection_retained,
+            require_sql_admission,
+            retain_connection,
+        )
         from services.producer_recovery_intent import current_intent
 
         require_sql_admission()
@@ -1038,7 +1042,7 @@ class LegacyExportRuntime:
             guard.__enter__()
         except BaseException as original:
             try:
-                if connection is not None:
+                if connection is not None and not connection_retained(connection):
                     try:
                         connection.close()
                     except BaseException as cleanup:
@@ -1078,22 +1082,33 @@ class LegacyExportRuntime:
         return self.dal.authorize(owner.claim)
 
     def _close_writer(self, owner):
-        from core.sql_connection_custody import preserve_failure, retain_connection
+        from core.sql_connection_custody import (
+            SqlCleanupUnknown,
+            connection_retained,
+            preserve_failure,
+            retain_connection,
+        )
 
         self._require_writer(owner)
         owner.closed = True
         failure = None
         try:
+            if connection_retained(owner.connection):
+                raise SqlCleanupUnknown("Writer SQL connection remains retained.")
             owner.session_guard.__exit__(None, None, None)
         except BaseException as error:
             failure = error
         finally:
             try:
-                owner.connection.close()
+                if failure is None and not connection_retained(owner.connection):
+                    owner.connection.close()
             except BaseException as error:
                 failure = preserve_failure(failure, error, "writer_connection_close")
         if failure is not None:
-            retain_connection(owner, effect="unknown", first_failure=failure, cleanup_error=failure)
+            if not connection_retained(owner.connection):
+                retain_connection(
+                    owner, effect="unknown", first_failure=failure, cleanup_error=failure
+                )
             raise failure
 
     def uncertain_writer(self, owner):

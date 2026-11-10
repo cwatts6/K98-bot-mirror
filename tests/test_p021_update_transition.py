@@ -17,7 +17,7 @@ def transition():
 
 def test_all_67_predecessor_entries_remain_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 87
+    assert len(entries) == 88
     assert hashlib.sha256(json.dumps(entries[:67], sort_keys=True).encode()).hexdigest() == (
         "c567936cdac7aca194c86065b4ff75da4e3982810bfc083801e524c4198f7e2f"
     )

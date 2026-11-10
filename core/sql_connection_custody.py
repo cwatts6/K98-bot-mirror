@@ -30,6 +30,16 @@ def require_sql_admission():
             )
 
 
+def connection_retained(connection):
+    """Whether this exact connection is fenced by an inner resource owner."""
+    with _guard:
+        return any(
+            outcome.retained_connection is connection
+            or getattr(outcome.retained_connection, "connection", None) is connection
+            for outcome in _holds.values()
+        )
+
+
 def retain_connection(connection, *, effect, first_failure, cleanup_error):
     outcome = SqlOutcome(
         effect=effect,

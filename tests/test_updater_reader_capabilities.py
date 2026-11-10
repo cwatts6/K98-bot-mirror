@@ -23,6 +23,7 @@ from tests.updater_source_assertions import (
     before_d2j_hash,
     before_d2k_hash,
     before_d2l_hash,
+    before_d3_cleanup_hash,
     before_d3a_hash,
     before_d3b_hash,
     before_d3c_hash,
@@ -116,6 +117,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
 
     for transition in update.reviewed_transitions():
         d3_successors = {
+            "p02_d3_cleanup_custody_v1": before_d3_cleanup_hash,
             "p02_d3c_import_maintenance_v1": before_d3c_hash,
             "p02_d3d_configuration_maintenance_v1": before_d3d_hash,
             "p02_d3e_player_report_maintenance_v1": before_d3e_hash,

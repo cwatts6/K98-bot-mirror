@@ -41,7 +41,13 @@ def test_owned_read_rolls_back_restores_and_closes_without_commit():
 
 
 @pytest.mark.parametrize("phase", ["rollback", "cursor_close", "isolation_restore", "close"])
-def test_first_failure_survives_failed_cleanup_and_every_cleanup_is_attempted(phase):
+def test_first_failure_survives_and_unacknowledged_cleanup_stops_pool_return(phase):
+    from core.sql_connection_custody import (
+        SqlCleanupUnknown,
+        connection_retained,
+        require_sql_admission,
+    )
+
     cn = connection()
     first = ImportExecutionActive("busy")
     cleanup = OSError("private cleanup detail")
@@ -63,9 +69,18 @@ def test_first_failure_survives_failed_cleanup_and_every_cleanup_is_attempted(ph
         cn.cursor.return_value.close.assert_not_called()
         cn.close.assert_not_called()
         assert cn.set_attr.call_count == 1
+    elif phase == "isolation_restore":
+        cn.cursor.return_value.close.assert_not_called()
+        cn.close.assert_not_called()
+    elif phase == "cursor_close":
+        cn.cursor.return_value.close.assert_called_once()
+        cn.close.assert_not_called()
     else:
         cn.cursor.return_value.close.assert_called_once()
         cn.close.assert_called_once()
+    assert connection_retained(cn)
+    with pytest.raises(SqlCleanupUnknown):
+        require_sql_admission()
     cn.commit.assert_not_called()
 
 

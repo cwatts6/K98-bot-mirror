@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from core.sql_connection_custody import (
     SqlCleanupUnknown,
+    connection_retained,
     preserve_failure,
     require_sql_admission,
     retain_connection,
@@ -27,11 +28,15 @@ def player_connection(*, operation):
         failure = error
     finally:
         for phase, action in (("rollback", connection.rollback), ("close", connection.close)):
+            if connection_retained(connection):
+                failure = failure or SqlCleanupUnknown("Player SQL connection remains retained.")
+                break
             try:
                 action()
             except BaseException as error:
                 failure = preserve_failure(failure, error, "player_" + phase)
                 cleanup_error = cleanup_error or error
+                break
         if cleanup_error is not None:
             retain_connection(
                 connection, effect="unknown", first_failure=failure, cleanup_error=cleanup_error

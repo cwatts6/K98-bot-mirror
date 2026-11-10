@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import prepare_k98_update as updater
-from tests.updater_source_assertions import before_d3g_hash
+from tests.updater_source_assertions import before_d3_cleanup_hash, before_d3g_hash
 
 
 def transition():
@@ -21,7 +21,7 @@ def transition():
 
 def test_prior_86_transitions_are_immutable():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 87
+    assert len(entries) == 88
     assert hashlib.sha256(json.dumps(entries[:86], sort_keys=True).encode()).hexdigest() == (
         "49752cc86f05563aeb7b04111c050e2730548e0a32654e757b5b24e7d7991d90"
     )
@@ -34,7 +34,10 @@ def pair(monkeypatch):
     for member in transition()["members"]:
         path = member["path"]
         after[path] = (root / path).read_bytes().replace(b"\r\n", b"\n")
-        assert updater.sha256(after[path]) == member["after_sha256"], path
+        assert before_d3_cleanup_hash(root, path) == member["after_sha256"], path
+        if updater.sha256(after[path]) != member["after_sha256"]:
+            after[path] = ("inert D3g reference:" + path).encode()
+            known[after[path]] = member["after_sha256"]
         assert before_d3g_hash(root, path) == member["before_sha256"]
         if member["before_sha256"] is None:
             before[path] = None

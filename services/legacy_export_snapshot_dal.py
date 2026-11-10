@@ -717,11 +717,14 @@ class LegacySnapshotDAL:
 
             from core.sql_connection_custody import (
                 SqlCleanupUnknown,
+                connection_retained,
                 preserve_failure,
                 retain_connection,
             )
 
-            if attempted:
+            if connection_retained(connection):
+                failure = failure or SqlCleanupUnknown("Writer SQL connection remains retained.")
+            if attempted and not connection_retained(connection):
                 try:
                     cursor.execute(
                         "IF APPLOCK_MODE('public','k98-legacy-output-snapshot','Session')='Exclusive' "
@@ -735,7 +738,8 @@ class LegacySnapshotDAL:
                     failure = preserve_failure(failure, error, "writer_guard_release")
                     cleanup_error = error
             try:
-                cursor.close()
+                if cleanup_error is None and not connection_retained(connection):
+                    cursor.close()
             except BaseException as error:
                 failure = preserve_failure(failure, error, "writer_guard_cursor_close")
                 cleanup_error = cleanup_error or error

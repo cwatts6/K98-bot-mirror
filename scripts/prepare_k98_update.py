@@ -616,6 +616,20 @@ MGE_A1B_PATHS = frozenset(
 )
 
 
+P02_D3_CLEANUP_CUSTODY_PATHS = frozenset(
+    [
+        "core/recovery_sql_snapshot.py",
+        "core/sql_connection_custody.py",
+        "kvk/dal/new_source_import_dal.py",
+        "services/import_capture_recovery_dal.py",
+        "services/legacy_export_snapshot_dal.py",
+        "services/legacy_export_snapshot_service.py",
+        "services/maintenance_dal.py",
+        "services/player_report_sql.py",
+    ]
+)
+
+
 P02_D3G_FINAL_REPORT_MAINTENANCE_PATHS = frozenset(
     [
         "core/owned_work.py",
@@ -1203,7 +1217,7 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 87:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 88:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -1316,6 +1330,9 @@ def reviewed_transitions():
             )
             fixed_p02_d3a = (
                 item["id"] == "p02_d3a_file_ownership_v1" and path in P02_D3A_FILE_OWNERSHIP_PATHS
+            )
+            fixed_p02_d3_cleanup = (
+                item["id"] == "p02_d3_cleanup_custody_v1" and path in P02_D3_CLEANUP_CUSTODY_PATHS
             )
             fixed_p02_d3g = (
                 item["id"] == "p02_d3g_final_report_maintenance_v1"
@@ -1510,6 +1527,7 @@ def reviewed_transitions():
                     or fixed_p021
                     or fixed_p02_phase1
                     or fixed_p02_d3a
+                    or fixed_p02_d3_cleanup
                     or fixed_p02_d3g
                     or fixed_p02_d3e
                     or fixed_p02_d3d
@@ -1723,6 +1741,8 @@ def reviewed_transitions():
             and paths != P02_D3G_FINAL_REPORT_MAINTENANCE_PATHS
         ):
             raise ValueError("Complete fixed P02 D3g final report maintenance transition required.")
+        if item["id"] == "p02_d3_cleanup_custody_v1" and paths != P02_D3_CLEANUP_CUSTODY_PATHS:
+            raise ValueError("Complete fixed P02 D3 cleanup custody transition required.")
         if item["id"] == "p02_d3b_maintenance_ownership_v1" and paths != P02_D3B_MAINTENANCE_PATHS:
             raise ValueError("Complete fixed P02 D3b maintenance transition required.")
         if item["id"] == "p02_d2l_operation_policy_v1" and paths != P02_D2L_OPERATION_POLICY_PATHS:

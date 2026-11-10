@@ -7,6 +7,7 @@ retain their independent session guards, current-row locks and evidence CAS.
 
 from contextlib import contextmanager
 import re
+from types import SimpleNamespace
 
 from core.sql_connection_custody import require_sql_admission, retain_connection
 from core.sql_observation import ObservationBusy, lock_contention, observation
@@ -78,8 +79,8 @@ def recovery_snapshot(connect):
     except BaseException as error:
         failure = error
     finally:
-        # Attempt every cleanup step and preserve the first failure. Never return
-        # a successful/busy observation if physical cleanup was not acknowledged.
+        # Stop at the first unacknowledged cleanup. Later close could return an
+        # unsafe connection to the pool; retain both handles and the first failure.
         for phase, action in (
             ("rollback", connection.rollback),
             (
@@ -99,16 +100,13 @@ def recovery_snapshot(connect):
                     failure = error
                 else:
                     failure.add_note(f"Recovery observation {phase} failed: {type(error).__name__}")
-                if phase in {"rollback", "close"}:
-                    # A failed rollback may still own the shared transaction
-                    # guard. Never return it to a pool or change its isolation.
-                    retain_open = True
-                    retain_connection(
-                        connection,
-                        effect="not_applicable",
-                        first_failure=failure,
-                        cleanup_error=error,
-                    )
+                retain_open = True
+                retain_connection(
+                    SimpleNamespace(connection=connection, cursor=cursor),
+                    effect="not_applicable",
+                    first_failure=failure,
+                    cleanup_error=error,
+                )
     if failure is not None:
         if cleanup_failed:
             raise RecoveryObservationCleanupUnknown(
