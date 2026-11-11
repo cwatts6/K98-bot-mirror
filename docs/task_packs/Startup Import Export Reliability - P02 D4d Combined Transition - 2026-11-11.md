@@ -1,3 +1,5 @@
+> **Active release reference:** PR740 is merged, not deployed. This fixed combined-transition contract remains needed for D5/D6. Use the [D5 scope](Startup%20Import%20Export%20Reliability%20-%20P02%20D5%20Scope%20and%20Handover%20-%202026-11-11.md) for current authority and qualification; earlier source-preparation status below is historical.
+
 # P02 D4d combined transition
 
 The candidate joins the installed Phase 1 Bot, D2/D3 source and the D4 SQL package

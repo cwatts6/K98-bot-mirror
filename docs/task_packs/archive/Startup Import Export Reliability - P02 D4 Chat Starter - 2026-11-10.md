@@ -1,3 +1,5 @@
+> **Archived 11 November 2026:** Superseded planning or delivered D4 evidence. Use the [active D5 scope](../Startup%20Import%20Export%20Reliability%20-%20P02%20D5%20Scope%20and%20Handover%20-%202026-11-11.md). Preserve the historical body below; do not replay dated instructions.
+
 # P02 D4 new-chat starter
 
 The [10 November scope review](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20Review%20-%202026-11-10.md)

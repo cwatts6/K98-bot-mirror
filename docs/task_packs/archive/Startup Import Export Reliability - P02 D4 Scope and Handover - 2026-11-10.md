@@ -1,6 +1,8 @@
+> **Archived 11 November 2026:** Superseded planning or delivered D4 evidence. Use the [active D5 scope](../Startup%20Import%20Export%20Reliability%20-%20P02%20D5%20Scope%20and%20Handover%20-%202026-11-11.md). Preserve the historical body below; do not replay dated instructions.
+
 # P02 D4 scope and handover
 
-> **D4 delivery, 11 November:** The [delivery and D5 handoff](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Delivery%20and%20D5%20Handoff%20-%202026-11-11.md) records the completed source slices, approved decisions, validation and remaining owners. This original scope remains the historical obligation baseline; D5/D6 and operational acceptance are still open.
+> **D4 delivery, 11 November:** The [delivery and D5 handoff](../Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Delivery%20and%20D5%20Handoff%20-%202026-11-11.md) records the completed source slices, approved decisions, validation and remaining owners. This original scope remains the historical obligation baseline; D5/D6 and operational acceptance are still open.
 
 > **Scope review, 10 November:** Read the [independent obligation reconciliation](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20Review%20-%202026-11-10.md)
 > for the refreshed Bot/SQL caller matrix, F01-F32 and exact 73-pair action census,
@@ -41,7 +43,7 @@ instruction to execute migrations or an assertion that installed evidence exists
 
 The final [PR739 receipt](https://github.com/cwatts6/k98-bot/pull/739#issuecomment-6773271380)
 retains exact checks, review dispositions, scan usage and superseded runs.
-The [D3 delivery review](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Delivery%20Review%20-%202026-11-10.md)
+The [D3 delivery review](../Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Delivery%20Review%20-%202026-11-10.md)
 and its archived slices remain evidence. Earlier failed, stopped and superseded
 runs are not acceptance. No completed D3 slice is to be replayed merely for freshness.
 
