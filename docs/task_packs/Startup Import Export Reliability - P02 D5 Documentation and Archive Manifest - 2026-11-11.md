@@ -15,6 +15,6 @@ SQL separately archives `docs/p02-d4-scope-handover.md` to `docs/archive/p02-d4-
 
 Active documents retained: D5 scope and chat starter; D4 delivery register (all F/C mappings and validation); D4d combined transition; D2/D3 delivery reviews; programme scope/tracker/census/coverage/tracing/final sweep/principles/remaining-work and integrated plan; P01 natural-acceptance registers. SQL D4 delivery, combined package, dependency/permission/legacy contracts and integrated plan remain active references until their outstanding qualification/release obligations close.
 
-The new D5 packet owns scope reconfirmation, missed/new-issue review, failed drain evidence, SQL3961, consumed21-input allowance, resource/cost limits and D5/D6/P03/P04/P05 handoff. Archived commands are not execution authority. Private raw receipts and CI logs remain local evidence; they are not published as attachments.
+The new D5 packet owns scope reconfirmation, missed/new-issue review, failed drain evidence, SQL 3961, consumed 21-input allowance, resource/cost limits and D5/D6/P03/P04/P05 handoff. Archived commands are not execution authority. Private raw receipts and CI logs remain local evidence; they are not published as attachments.
 
 Validation: check introduced/rebased links, exact archive destinations and before-image bodies, architecture/deferred/security-routing/test selection, whitespace and pre-commit. No executable/SQL/configuration change; runtime/native/provider tests and a new security scan are skipped for this documentation-only delta.

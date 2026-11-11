@@ -19,19 +19,19 @@ including Recheck/group/batch/outcome paths outside that count. Review the whole
 affected solution across Bot and SQL, equivalent/direct callers, all six
 maintenance boundaries, observers, physical ownership, restart and cost.
 
-Carry the exact failed Personal Stats drain test into D5: CI run42998021332
-attempt1, test_cancelled_unstarted_owners_keep_two_native_slots_and_drain,
-final drain assertion false at line63 on8b6879bf. The unchanged test/runtime
+Carry the exact failed Personal Stats drain test into D5: CI run 42998021332
+attempt 1, test_cancelled_unstarted_owners_keep_two_native_slots_and_drain,
+final drain assertion false at line 63 on `8b6879bf`. The unchanged test/runtime
 passed four focused cases and one same-head full-suite retry. Root cause is
 unproven; passing retry does not erase failure. Preserve logs and design bounded
 deterministic investigation of native completion, settlement and concurrent
-drain/cancellation before proposing a fix. Preserve SQL3961 and prior failed runs.
+drain/cancellation before proposing a fix. Preserve SQL 3961 and prior failed runs.
 
 Reconfirm the proposed D5a-f sequence, all 14 outputs/detailed state and numeric/
 queued-payload equality, actual maintenance children, both ownership orders,
 known holders/observer saturation, lost ACK/cleanup uncertainty, cancellation/
-restart and balanced resource cost. Keep RCSI off, 8GiB memory/disk floors,
-log70/version512 limits and existing budgets. The 21-input allowance is consumed;
+restart and balanced resource cost. Keep RCSI off, 8 GiB memory/disk floors,
+log below 70 percent / version store below 512 MiB limits and existing budgets. The 21-input allowance is consumed;
 no new copy/restore/reset, expanded allowance or backup-schedule change is implied.
 Verify test-host/VM/session readiness before any later native work.
 
