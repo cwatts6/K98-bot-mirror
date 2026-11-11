@@ -1,5 +1,7 @@
 # P02 D4 scope and handover
 
+> **D4 delivery, 11 November:** The [delivery and D5 handoff](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Delivery%20and%20D5%20Handoff%20-%202026-11-11.md) records the completed source slices, approved decisions, validation and remaining owners. This original scope remains the historical obligation baseline; D5/D6 and operational acceptance are still open.
+
 > **Scope review, 10 November:** Read the [independent obligation reconciliation](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20Review%20-%202026-11-10.md)
 > for the refreshed Bot/SQL caller matrix, F01-F32 and exact 73-pair action census,
 > new direct-child/backup/legacy admission items, registry capacity and concrete D4a
