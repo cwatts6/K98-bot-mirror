@@ -1,3 +1,5 @@
+> **Archived 11 November 2026:** Superseded planning or delivered D4 evidence. Use the [active D5 scope](../Startup%20Import%20Export%20Reliability%20-%20P02%20D5%20Scope%20and%20Handover%20-%202026-11-11.md). Preserve the historical body below; do not replay dated instructions.
+
 # P02 D4b backup route visibility
 
 Status: source correction under validation. Installed route qualification and the

@@ -1,6 +1,6 @@
 # P02 D3a: archived file ownership delivery review
 
-D3a is implemented and qualified for mirror review in PR [513](https://github.com/cwatts6/K98-bot-mirror/pull/513), following the requested fresh bounded coverage review. No outstanding D3a review finding remains. The six maintenance boundaries and D4/D5 remain open. The [D3 handover and scope](../Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) and starting-point sections below preserve the earlier handover evidence.
+D3a is implemented and qualified for mirror review in PR [513](https://github.com/cwatts6/K98-bot-mirror/pull/513), following the requested fresh bounded coverage review. No outstanding D3a review finding remains. The six maintenance boundaries and D4/D5 remain open. The [D3 handover and scope](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Handover%20and%20Scope%20-%202026-11-10.md) and starting-point sections below preserve the earlier handover evidence.
 
 ## Authorization and starting point
 

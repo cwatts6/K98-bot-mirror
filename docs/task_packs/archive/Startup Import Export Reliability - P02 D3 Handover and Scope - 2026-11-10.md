@@ -1,3 +1,5 @@
+> **Archived 11 November 2026:** Superseded planning or delivered D4 evidence. Use the [active D5 scope](../Startup%20Import%20Export%20Reliability%20-%20P02%20D5%20Scope%20and%20Handover%20-%202026-11-11.md). Preserve the historical body below; do not replay dated instructions.
+
 > **Superseded handover checkpoint:** PR739 is now merged at `5ec55e3b`. The operator requested a new [D4 scope review](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Scope%20and%20Handover%20-%202026-11-10.md). Deployment remains held for D4/D5 and separate release authorization. Original D3 authorization and no-new-chat wording below is historical; remaining obligations carry forward.
 
 # P02 D3 closeout and remaining-work handover
@@ -8,7 +10,7 @@ private production PR and its review/comment cycle. Production merge, deployment
 restart, SQL apply, provider actions and retained recovery are separate. Deployment
 remains held until the planned step after D5. Phase 1 remains the installed release.
 
-Use the [D3 delivery closeout](Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Delivery%20Review%20-%202026-11-10.md)
+Use the [D3 delivery closeout](../Startup%20Import%20Export%20Reliability%20-%20P02%20D3%20Delivery%20Review%20-%202026-11-10.md)
 for all seven slices, exact merge/review evidence, final tests, coverage and impact.
 Completed slice packs and original scope evidence are archived, not discarded.
 The original D3a-first instructions are historical and must not restart completed work.

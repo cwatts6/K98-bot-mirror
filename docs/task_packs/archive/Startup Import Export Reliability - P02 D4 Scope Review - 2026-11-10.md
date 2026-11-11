@@ -1,3 +1,5 @@
+> **Archived 11 November 2026:** Superseded planning or delivered D4 evidence. Use the [active D5 scope](../Startup%20Import%20Export%20Reliability%20-%20P02%20D5%20Scope%20and%20Handover%20-%202026-11-11.md). Preserve the historical body below; do not replay dated instructions.
+
 # P02 D4 scope review and obligation reconciliation
 
 10 November 2026. Review baseline: Bot `d4169d7`, SQL `eeefd6f`.
@@ -95,8 +97,8 @@ diagnostic fingerprint assertion. None is closed by this source review.
 
 ## Original findings and source-census disposition
 
-Read with the original [tracker](Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md)
-and [action census](Startup%20Import%20Export%20Reliability%20-%20Action%20Census%20-%202026-11-02.md).
+Read with the original [tracker](../Startup%20Import%20Export%20Reliability%20-%20Tracker%20-%202026-11-02.md)
+and [action census](../Startup%20Import%20Export%20Reliability%20-%20Action%20Census%20-%202026-11-02.md).
 Accepted work remains accepted within its recorded limits. D5 integration evidence
 does not reopen a completed slice without a demonstrated defect.
 
