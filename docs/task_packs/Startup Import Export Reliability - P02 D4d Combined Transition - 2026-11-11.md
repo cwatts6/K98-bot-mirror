@@ -1,9 +1,10 @@
 # P02 D4d combined transition
 
 The candidate joins the installed Phase 1 Bot, D2/D3 source and the D4 SQL package
-through the existing combined updater. Source qualification is in progress;
-this document does not authorize installation, restart or recovery. D5 and the
-separate D6 release decision remain required.
+through the existing combined updater. Source qualification and review are
+complete in mirror PR532; the [D4 delivery and D5 handoff](Startup%20Import%20Export%20Reliability%20-%20P02%20D4%20Delivery%20and%20D5%20Handoff%20-%202026-11-11.md)
+records final validation and remaining owners. This document does not authorize
+installation, restart or recovery. D5 and the separate D6 release decision remain required.
 
 ## Fixed inputs and behaviour
 
