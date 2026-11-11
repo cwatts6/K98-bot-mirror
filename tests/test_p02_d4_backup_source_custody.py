@@ -46,8 +46,9 @@ def test_partial_backup_patch_requires_combined_release(monkeypatch):
 
 def test_all_88_historical_entries_remain_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 88
-    assert hashlib.sha256(json.dumps(entries, sort_keys=True).encode()).hexdigest() == (
+    assert len(entries) == 89
+    assert hashlib.sha256(json.dumps(entries[:88], sort_keys=True).encode()).hexdigest() == (
         "44ea1d790395c62940fa38ce4aa63684a71310933658a247411477ae57af025a"
     )
-    assert entries[-1]["id"] == "p02_d3_cleanup_custody_v1"
+    assert entries[87]["id"] == "p02_d3_cleanup_custody_v1"
+    assert entries[88]["id"] == updater.D4_CONTRACT_TRANSITION
