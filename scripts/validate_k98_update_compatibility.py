@@ -14,6 +14,7 @@ import subprocess
 from scripts.prepare_k98_update import (
     TOOL_SOURCE_PATHS,
     check_case_aliases,
+    check_d4_release_binding,
     check_mge_release_binding,
     check_phase1_release_binding,
     check_source_only,
@@ -52,6 +53,7 @@ def classify(
         check_transition_inventory(paths, read_blob, before, target, admitted=admitted)
         check_mge_release_binding(before, target, paths, read_blob)
         check_phase1_release_binding(before, target, paths, read_blob)
+        check_d4_release_binding(before, target, paths, read_blob)
     except ValueError as exc:
         blockers.append(str(exc))
     if installed_tool is not None:

@@ -5,6 +5,12 @@ import re
 
 from kvk.dal.new_source_import_dal import SourceConflict, digest
 from services.export_contract_resources import read_contract_resource
+from services.export_d4_contract import (
+    LEGACY_SOURCE_SHA256 as D4_SOURCE_HASH,
+    MIGRATION_ID as D4_MIGRATION,
+    PROFILE_SHA256 as D4_CHECKSUM,
+    d4_contract,
+)
 from services.export_phase1_contract import (
     LEGACY_SOURCE_SHA256 as PHASE1_SOURCE_HASH,
     MIGRATION_ID as PHASE1_MIGRATION,
@@ -81,8 +87,11 @@ def validate_contract(approved):
         "recovery_installation",
     }
     phase1 = phase1_contract(approved)
+    d4 = d4_contract(approved)
     if phase1:
         fields.add("phase1_installation")
+    if d4:
+        fields.add("d4_installation")
     amended = isinstance(approved, dict) and "module_amendment" in approved
     if amended:
         fields.add("module_amendment")
@@ -108,7 +117,7 @@ def validate_contract(approved):
             for k in ("migration_hash", "metadata_hash")
         )
         or digest(approved["source"]).hex()
-        != (PHASE1_SOURCE_HASH if phase1 else DIRECT_SOURCE_HASH)
+        != (D4_SOURCE_HASH if d4 else PHASE1_SOURCE_HASH if phase1 else DIRECT_SOURCE_HASH)
         or approved.get("recovery_installation") != P0_RECEIPT_MIGRATION
         or (
             amended
@@ -251,13 +260,22 @@ def queries(base, source):
             P0_RECEIPT_MIGRATION,
         ),
     )
-    if digest(source).hex() == PHASE1_SOURCE_HASH:
+    source_hash = digest(source).hex()
+    if source_hash in {PHASE1_SOURCE_HASH, D4_SOURCE_HASH}:
         query, parameters = result["migration"]
         if query.count("IN (?,?,?,?,?,?)") != 1:
             raise SourceConflict("Exact Phase 1 migration reader required.")
         result["migration"] = (
             query.replace("IN (?,?,?,?,?,?)", "IN (?,?,?,?,?,?,?)"),
             (*parameters, PHASE1_MIGRATION),
+        )
+    if source_hash == D4_SOURCE_HASH:
+        query, parameters = result["migration"]
+        if query.count("IN (?,?,?,?,?,?,?)") != 1:
+            raise SourceConflict("Exact D4 migration reader required.")
+        result["migration"] = (
+            query.replace("IN (?,?,?,?,?,?,?)", "IN (?,?,?,?,?,?,?,?)"),
+            (*parameters, D4_MIGRATION),
         )
     return result
 
@@ -457,6 +475,10 @@ def verify(observed, approved, *, profile):
     if phase1_contract(approved):
         expected_migrations.append(
             dict(MigrationId=PHASE1_MIGRATION, ChecksumSha256=PHASE1_CHECKSUM, Status="Applied")
+        )
+    if d4_contract(approved):
+        expected_migrations.append(
+            dict(MigrationId=D4_MIGRATION, ChecksumSha256=D4_CHECKSUM, Status="Applied")
         )
     if not _exact(observed["migration"], expected_migrations):
         raise SourceConflict("Exact direct-permission migration receipt required.")

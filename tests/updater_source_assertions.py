@@ -28,9 +28,38 @@ _EVENT_CACHE_READINESS_PAIRS = {
 }
 
 
+_D4_CONTRACT_PAIRS = {
+    "services/export_runtime_composition.py": (
+        "6e8bc38bc4d8f12f1881869f070a4bbbf8d66fd43644ad7cfa18fbce2b044611",
+        "9737637b5f29f0e1c8ae89f7ad9f8a002ac06ad1cc78a2b658ea2b9b6d03211a",
+    ),
+    "services/export_execution_dal.py": (
+        "908829d695ffdde9e3aeedbc03b33a2c5cc949f9d939fb7ba3856b0da487d2ef",
+        "ca568135303c3828e1988c6a7152d4c743c558f5b7fd9b3c150f566804382b0f",
+    ),
+    "services/export_contract_resources.py": (
+        "c77c4e385e81ed1174e91a26482e8be6713238bfc2c3d248bd38fd9bb393785b",
+        "e545f01fe7fab35bbb80f0a8817935143fa8f1bdff67ca124290a4ac1e21b04c",
+    ),
+    "services/export_sql_direct_permissions.py": (
+        "4e9c5ba53cd13d1c8f98f447c042aeb60e9b944d725581d098229f35c173d8e0",
+        "02abee1b52097ee242a3bc7e2cdc973e3e683e990042e3f1051ca309b0162694",
+    ),
+}
+
+
+def before_d4_contract_hash(root, path):
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path in _D4_CONTRACT_PAIRS:
+        before, after = _D4_CONTRACT_PAIRS[path]
+        assert actual == after, path
+        return before
+    return actual
+
+
 def before_d4_backup_route_hash(root, path):
     """Test-only source bridge; D4's combined installed release is still required."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_d4_contract_hash(root, path)
     if path == "log_backup.py":
         assert actual == "37ec41d36a1f62f9cad569fbaea58cad524fe8887a4525474c585d4d3b929cec", path
         return "bd6a99fbd5eab29ac31528fe2e137b0e1dc1d411ff336b19ec380efeb04dac50"

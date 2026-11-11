@@ -585,11 +585,16 @@ APPLICATION_ACTIVATION_SCOPE_HASH = (
 )
 
 
-def application_activation_scope(*, phase1=False):
+def application_activation_scope(*, phase1=False, d4=False):
+    from services.export_d4_contract import ACTIVATION_SCOPE_SHA256 as D4_SCOPE_SHA256
     from services.export_phase1_contract import ACTIVATION_SCOPE_SHA256
 
+    if d4 and not phase1:
+        raise SourceConflict("D4 activation scope requires its Phase 1 lineage.")
     resource = "p02_phase1_activation_scope.json" if phase1 else "s11_activation_scope.json"
     expected = ACTIVATION_SCOPE_SHA256 if phase1 else APPLICATION_ACTIVATION_SCOPE_HASH
+    if d4:
+        resource, expected = "p02_d4_activation_scope.json", D4_SCOPE_SHA256
     scope = json.loads(read_contract_resource(resource))
     if digest(scope).hex() != expected:
         raise SourceConflict("Reviewed S11 activation dependency scope differs.")
@@ -712,10 +717,14 @@ def legacy_definition_hash(definition):
 
 
 def validate_legacy_permission_source(source):
-    from services.export_sql_direct_permissions import DIRECT_SOURCE_HASH, PHASE1_SOURCE_HASH
+    from services.export_sql_direct_permissions import (
+        D4_SOURCE_HASH,
+        DIRECT_SOURCE_HASH,
+        PHASE1_SOURCE_HASH,
+    )
 
     expected = (
-        {DIRECT_SOURCE_HASH, PHASE1_SOURCE_HASH}
+        {DIRECT_SOURCE_HASH, PHASE1_SOURCE_HASH, D4_SOURCE_HASH}
         if isinstance(source, dict) and source.get("permission_model") == "direct_application_v1"
         else {LEGACY_PERMISSION_SOURCE_HASH}
     )

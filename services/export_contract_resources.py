@@ -8,7 +8,12 @@ the deployment boundary remains responsible for authenticating executable code.
 from pathlib import Path
 
 _RESOURCES = frozenset(
-    {"s11_activation_scope.json", "s11_application_grants.json", "p02_phase1_activation_scope.json"}
+    {
+        "s11_activation_scope.json",
+        "s11_application_grants.json",
+        "p02_phase1_activation_scope.json",
+        "p02_d4_activation_scope.json",
+    }
 )
 
 
