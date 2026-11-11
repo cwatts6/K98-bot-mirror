@@ -1,15 +1,15 @@
 {
-  "version": 3,
-  "profile": "p02_phase1_v1",
+  "version": 4,
+  "profile": "p02_d4_v1",
   "bot_predecessors": [
-    "6cb5d8ed532a8b1e34ad58ed230daa74d5ba77a3"
+    "97abcce1b2a9e71b3959eff74525c57930a703e6"
   ],
-  "sql_commit": "a202a51440f17233800b49801bd31c3ead2a9227",
+  "sql_commit": "ba5c6acbefba0eb89cb18842a7f6c6811096759b",
   "migrations": [
     {
-      "id": "20261109_001_p02_phase1_sql_exports",
-      "sha256": "520b58c1b25d80bd28f32324d99b5fede0d6191ddab93ac93469ed5c1f6e4041"
+      "id": "20261111_001_p02_d4_combined",
+      "sha256": "57944777e50b7dc9200220cfcc2ce767edb22a2e0972e02bc2cd6f04e23e8171"
     }
   ],
-  "contract_transition": "p02_phase1_sql_names_numbers_v1"
+  "contract_transition": "p02_d4_combined_v1"
 }

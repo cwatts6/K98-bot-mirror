@@ -143,14 +143,14 @@ def test_descriptor_version_is_exact(version):
 
 def test_committed_descriptor_selects_portable_transition():
     root = Path(__file__).resolve().parents[1]
-    # Phase 1 is the current coordinated release. The historical portable MGE
+    # D4 is the current coordinated release. The historical portable MGE
     # descriptor must remain independently admitted with its original authority.
     prior = updater.MGE_PORTABLE_APPLICATION_RELEASE
     assert updater.validate_combined_description(json.dumps(prior).encode()) == prior
     current = json.loads((root / updater.RELEASE_DESCRIPTION).read_bytes())
     assert updater.validate_combined_description(json.dumps(current).encode()) == current
-    assert current["version"] == 3
-    assert current["contract_transition"] == updater.PHASE1_CONTRACT_TRANSITION
+    assert current["version"] == 4
+    assert current["contract_transition"] == updater.D4_CONTRACT_TRANSITION
 
 
 def test_legacy_descriptor_cannot_smuggle_a_format_choice():

@@ -1204,6 +1204,91 @@ REQUEST_SETTLEMENT_TRANSITIONS = frozenset(
 )
 
 
+P02_D4_COMBINED_PATHS = frozenset(
+    [
+        "ark/state/ark_state.py",
+        "ark/team_state.py",
+        "constants.py",
+        "core/export_execution_host.py",
+        "core/export_process_identity.py",
+        "core/export_sql_connection.py",
+        "core/file_lock.py",
+        "core/operation_evidence.py",
+        "core/operation_timing.py",
+        "core/owned_work.py",
+        "core/recovery_sql_snapshot.py",
+        "core/sql_connection_custody.py",
+        "core/sql_observation.py",
+        "core/sql_operation_policy.py",
+        "deploy/p02_d4_activation_scope.json",
+        "deploy/p02_d4_application_sources.json",
+        "deploy/p02_d4_legacy_source.json",
+        "event_calendar/sql_lifecycle.py",
+        "file_utils.py",
+        "kvk/dal/new_source_admin_dal.py",
+        "kvk/dal/new_source_delivery_dal.py",
+        "kvk/dal/new_source_import_dal.py",
+        "kvk/dal/season_source_dal.py",
+        "kvk/dal/source_admin_review_dal.py",
+        "kvk/dal/source_output_pool_dal.py",
+        "kvk/dal/source_routing_dal.py",
+        "kvk/dal/source_sql_diagnostics.py",
+        "kvk/dal/source_update_dal.py",
+        "kvk/dal/source_weight_dal.py",
+        "log_backup.py",
+        "log_health.py",
+        "maintenance_worker.py",
+        "player_stats_cache.py",
+        "prekvk_importer.py",
+        "proc_config_import.py",
+        "profile_cache.py",
+        "scripts/retry_phase52_stats_import.py",
+        "scripts/run_export_authority.py",
+        "services/authority_observation.py",
+        "services/config_preparation_recovery_dal.py",
+        "services/config_preparation_recovery_service.py",
+        "services/config_recovery_authority.py",
+        "services/export_contention.py",
+        "services/export_contract_resources.py",
+        "services/export_coordination_dal.py",
+        "services/export_d4_contract.py",
+        "services/export_evidence_recovery.py",
+        "services/export_execution_authority.py",
+        "services/export_execution_dal.py",
+        "services/export_execution_progress.py",
+        "services/export_proof_progress.py",
+        "services/export_recovery_dal.py",
+        "services/export_replacement_authority.py",
+        "services/export_runtime_composition.py",
+        "services/export_sql_direct_permissions.py",
+        "services/export_sql_health_dal.py",
+        "services/export_target_recovery_authority.py",
+        "services/failed_export_recovery_authority.py",
+        "services/import_capture_recovery_dal.py",
+        "services/import_capture_recovery_service.py",
+        "services/legacy_export_snapshot_dal.py",
+        "services/legacy_export_snapshot_service.py",
+        "services/legacy_snapshot_admission.py",
+        "services/maintenance_backup_dal.py",
+        "services/maintenance_dal.py",
+        "services/maintenance_service.py",
+        "services/player_report_continuation.py",
+        "services/player_report_sql.py",
+        "services/player_stats_startup.py",
+        "services/processing_pipeline_receipt_dal.py",
+        "services/processing_pipeline_receipts.py",
+        "services/producer_recovery_intent.py",
+        "services/profile_cache_service.py",
+        "services/sql_lock_holder_diagnostics.py",
+        "services/tracked_view_store.py",
+        "services/unowned_sql_hold_dal.py",
+        "services/unowned_sql_hold_recovery.py",
+        "stats/profile_cache_repository.py",
+        "update_all2_log_manager.py",
+    ]
+)
+
+
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
 
@@ -1211,13 +1296,13 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    # Fixed D2l successor plus Windows newlines; still a bounded installed file.
+    # Fixed D4 successor plus Windows newlines; the historical byte bound is unchanged.
     if len(raw) > 232448:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 88:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 89:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -1237,6 +1322,8 @@ def reviewed_transitions():
                 )
             )
         )
+        if item["id"] == "p02_d4_combined_v1":
+            member_limit = len(P02_D4_COMBINED_PATHS)
         if item["id"] == "p02_phase1_sql_exports_v1":
             member_limit = len(P02_PHASE1_SQL_EXPORT_PATHS)
         if item["id"] == "p015_calendar_ownership_v1":
@@ -1325,6 +1412,7 @@ def reviewed_transitions():
             fixed_p021 = (
                 item["id"] == "p021_observer_snapshots_v1" and path in P021_OBSERVER_SNAPSHOT_PATHS
             )
+            fixed_p02_d4 = item["id"] == "p02_d4_combined_v1" and path in P02_D4_COMBINED_PATHS
             fixed_p02_phase1 = (
                 item["id"] == "p02_phase1_sql_exports_v1" and path in P02_PHASE1_SQL_EXPORT_PATHS
             )
@@ -1526,6 +1614,7 @@ def reviewed_transitions():
                     or fixed_p016
                     or fixed_p021
                     or fixed_p02_phase1
+                    or fixed_p02_d4
                     or fixed_p02_d3a
                     or fixed_p02_d3_cleanup
                     or fixed_p02_d3g
@@ -1574,6 +1663,15 @@ def reviewed_transitions():
                 )
                 or not (
                     path.endswith(".py")
+                    or (
+                        fixed_p02_d4
+                        and path
+                        in {
+                            "deploy/p02_d4_activation_scope.json",
+                            "deploy/p02_d4_application_sources.json",
+                            "deploy/p02_d4_legacy_source.json",
+                        }
+                    )
                     or (
                         fixed_p02_phase1
                         and path
@@ -1741,6 +1839,8 @@ def reviewed_transitions():
             and paths != P02_D3G_FINAL_REPORT_MAINTENANCE_PATHS
         ):
             raise ValueError("Complete fixed P02 D3g final report maintenance transition required.")
+        if item["id"] == "p02_d4_combined_v1" and paths != P02_D4_COMBINED_PATHS:
+            raise ValueError("Complete fixed P02 D4 combined transition required.")
         if item["id"] == "p02_d3_cleanup_custody_v1" and paths != P02_D3_CLEANUP_CUSTODY_PATHS:
             raise ValueError("Complete fixed P02 D3 cleanup custody transition required.")
         if item["id"] == "p02_d3b_maintenance_ownership_v1" and paths != P02_D3B_MAINTENANCE_PATHS:
@@ -2085,6 +2185,130 @@ def phase1_contract_transition(previous, description, read_blob, target):
     return dict(contracts=result)
 
 
+# Exact installed D4 predecessor and independently qualified SQL successor.
+D4_MIGRATION = "20261111_001_p02_d4_combined"
+D4_PROFILE_HASH = "57944777e50b7dc9200220cfcc2ce767edb22a2e0972e02bc2cd6f04e23e8171"
+D4_SCRIPT_HASH = "8c0c99d92c14cac6da6e22076a5620927bac4c8af3deaa50950d66062381a8dc"
+D4_PREDECESSOR = "97abcce1b2a9e71b3959eff74525c57930a703e6"
+D4_SQL_COMMIT = "ba5c6acbefba0eb89cb18842a7f6c6811096759b"
+D4_CONTRACT_TRANSITION = "p02_d4_combined_v1"
+D4_CONTRACT_PINS = {
+    "sql_contract": {
+        "before": "c257388a8d13e20d7903605f26596e5177d829b661dab1c60a086b4d87e6496c",
+        "after": "c257388a8d13e20d7903605f26596e5177d829b661dab1c60a086b4d87e6496c",
+    },
+    "legacy_sql_contract": {
+        "before": "f95a82fecfe47593f823d7108ec5243b7a4f3bfe991082a7cd6f6947fd6c84cd",
+        "after": "e74042f9ff6dd64da10d5d743104e06c2ac08c6903bd9916f5608fff48aada0f",
+    },
+    "application_sql_contract": {
+        "before": "81d81816c1eeabb6071984890f6ff3f66bc117cee2cac49e2bb90080bfc85697",
+        "after": "50fb90ecf0174a336c3f8b88e96a69cc3889ce3454c2608a4124caed04ac3092",
+    },
+}
+D4_CONTRACT_UPDATES = {
+    "legacy_sql_contract": {
+        "metadata_hash": "3f5f2cf133ca092a0721928546e4dce5300f0d2c3c60578112ef8b8de45ee713",
+        "d4_installation": "20261111_001_p02_d4_combined",
+    },
+    "application_sql_contract": {
+        "metadata_hash": "a78e17b2874340067d39b2ba49754b506b0d6dd965e21ae89276644b91113003",
+        "permissions_hash": "2d1a6328f6310b3912a49ee0c793feb82334cb82a13e1f1c1d573350329d2767",
+        "review_id": "f64f88de-5870-5f8e-a2d0-d8eb7ce00f3d",
+        "scope_hash": "7976d3dd9a54cb125e638f99b63fef871985617d45405910184e82d7ddce48b2",
+        "d4_installation": "20261111_001_p02_d4_combined",
+    },
+}
+D4_SOURCE_FILES = {
+    "legacy_sql_contract": ("source", "deploy/p02_d4_legacy_source.json"),
+    "application_sql_contract": ("sources", "deploy/p02_d4_application_sources.json"),
+}
+D4_OBJECTS = frozenset(
+    [
+        "dbo.CREATE_DELTA_TABLES",
+        "dbo.MaintenanceBackupWork",
+        "dbo.MaintenanceConfigurationWork",
+        "dbo.MaintenanceKvkWork",
+        "dbo.MaintenanceWork",
+        "dbo.SP_Stats_for_Upload",
+        "dbo.TEST",
+        "dbo.UPDATE_ALL",
+        "dbo.UPDATE_ALL2",
+        "dbo.UPDATE_RALLY_DATA",
+        "dbo.sp_ExcelOutput_ByKVK",
+        "dbo.usp_CleanupLogBackupTriggerQueue",
+        "dbo.usp_GetPendingLogBackupTriggers",
+        "dbo.usp_MaintenanceBackupAcknowledge",
+        "dbo.usp_MaintenanceBackupClaim",
+        "dbo.usp_MaintenanceConfiguration",
+        "dbo.usp_MaintenanceConfigurationDue",
+        "dbo.usp_MaintenanceDue",
+        "dbo.usp_MaintenanceFinalStats",
+        "dbo.usp_MaintenanceImport",
+        "dbo.usp_MaintenanceKvkDue",
+        "dbo.usp_MaintenanceKvkOutput",
+        "dbo.usp_MaintenancePlayerReport",
+        "dbo.usp_MaintenancePostImport",
+        "dbo.usp_MarkLogBackupTriggerProcessed",
+        "dbo.usp_P02LegacyQueueState",
+        "dbo.usp_RunMaintenance",
+        "dbo.usp_S11CompleteStatsReportsCore",
+        "dbo.usp_S11ValidateStatsReportStage",
+        "dbo.usp_update_stats",
+    ]
+)
+
+
+def validate_d4_description(value):
+    if (
+        value.get("version") != 4
+        or value.get("profile") != "p02_d4_v1"
+        or value.get("sql_commit") != D4_SQL_COMMIT
+        or value.get("contract_transition") != D4_CONTRACT_TRANSITION
+        or value.get("bot_predecessors") != [D4_PREDECESSOR]
+        or value.get("migrations") != [dict(id=D4_MIGRATION, sha256=D4_PROFILE_HASH)]
+    ):
+        raise ValueError("Exact complete D4 combined release required.")
+
+
+def check_d4_release_binding(before, target, changes, read_blob):
+    """First D4 adoption requires the complete installed-to-combined family."""
+    marker = "services/export_d4_contract.py"
+    if marker not in changes or read_blob(before, marker) is not None:
+        return
+    raw = read_blob(target, RELEASE_DESCRIPTION)
+    if raw is None or raw == read_blob(before, RELEASE_DESCRIPTION):
+        raise ValueError("D4 requires a changed, bound combined SQL descriptor.")
+    validate_d4_description(combined_description(raw, before))
+    transition = next(t for t in reviewed_transitions() if t["id"] == D4_CONTRACT_TRANSITION)
+    required = {m["path"] for m in transition["members"] if m["before_sha256"] != m["after_sha256"]}
+    if not required <= set(changes):
+        raise ValueError("Complete D4 source family required with its SQL release.")
+
+
+def d4_contract_transition(previous, description, read_blob, target):
+    """Authenticate all three predecessor/successor contracts; grant no rights."""
+    validate_d4_description(description)
+    bot = previous["bot-template.json"]
+    result = {}
+    for key, pins in D4_CONTRACT_PINS.items():
+        before = bot[key]
+        if sha256(encode(before)) != pins["before"]:
+            raise ValueError("D4 predecessor startup contract differs: " + key)
+        after = deepcopy(before)
+        after.update(D4_CONTRACT_UPDATES.get(key, {}))
+        if key in D4_SOURCE_FILES:
+            field, path = D4_SOURCE_FILES[key]
+            raw = read_blob(target, path)
+            if raw is None or len(raw) > 1024 * 1024:
+                raise ValueError("Bounded D4 contract source required: " + path)
+            after[field] = json.loads(raw)
+        if sha256(encode(after)) != pins["after"]:
+            raise ValueError("D4 successor startup contract differs: " + key)
+        result[key] = dict(before=deepcopy(before), after=after)
+    return dict(contracts=result)
+
+
 def validate_combined_description(raw):
     """Validate committed metadata without claiming installed compatibility."""
     if len(raw) > 65536:
@@ -2100,6 +2324,9 @@ def validate_combined_description(raw):
     elif value["version"] == 3:
         validate_phase1_description(value)
         fields.add("contract_transition")
+    elif value["version"] == 4:
+        validate_d4_description(value)
+        fields.add("contract_transition")
     elif value["version"] != 1:
         raise ValueError("Unsupported combined descriptor version; no drain requested.")
     if set(value) != fields:
@@ -2109,10 +2336,13 @@ def validate_combined_description(raw):
         "additive_tables_v1",
         "mge_finalisation_v1",
         "p02_phase1_v1",
+        "p02_d4_v1",
     }:
         raise ValueError("Unsupported combined SQL profile; no drain requested.")
     if value["profile"] == "p02_phase1_v1":
         validate_phase1_description(value)
+    if value["profile"] == "p02_d4_v1":
+        validate_d4_description(value)
     predecessors = value["bot_predecessors"]
     if (
         not isinstance(predecessors, list)
@@ -2226,6 +2456,13 @@ def combined_payload(description, read_sql_blob, *, protected_objects=(), protec
     if description["profile"] == "p02_phase1_v1":
         validate_phase1_description(description)
         sql_tools += ("SqlDeploy.Phase1Release.ps1", "SqlDeploy.RecoveryRelease.ps1")
+    if description["profile"] == "p02_d4_v1":
+        validate_d4_description(description)
+        sql_tools += (
+            "SqlDeploy.Phase1Release.ps1",
+            "SqlDeploy.RecoveryRelease.ps1",
+            "SqlDeploy.P02D4Release.ps1",
+        )
     for name in sql_tools:
         raw = read_sql_blob("deploy/" + name)
         if not raw or len(raw) > 2 * 1024 * 1024:
@@ -2240,6 +2477,21 @@ def combined_payload(description, read_sql_blob, *, protected_objects=(), protec
         if not raw or len(raw) > 1024 * 1024 or sha256(raw) != migration["sha256"]:
             raise ValueError(f"SQL profile differs from reviewed description: {name}")
         p = json.loads(raw)
+        if description["profile"] == "p02_d4_v1":
+            if sha256(raw) != D4_PROFILE_HASH:
+                raise ValueError("Fixed D4 profile bytes required.")
+            objects = {x["name"].casefold() for x in p["images"]}
+            if objects != {x.casefold() for x in D4_OBJECTS} or objects & protected_objects:
+                raise ValueError("Repeated, incomplete or protected D4 object family.")
+            member = D4_MIGRATION + ".sql"
+            content = read_sql_blob("migrations/" + member)
+            if not content or sha256(content) != D4_SCRIPT_HASH:
+                raise ValueError("Fixed qualified D4 SQL batch required.")
+            files[member] = content
+            files[name] = raw
+            profiles.append(dict(id=migration["id"], file=name, sha256=sha256(raw)))
+            modules.update(objects)
+            continue
         if description["profile"] == "p02_phase1_v1":
             if sha256(raw) != PHASE1_PROFILE_HASH:
                 raise ValueError("Fixed Phase 1 profile bytes required.")
@@ -2566,6 +2818,7 @@ def source_plan(previous, before, target, changes, read_blob, *, tool_sources=No
     check_transition_inventory(changes, read_blob, before, target, admitted=admitted)
     check_mge_release_binding(before, target, changes, read_blob)
     check_phase1_release_binding(before, target, changes, read_blob)
+    check_d4_release_binding(before, target, changes, read_blob)
     check_source_only(
         [p for p in changes if p not in admitted],
         tool_copies=tool_sources,
@@ -2942,6 +3195,14 @@ def prepare_update(
             fixed = {name.casefold() for name in PHASE1_OBJECTS}
             if fixed & {name.casefold() for name in INSTALLATION_OBJECTS}:
                 raise ValueError("Phase 1 cannot amend coordination installation objects.")
+            protected = {name for name in protected if name.casefold() not in fixed}
+        if description["profile"] == "p02_d4_v1":
+            mge_contracts = d4_contract_transition(
+                previous, description, read_blob, config["target"]
+            )
+            fixed = {name.casefold() for name in D4_OBJECTS}
+            if fixed & {name.casefold() for name in INSTALLATION_OBJECTS}:
+                raise ValueError("D4 cannot amend coordination installation objects.")
             protected = {name for name in protected if name.casefold() not in fixed}
         principals = {
             bot[k]["principal"]
