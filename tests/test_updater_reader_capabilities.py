@@ -116,6 +116,15 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     )
 
     for transition in update.reviewed_transitions():
+        if transition["id"] == update.D4_CONTRACT_TRANSITION:
+            # The combined installed-to-D4 jump spans the historical chains below.
+            # Authenticate its complete current image independently, retaining
+            # every older chain assertion rather than rebasing those histories.
+            assert {m["path"] for m in transition["members"]} == update.P02_D4_COMBINED_PATHS
+            for member in transition["members"]:
+                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
+                assert update.sha256(raw) == member["after_sha256"], member["path"]
+            continue
         d3_successors = {
             "p02_d3_cleanup_custody_v1": before_d3_cleanup_hash,
             "p02_d3c_import_maintenance_v1": before_d3c_hash,
