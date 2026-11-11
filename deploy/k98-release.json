@@ -1,0 +1,15 @@
+{
+  "version": 4,
+  "profile": "p02_d4_v1",
+  "bot_predecessors": [
+    "97abcce1b2a9e71b3959eff74525c57930a703e6"
+  ],
+  "sql_commit": "ba5c6acbefba0eb89cb18842a7f6c6811096759b",
+  "migrations": [
+    {
+      "id": "20261111_001_p02_d4_combined",
+      "sha256": "57944777e50b7dc9200220cfcc2ce767edb22a2e0972e02bc2cd6f04e23e8171"
+    }
+  ],
+  "contract_transition": "p02_d4_combined_v1"
+}
