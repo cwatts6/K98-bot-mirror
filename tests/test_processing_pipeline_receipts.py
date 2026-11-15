@@ -60,9 +60,11 @@ def test_maintenance_sets_odbc_timeout_before_cursor_creation(monkeypatch, timeo
 
         def fetchmany(self, size):
             return [
-                (kind, 1, 1, 1, str(uuid4()), "complete", None, None)
-                if kind == "post_import"
-                else (kind, 0, 0, None, None, "complete", None, None)
+                (
+                    (kind, 1, 1, 1, str(uuid4()), "complete", None, None)
+                    if kind == "post_import"
+                    else (kind, 0, 0, None, None, "complete", None, None)
+                )
                 for kind in sorted(KINDS)
             ]
 

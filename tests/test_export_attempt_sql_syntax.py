@@ -49,8 +49,7 @@ def test_postcase_accounting_quotes_reserved_backup_alias():
     The consumed failed packet remains immutable historical evidence.
     """
     source = (
-        Path(__file__).resolve().parents[1]
-        / "scripts/observe_p02_d5d_postcase_accounting.ps1"
+        Path(__file__).resolve().parents[1] / "scripts/observe_p02_d5d_postcase_accounting.ps1"
     ).read_text(encoding="utf-8-sig")
     queries = re.findall(r"\$r\.finalFixtureCounts=Query \$work '([^']+)' 1", source)
     assert len(queries) == 1

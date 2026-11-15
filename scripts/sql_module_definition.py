@@ -4,6 +4,7 @@ This is not a SQL parser or a replacement for catalog identity/options checks.
 Only the leading DDL keywords and their whitespace are canonicalized. The name,
 signature and complete remaining definition are compared exactly.
 """
+
 import re
 
 _HEADER = re.compile(
@@ -17,9 +18,9 @@ def canonical_procedure_definition(definition: str) -> str:
     if not isinstance(definition, str) or not definition:
         raise ValueError("A complete visible procedure definition is required")
     match = _HEADER.match(definition)
-    if match is None or not definition[match.end():]:
+    if match is None or not definition[match.end() :]:
         raise ValueError("Unsupported procedure header; retain actual catalog evidence")
-    return "PROCEDURE " + definition[match.end():]
+    return "PROCEDURE " + definition[match.end() :]
 
 
 def same_procedure_definition(expected: str, actual: str) -> bool:
