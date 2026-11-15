@@ -35,3 +35,28 @@ The failed job remains retained and is not replayed by this patch. Protected
 source/runtime pins need renewal after review and merge. Fresh export completion,
 the startup stats-cache fallback and G5 activation remain separate acceptance
 items; successful preflight reads do not prove completed provider writes.
+
+## Shared reserved-identifier regression: BACKUP — 2026-11-15
+
+`BACKUP` has the same delimiter requirement as `ROWCOUNT`, including when used
+only as a result alias. The D5d catalog continuation finished all 24 native cases,
+then its aggregate query failed on `AS backup`. The accepted cases were retained;
+a separate read-only accounting packet used `AS [backup]` and completed the final
+counts and closure checks. A reporting failure does not authorize replay.
+
+Use `[RowCount]` for the existing column/preview alias and `[backup]` for the
+accounting alias. Delimit every alias in new diagnostic count queries, preserve
+result names, and bind values separately. PowerShell parsing does not validate
+SQL Server grammar. Prepare final receipt/accounting SQL as carefully as workload
+SQL, before consuming an intent or any mutation allowance.
+
+The same `tests/test_export_attempt_sql_syntax.py` now includes
+`test_postcase_accounting_quotes_reserved_backup_alias`. It extracts the actual
+read-only PowerShell accounting query, checks all five delimited aliases, and
+rejects bare `backup`/`rowcount` aliases independent of case and spacing. It never
+executes a native packet or rewrites the failed packet. This complements the
+existing emitted-DAL `[RowCount]` check and the preview alias regression in
+`tests/test_kvk_source_window_preview_sql.py`; it does not claim to be a general
+T-SQL parser. The existing opt-in compiler restriction above remains unchanged.
+
+Core guidance: [Coding Execution Guidelines, SQL comparison and accounting](../K98%20Bot%20-%20Coding%20Execution%20Guidelines.md#comparing-submitted-sql-with-stored-procedure-definitions).

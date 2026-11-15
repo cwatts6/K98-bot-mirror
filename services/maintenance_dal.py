@@ -162,11 +162,14 @@ def validate_receipts(receipts):
         if state not in {"pending", "running", "complete", "failed", "unknown"}:
             raise ValueError("Unexpected maintenance state.")
         due, done = row["DueGeneration"], row["CompletedGeneration"]
-        if not isinstance(due, int) or not isinstance(done, int) or not 0 <= done <= due:
+        if type(due) is not int or type(done) is not int or not 0 <= done <= due < 2**63:
             raise ValueError("Invalid maintenance generation.")
+        claimed = row["ClaimedGeneration"]
+        if claimed is not None and (type(claimed) is not int or not 0 < claimed <= due):
+            raise ValueError("Invalid claimed maintenance generation.")
         if state == "complete" and done != due:
             raise ValueError("Incomplete maintenance was labelled complete.")
         if row["ClaimID"] is not None:
             row["ClaimID"] = str(UUID(str(row["ClaimID"])))
-    if "post_import" not in seen:
-        raise ValueError("The post-import maintenance receipt is missing.")
+    if seen != KINDS:
+        raise ValueError("The complete six-kind maintenance receipt is required.")

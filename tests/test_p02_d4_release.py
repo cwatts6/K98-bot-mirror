@@ -20,7 +20,7 @@ def descriptor():
         bot_predecessors=[updater.D4_PREDECESSOR],
         sql_commit=updater.D4_SQL_COMMIT,
         migrations=[dict(id=updater.D4_MIGRATION, sha256=updater.D4_PROFILE_HASH)],
-        contract_transition=updater.D4_CONTRACT_TRANSITION,
+        contract_transition=updater.D5_CONTRACT_TRANSITION,
     )
 
 
@@ -53,7 +53,7 @@ def test_d4_cannot_masquerade_as_historical_descriptor(version):
         updater.validate_combined_description(encode(value))
 
 
-def test_source_only_incomplete_and_wrong_predecessor_adoption_refuse():
+def test_source_only_incomplete_and_wrong_predecessor_adoption_refuse(monkeypatch):
     files = {"services/export_d4_contract.py": b"fixture"}
     read = lambda rev, path: files.get(path) if rev == "target" else None
     with pytest.raises(ValueError, match="combined SQL descriptor"):
@@ -61,8 +61,11 @@ def test_source_only_incomplete_and_wrong_predecessor_adoption_refuse():
     files[updater.RELEASE_DESCRIPTION] = encode(descriptor())
     with pytest.raises(ValueError, match="Complete D4 source"):
         updater.check_d4_release_binding(updater.D4_PREDECESSOR, "target", files, read)
+    # The descriptor/inventory boundary is independent of the exact byte-pair
+    # checks exercised for every member in test_p02_d5f_release.py.
+    monkeypatch.setattr(updater, "matches_protocol_transition", lambda *args: True)
     updater.check_d4_release_binding(
-        updater.D4_PREDECESSOR, "target", updater.P02_D4_COMBINED_PATHS, read
+        updater.D4_PREDECESSOR, "target", updater.P02_D5_COMBINED_PATHS, read
     )
     with pytest.raises(ValueError):
         updater.check_d4_release_binding("a" * 40, "target", updater.P02_D4_COMBINED_PATHS, read)
@@ -134,7 +137,7 @@ def test_candidate_source_drift_refuses(contract_pair, key):
 def test_registry_preserves_all_historical_entries_and_original_byte_bound():
     raw = (ROOT / "scripts/k98_update_transitions.json").read_bytes().replace(b"\r\n", b"\n")
     transitions = updater.reviewed_transitions()
-    assert len(transitions) == 89
+    assert len(transitions) == 90
     prior = dict(version=1, transitions=transitions[:88])
     # Exact canonical digest of the already merged 88-entry registry.
     assert (
@@ -142,14 +145,13 @@ def test_registry_preserves_all_historical_entries_and_original_byte_bound():
         == "00a61cb85ff2180b4261a42d4848f0d0a2732037e01d9ef3e174d9582d5b1b1a"
     )
     assert len(raw.replace(b"\n", b"\r\n")) <= 232448
-    current = transitions[-1]
+    current = transitions[88]
     assert current["id"] == updater.D4_CONTRACT_TRANSITION
     assert {m["path"] for m in current["members"]} == updater.P02_D4_COMBINED_PATHS
     for member in current["members"]:
-        assert (
-            updater.sha256((ROOT / member["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == member["after_sha256"]
-        )
+        from tests.updater_source_assertions import before_d5_qualification_hash
+
+        assert before_d5_qualification_hash(ROOT, member["path"]) == member["after_sha256"]
 
 
 def test_partial_or_foreign_family_never_matches_installed_registry():

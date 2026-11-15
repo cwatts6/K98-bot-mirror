@@ -150,7 +150,7 @@ def test_committed_descriptor_selects_portable_transition():
     current = json.loads((root / updater.RELEASE_DESCRIPTION).read_bytes())
     assert updater.validate_combined_description(json.dumps(current).encode()) == current
     assert current["version"] == 4
-    assert current["contract_transition"] == updater.D4_CONTRACT_TRANSITION
+    assert current["contract_transition"] == updater.D5_CONTRACT_TRANSITION
 
 
 def test_legacy_descriptor_cannot_smuggle_a_format_choice():

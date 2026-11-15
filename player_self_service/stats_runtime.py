@@ -37,6 +37,7 @@ class ReadRun:
     valid: bool = True
     task: asyncio.Task | None = None
     native_future: asyncio.Future | None = field(default=None, repr=False)
+    settlement_future: asyncio.Future | None = field(default=None, repr=False)
     started: bool = False
     entered: bool = False
     settled: bool = False
@@ -174,7 +175,12 @@ class StatsRuntime:
         limit = RENDER_LIMIT if render else SQL_LIMIT
         if sum((r.kind == "render") == render for r in self.jobs.values()) >= limit:
             raise PersonalStatsUnavailable("Personal Stats is busy; please try later")
-        run = ReadRun(kind=kind, key=key, epoch=self.epoch)
+        run = ReadRun(
+            kind=kind,
+            key=key,
+            epoch=self.epoch,
+            settlement_future=self.loop.create_future() if render else None,
+        )
         self.jobs[id(run)] = run
         if key is not None:
             self.inflight[key] = run
@@ -201,18 +207,27 @@ class StatsRuntime:
                 run.native_future = render_future
                 run.started = True
             except BaseException:
-                self._settle(run, None)
+                try:
+                    self._settle(run, None)
+                finally:
+                    run.settlement_future.set_result(None)
                 raise
 
             def render_completed(future):
                 # The native Future owns settlement even if the observer/owner
                 # Task is cancelled before its first turn or cannot be created.
                 # No caller cancels this Future; owner cancellation is shielded.
-                if not future.cancelled():
-                    error = future.exception()
-                    if error is not None and run.error is None:
-                        run.error = error
-                    self._settle(run, publish)
+                try:
+                    if not future.cancelled():
+                        error = future.exception()
+                        if error is not None and run.error is None:
+                            run.error = error
+                        self._settle(run, publish)
+                finally:
+                    # Future completion can precede this callback by a loop
+                    # turn. Acknowledge its disposition, including retained
+                    # uncertainty, without treating completion alone as release.
+                    run.settlement_future.set_result(None)
 
             render_future.add_done_callback(render_completed)
 
@@ -298,7 +313,12 @@ class StatsRuntime:
             try:
                 await drain_awaitable(run.native_future if run.kind == "render" else run.task)
             except (asyncio.CancelledError, Exception):
-                continue
+                pass
+            if run.settlement_future is not None:
+                try:
+                    await drain_awaitable(run.settlement_future)
+                except (asyncio.CancelledError, Exception):
+                    pass
         if not any(run.kind == "render" for run in self.jobs.values()) and self.render_executor:
             await drain_thread(self.render_executor.shutdown, wait=True)
         return not self.jobs

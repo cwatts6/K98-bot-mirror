@@ -1287,6 +1287,7 @@ P02_D4_COMBINED_PATHS = frozenset(
         "update_all2_log_manager.py",
     ]
 )
+P02_D5_COMBINED_PATHS = P02_D4_COMBINED_PATHS | {"player_self_service/stats_runtime.py"}
 
 
 def reviewed_transitions():
@@ -1296,13 +1297,13 @@ def reviewed_transitions():
     Git/Windows newline representations; source_plan retains exact installed pins.
     """
     raw = Path(__file__).with_name("k98_update_transitions.json").read_bytes()
-    # Fixed D4 successor plus Windows newlines; the historical byte bound is unchanged.
+    # Fixed D5 successor plus Windows newlines; the historical byte bound is unchanged.
     if len(raw) > 232448:
         raise ValueError("Installed transition registry exceeds bound.")
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 89:
+    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 90:
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -1324,6 +1325,8 @@ def reviewed_transitions():
         )
         if item["id"] == "p02_d4_combined_v1":
             member_limit = len(P02_D4_COMBINED_PATHS)
+        if item["id"] == D5_CONTRACT_TRANSITION:
+            member_limit = len(P02_D5_COMBINED_PATHS)
         if item["id"] == "p02_phase1_sql_exports_v1":
             member_limit = len(P02_PHASE1_SQL_EXPORT_PATHS)
         if item["id"] == "p015_calendar_ownership_v1":
@@ -1413,6 +1416,7 @@ def reviewed_transitions():
                 item["id"] == "p021_observer_snapshots_v1" and path in P021_OBSERVER_SNAPSHOT_PATHS
             )
             fixed_p02_d4 = item["id"] == "p02_d4_combined_v1" and path in P02_D4_COMBINED_PATHS
+            fixed_p02_d5 = item["id"] == D5_CONTRACT_TRANSITION and path in P02_D5_COMBINED_PATHS
             fixed_p02_phase1 = (
                 item["id"] == "p02_phase1_sql_exports_v1" and path in P02_PHASE1_SQL_EXPORT_PATHS
             )
@@ -1615,6 +1619,7 @@ def reviewed_transitions():
                     or fixed_p021
                     or fixed_p02_phase1
                     or fixed_p02_d4
+                    or fixed_p02_d5
                     or fixed_p02_d3a
                     or fixed_p02_d3_cleanup
                     or fixed_p02_d3g
@@ -1664,7 +1669,7 @@ def reviewed_transitions():
                 or not (
                     path.endswith(".py")
                     or (
-                        fixed_p02_d4
+                        (fixed_p02_d4 or fixed_p02_d5)
                         and path
                         in {
                             "deploy/p02_d4_activation_scope.json",
@@ -1841,6 +1846,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed P02 D3g final report maintenance transition required.")
         if item["id"] == "p02_d4_combined_v1" and paths != P02_D4_COMBINED_PATHS:
             raise ValueError("Complete fixed P02 D4 combined transition required.")
+        if item["id"] == D5_CONTRACT_TRANSITION and paths != P02_D5_COMBINED_PATHS:
+            raise ValueError("Complete fixed P02 D5 qualified transition required.")
         if item["id"] == "p02_d3_cleanup_custody_v1" and paths != P02_D3_CLEANUP_CUSTODY_PATHS:
             raise ValueError("Complete fixed P02 D3 cleanup custody transition required.")
         if item["id"] == "p02_d3b_maintenance_ownership_v1" and paths != P02_D3B_MAINTENANCE_PATHS:
@@ -1946,17 +1953,22 @@ def transition_paths():
     return {m["path"] for t in reviewed_transitions() for m in t["members"]}
 
 
+def matches_protocol_transition(transition, read_blob, before, target):
+    """Match the complete direct pair; never compose historical transitions."""
+    for member in transition["members"]:
+        for commit, field in ((before, "before_sha256"), (target, "after_sha256")):
+            raw = read_blob(commit, member["path"])
+            digest = sha256(raw.replace(b"\r\n", b"\n")) if raw is not None else None
+            if digest != member[field]:
+                return False
+    return True
+
+
 def check_protocol_transition(path, read_blob, before, target):
     for transition in reviewed_transitions():
         if path not in {member["path"] for member in transition["members"]}:
             continue
-        matched = True
-        for member in transition["members"]:
-            for commit, field in ((before, "before_sha256"), (target, "after_sha256")):
-                raw = read_blob(commit, member["path"])
-                digest = sha256(raw.replace(b"\r\n", b"\n")) if raw is not None else None
-                matched = matched and digest == member[field]
-        if matched:
+        if matches_protocol_transition(transition, read_blob, before, target):
             return {member["path"] for member in transition["members"]}
     raise ValueError(f"Protected protocol transition is not installed/reviewed: {path}")
 
@@ -2192,6 +2204,7 @@ D4_SCRIPT_HASH = "8c0c99d92c14cac6da6e22076a5620927bac4c8af3deaa50950d66062381a8
 D4_PREDECESSOR = "97abcce1b2a9e71b3959eff74525c57930a703e6"
 D4_SQL_COMMIT = "ba5c6acbefba0eb89cb18842a7f6c6811096759b"
 D4_CONTRACT_TRANSITION = "p02_d4_combined_v1"
+D5_CONTRACT_TRANSITION = "p02_d5_qualified_combined_v1"
 D4_CONTRACT_PINS = {
     "sql_contract": {
         "before": "c257388a8d13e20d7903605f26596e5177d829b661dab1c60a086b4d87e6496c",
@@ -2264,7 +2277,7 @@ def validate_d4_description(value):
         value.get("version") != 4
         or value.get("profile") != "p02_d4_v1"
         or value.get("sql_commit") != D4_SQL_COMMIT
-        or value.get("contract_transition") != D4_CONTRACT_TRANSITION
+        or value.get("contract_transition") not in {D4_CONTRACT_TRANSITION, D5_CONTRACT_TRANSITION}
         or value.get("bot_predecessors") != [D4_PREDECESSOR]
         or value.get("migrations") != [dict(id=D4_MIGRATION, sha256=D4_PROFILE_HASH)]
     ):
@@ -2279,11 +2292,16 @@ def check_d4_release_binding(before, target, changes, read_blob):
     raw = read_blob(target, RELEASE_DESCRIPTION)
     if raw is None or raw == read_blob(before, RELEASE_DESCRIPTION):
         raise ValueError("D4 requires a changed, bound combined SQL descriptor.")
-    validate_d4_description(combined_description(raw, before))
-    transition = next(t for t in reviewed_transitions() if t["id"] == D4_CONTRACT_TRANSITION)
+    description = combined_description(raw, before)
+    validate_d4_description(description)
+    transition = next(
+        t for t in reviewed_transitions() if t["id"] == description["contract_transition"]
+    )
     required = {m["path"] for m in transition["members"] if m["before_sha256"] != m["after_sha256"]}
     if not required <= set(changes):
         raise ValueError("Complete D4 source family required with its SQL release.")
+    if not matches_protocol_transition(transition, read_blob, before, target):
+        raise ValueError("Complete source pair must match the selected combined descriptor.")
 
 
 def d4_contract_transition(previous, description, read_blob, target):

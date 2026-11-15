@@ -108,6 +108,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
     from tests.updater_source_assertions import (
+        before_d5_qualification_hash,
         before_p013_hash,
         before_p014_hash,
         before_p015_hash,
@@ -121,6 +122,11 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             # Authenticate its complete current image independently, retaining
             # every older chain assertion rather than rebasing those histories.
             assert {m["path"] for m in transition["members"]} == update.P02_D4_COMBINED_PATHS
+            for member in transition["members"]:
+                assert before_d5_qualification_hash(root, member["path"]) == member["after_sha256"]
+            continue
+        if transition["id"] == update.D5_CONTRACT_TRANSITION:
+            assert {m["path"] for m in transition["members"]} == update.P02_D5_COMBINED_PATHS
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"], member["path"]

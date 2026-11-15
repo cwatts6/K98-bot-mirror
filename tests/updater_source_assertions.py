@@ -48,8 +48,28 @@ _D4_CONTRACT_PAIRS = {
 }
 
 
-def before_d4_contract_hash(root, path):
+def before_d5_qualification_hash(root, path):
+    """Authenticate both qualified fixes before checking unchanged historical pins."""
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    pairs = {
+        "services/maintenance_dal.py": (
+            "588f00f691779af53075ce990e13949cf48a37daa85d93d724ca72a5b525514b",
+            "347e799e7424f257b3f19109fb041b9a209a1022bbc2748e199b2f1e5bd11360",
+        ),
+        "player_self_service/stats_runtime.py": (
+            "5d522cce5df87fdb6bfe7101ee14dae6e9596bff73ecd437dd3298de37258aa8",
+            "9e6e9f3be2c9dfe261e0d8c4ef512776ebeeb6e5137cb535f1572ed24bc8c010",
+        ),
+    }
+    if path in pairs:
+        before, after = pairs[path]
+        assert actual == after, path
+        return before
+    return actual
+
+
+def before_d4_contract_hash(root, path):
+    actual = before_d5_qualification_hash(root, path)
     if path in _D4_CONTRACT_PAIRS:
         before, after = _D4_CONTRACT_PAIRS[path]
         assert actual == after, path

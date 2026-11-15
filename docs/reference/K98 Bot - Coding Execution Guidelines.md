@@ -180,6 +180,33 @@ Required SQL rules:
 - Document migration order.
 - Call out breaking-change risk.
 
+### Comparing submitted SQL with stored procedure definitions
+
+Do not compare a submitted `CREATE OR ALTER PROCEDURE` script with catalog text
+using raw equality or an assumed single-space `CREATE PROCEDURE` header. SQL Server
+catalog evidence in this project has contained `CREATE   PROCEDURE` (three spaces).
+This has caused repeated false refusals. Use the tested header-only comparison in
+`scripts/sql_module_definition.py` for new Python validation tooling, or prove an
+equivalent implementation against `tests/test_sql_module_definition.py`.
+
+Retain the complete raw expected and actual text and their hashes before deciding.
+Normalize only the leading `CREATE`, `CREATE OR ALTER` or `ALTER` procedure keywords
+and the whitespace separating those keywords. Compare the remaining object name,
+signature, execution clause, comments, literals and body exactly. Do not collapse
+whitespace throughout SQL, strip comments or accept an observed body merely because
+it came from the server. Any transport line-ending normalization needs an explicit
+policy and retained raw evidence; the shared helper does not change body newlines.
+Validate schema/object identity, module type, `uses_ansi_nulls`,
+`uses_quoted_identifier` and execution context separately. Missing, encrypted,
+truncated or unsupported definitions must stop with useful evidence.
+
+Regression coverage must include all three header forms, multiple spaces and tabs,
+the observed three-space form, and rejection of changed names, signatures, bodies,
+comments and string-literal whitespace. Use delimited identifiers for diagnostic
+SQL aliases, including `[backup]`; prepare and check final accounting queries as
+carefully as the test statements. A final reporting failure is not permission to
+replay already completed work.
+
 If Python code being changed contains SQL in a command or view layer, treat that as a refactor
 checkpoint. Decide and state one of:
 

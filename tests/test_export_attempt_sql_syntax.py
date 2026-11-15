@@ -2,6 +2,8 @@
 
 from contextlib import contextmanager
 import os
+from pathlib import Path
+import re
 from uuid import uuid4
 
 import pytest
@@ -37,6 +39,36 @@ def test_actual_attempt_part_statement_quotes_row_count_and_binds_value(monkeypa
     assert columns[7] == "[RowCount]"
     assert len(parameters) == query.count("?") == 9
     assert parameters[7] == part()["rows"]
+
+
+def test_postcase_accounting_quotes_reserved_backup_alias():
+    """Check the actual PowerShell query without running its native packet.
+
+    BACKUP and ROWCOUNT are both reserved identifiers. This source check joins
+    the existing emitted RowCount regression; it is not a T-SQL grammar parser.
+    The consumed failed packet remains immutable historical evidence.
+    """
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "scripts/observe_p02_d5d_postcase_accounting.ps1"
+    ).read_text(encoding="utf-8-sig")
+    queries = re.findall(r"\$r\.finalFixtureCounts=Query \$work '([^']+)' 1", source)
+    assert len(queries) == 1
+    query = queries[0]
+    for alias in ("maintenance", "configuration", "backup", "effects", "committedMarkers"):
+        assert re.search(r"\bAS\s+\[" + alias + r"\](?=,|$)", query, re.IGNORECASE)
+    assert not re.search(r"\bAS\s+(?:backup|rowcount)\b", query, re.IGNORECASE)
+
+
+def test_cost_readiness_quotes_both_reserved_count_aliases():
+    source = (
+        Path(__file__).resolve().parents[1] / "scripts/observe_p02_d5e_grouped_readiness.ps1"
+    ).read_text(encoding="utf-8-sig")
+    queries = re.findall(r"\$aliasSql='([^']+)'", source)
+    assert len(queries) == 1
+    for alias in ("RowCount", "backup"):
+        assert re.search(r"\bAS\s+\[" + alias + r"\]", queries[0], re.IGNORECASE)
+    assert not re.search(r"\bAS\s+(?:backup|rowcount)\b", queries[0], re.IGNORECASE)
 
 
 @pytest.mark.skipif(

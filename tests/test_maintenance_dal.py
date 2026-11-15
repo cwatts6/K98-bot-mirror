@@ -31,7 +31,20 @@ def receipt(state="complete"):
                     ),
                     strict=True,
                 )
-            )
+            ),
+            *[
+                dict(
+                    Kind=kind,
+                    DueGeneration=0,
+                    CompletedGeneration=0,
+                    ClaimedGeneration=None,
+                    ClaimID=None,
+                    State="complete",
+                    FirstErrorNumber=None,
+                    LastErrorNumber=None,
+                )
+                for kind in sorted(dal.KINDS - {"post_import"})
+            ],
         ],
     }
 
