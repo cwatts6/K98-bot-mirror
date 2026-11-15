@@ -42,7 +42,7 @@ async def test_strict_maintenance_preserves_configured_timeout(monkeypatch, time
 @pytest.mark.parametrize("timeout", [17, 901])
 def test_maintenance_sets_odbc_timeout_before_cursor_creation(monkeypatch, timeout):
     import file_utils
-    from services.maintenance_dal import RELEASE_SESSION, SESSION_STATE
+    from services.maintenance_dal import KINDS, RELEASE_SESSION, SESSION_STATE
 
     calls = []
 
@@ -59,7 +59,12 @@ def test_maintenance_sets_odbc_timeout_before_cursor_creation(monkeypatch, timeo
             return (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock")
 
         def fetchmany(self, size):
-            return [("post_import", 1, 1, 1, str(uuid4()), "complete", None, None)]
+            return [
+                (kind, 1, 1, 1, str(uuid4()), "complete", None, None)
+                if kind == "post_import"
+                else (kind, 0, 0, None, None, "complete", None, None)
+                for kind in sorted(KINDS)
+            ]
 
         def nextset(self):
             calls.append("response_consumed")
