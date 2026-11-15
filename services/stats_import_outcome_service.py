@@ -1,0 +1,229 @@
+"""Import outcome decisions independent of Discord and provider execution."""
+
+from contextlib import contextmanager
+import json
+import logging
+
+from kvk.dal.new_source_import_dal import SourceConflict, UncertainCommit
+from services.stats_import_outcome_dal import StatsImportOutcomeDAL
+
+logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def execution_connection(legacy_factory, *, timeout_seconds):
+    """Run coordinated import/reporting on the admitted snapshot-guard session.
+
+    SQL acquires the exact import guard on this same session. Borrowing does not
+    enter/exit the connection context, close it, or release the writer's guard.
+    The outer admitted writer retains custody through capture or failure.
+    """
+    from core.export_sql_connection import producer_connection
+    from services.legacy_export_snapshot_service import current_owner, require_runtime
+
+    owner = current_owner()
+    timeout = max(1, int(timeout_seconds) - 5)
+    if owner is None:
+        from services.legacy_export_snapshot_service import has_runtime_context
+
+        if has_runtime_context():
+            raise SourceConflict("Stats import requires its admitted writer session.")
+        with producer_connection(legacy_factory) as connection:
+            connection.autocommit = True
+            connection.timeout = timeout
+            yield connection
+        return
+    if (
+        owner.kind != "scan_data"
+        or owner.closed
+        or owner.runtime is not require_runtime()
+        or not owner.connection.autocommit
+    ):
+        raise SourceConflict("Stats import requires its active autocommit writer session.")
+    connection = owner.connection
+    previous_timeout = connection.timeout
+    try:
+        connection.timeout = timeout
+        yield connection
+    except BaseException as execution_error:
+        try:
+            connection.timeout = previous_timeout
+        except Exception as restore_error:
+            execution_error.add_note(
+                "Borrowed SQL timeout restoration also failed: " + type(restore_error).__name__
+            )
+        raise
+    else:
+        connection.timeout = previous_timeout
+
+
+def outcome_dal(runtime):
+    return StatsImportOutcomeDAL(
+        runtime.dal.connect, account=runtime.account, storage_owner=runtime.store.storage_owner
+    )
+
+
+def event(preparation_id, stage, outcome, *, action, error=None, **facts):
+    from services.legacy_export_snapshot_dal import _diagnostic_uuid
+
+    record = dict(
+        preparation_id=_diagnostic_uuid(preparation_id),
+        stage=stage,
+        outcome=outcome,
+        next_action=action,
+        **facts,
+    )
+    if error is not None:
+        from services.export_contention import sql_error_facts
+
+        record.update(sql_error_facts(error))
+    try:
+        logger.log(
+            logging.WARNING if error is not None or outcome == "held" else logging.INFO,
+            "stats_import_outcome %s",
+            json.dumps(record, sort_keys=True),
+        )
+    except Exception:
+        # A diagnostic sink must not turn an acknowledged settlement into a
+        # failed operation or cause an import to be replayed.
+        return
+
+
+def settle_known_failure(runtime, preparation_id):
+    """Only a proven unstarted/rolled-back receipt admits release; never replay."""
+    dal = outcome_dal(runtime)
+    try:
+        preview = dal.inspect(preparation_id)
+        if preview["action"] == "resolved":
+            return True
+        if preview["action"] != "release_failure":
+            event(
+                preparation_id,
+                "automatic_resolution",
+                "held",
+                action="ops import_resolution: preview; committed import requires explicit supersession decision",
+                sql_state=(preview["execution"] or {}).get("State"),
+            )
+            return False
+        action = dal.settle(
+            preparation_id,
+            token=preview["token"],
+            actor="system:import_outcome",
+            reason="Exact unstarted/rolled-back receipt and exclusive execution/producer locks verified",
+        )
+        event(
+            preparation_id,
+            "automatic_resolution",
+            "resolved",
+            action="correct source or configuration, then submit a fresh upload",
+            resolution=action,
+            import_replayed=False,
+        )
+        return True
+    except Exception as exc:
+        event(
+            preparation_id,
+            "automatic_resolution",
+            "held",
+            action="ops import_resolution: status; retain input and exact SQL evidence",
+            error=exc,
+        )
+        return False
+
+
+def register_execution(completed_filename):
+    from services.legacy_export_snapshot_service import current_owner, require_runtime
+
+    owner = current_owner()
+    if owner is None:
+        return None
+    dal = outcome_dal(require_runtime())
+    try:
+        dal.prepare(owner.claim, completed_filename)
+    except UncertainCommit as exc:
+        # A lost INSERT commit acknowledgment is not proof of no registration.
+        # Keep cleanup on the evidence-based path unless a fresh read proves absence.
+        owner.stats_execution_registered = True
+        event(
+            owner.claim.preparation_id,
+            "execution_registration",
+            "held",
+            action="read_exact_receipt_before_dispatch",
+            error=exc,
+        )
+        evidence = dal.read(owner.claim.preparation_id)
+        if evidence is None:
+            owner.stats_execution_registered = False
+            raise
+        if (
+            str(evidence["PreparationID"]).lower() != owner.claim.preparation_id
+            or str(evidence["OwnerID"]).lower() != owner.claim.owner
+            or evidence["Fence"] != owner.claim.fence
+            or evidence["CompletedFileName"] != completed_filename
+            or evidence["State"] != "prepared"
+            or evidence["Resolution"] is not None
+        ):
+            raise SourceConflict(
+                "Uncertain registration differs from this exact unstarted import."
+            ) from exc
+    owner.stats_execution_registered = True
+    event(owner.claim.preparation_id, "execution_registration", "prepared", action="execute once")
+    return owner.claim.preparation_id
+
+
+def recover_completed_writer(runtime, owner):
+    """Finish a proven SQL commit while the original snapshot session is still held.
+
+    No provider call, procedure rerun, resource stealing or new preparation occurs.
+    A capture whose durable acknowledgment is uncertain is retained for inspection.
+    """
+    from dataclasses import replace
+
+    if not owner.stats_execution_registered:
+        return False
+    evidence = outcome_dal(runtime).read(owner.claim.preparation_id)
+    if not evidence or evidence["State"] != "completed":
+        return False
+    row = runtime.dal.read(owner.claim.preparation_id)
+    if str(row["OwnerID"]).lower() != owner.claim.owner or row["Fence"] != owner.claim.fence:
+        raise SourceConflict("Completion recovery ownership differs.")
+    if row["State"] == "captured":
+        runtime.collect_capture(owner)
+        event(
+            owner.claim.preparation_id,
+            "completion_recovery",
+            "captured",
+            action="continue pipeline; do not import again",
+        )
+        return True
+    if row["State"] not in {"writing", "committed"} or row["SpoolKey"] is not None:
+        raise SourceConflict("Completion recovery requires the same unexported writer.")
+    owner.claim = replace(owner.claim, version=row["Version"])
+    owner.failed = False
+    if row["State"] == "writing":
+        runtime.checkpoint_writer(
+            owner,
+            dict(
+                procedure="dbo.UPDATE_ALL2",
+                completed_filename=evidence["CompletedFileName"],
+                execution_preparation_id=owner.claim.preparation_id,
+                scan_order=evidence["ScanOrder"],
+                last_run_counter=evidence["LastRunCounter"],
+            ),
+        )
+    else:
+        pending = json.loads(row["GenerationJson"])
+        if pending.get("capture") != "pending":
+            raise SourceConflict(
+                "Capture already started; inspect its durable spool acknowledgment before recovery."
+            )
+        owner.completion = pending
+    runtime.finish_writer(owner)
+    event(
+        owner.claim.preparation_id,
+        "completion_recovery",
+        "captured",
+        action="continue pipeline; do not import again",
+        sql_state="completed",
+    )
+    return True
