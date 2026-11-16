@@ -114,6 +114,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
         before_p015_hash,
         before_p016_hash,
         before_p016_render_hash,
+        before_p02_maintenance_hash,
     )
 
     for transition in update.reviewed_transitions():
@@ -128,8 +129,16 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
         if transition["id"] == update.D5_CONTRACT_TRANSITION:
             assert {m["path"] for m in transition["members"]} == update.P02_D5_COMBINED_PATHS
             for member in transition["members"]:
-                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
-                assert update.sha256(raw) == member["after_sha256"], member["path"]
+                assert before_p02_maintenance_hash(root, member["path"]) == member["after_sha256"]
+            continue
+        if transition["id"] == "p02_maintenance_compatibility_v1":
+            assert {
+                m["path"] for m in transition["members"]
+            } == update.P02_MAINTENANCE_COMPATIBILITY_PATHS
+            for member in transition["members"]:
+                # This authenticates the current bytes before exposing the
+                # immutable predecessor, including None for newly added files.
+                assert before_p02_maintenance_hash(root, member["path"]) == member["before_sha256"]
             continue
         d3_successors = {
             "p02_d3_cleanup_custody_v1": before_d3_cleanup_hash,
