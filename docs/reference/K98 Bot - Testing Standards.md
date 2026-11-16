@@ -227,7 +227,7 @@ a packaging test.
 
 Count the **complete generated release**, including support files and each
 non-deleted source payload, rather than only source changes or runtime pins.
-The v4 fixed-adapter limit is 525 members; generic packets remain at 128 and the
+The v4 fixed-adapter limit is 526 members; generic packets remain at 128 and the
 independent manifest limit remains 64 KiB. `tests/test_prepare_k98_release.py`
 checks the Python validator and extracted native PowerShell count guard at and
 beyond their limits. Registry entries (90) and transition-family members (80)

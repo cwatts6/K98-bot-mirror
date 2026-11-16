@@ -11,7 +11,7 @@ function Assert($condition,[string]$message){if(-not $condition){throw $message}
 $countGuard=$ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Assert-ReleaseMemberCount'},$true)
 if($null -eq $countGuard){throw 'Missing production inventory bound'}
 . ([scriptblock]::Create($countGuard.Extent.Text))
-foreach($case in @(@(4,243,$false),@(4,512,$false),@(4,513,$true),@(1,128,$false),@(1,129,$true),@(2,129,$true),@(3,129,$true),@(4,0,$true),@(5,1,$true))) {
+foreach($case in @(@(4,243,$false),@(4,512,$false),@(4,526,$false),@(4,527,$true),@(1,128,$false),@(1,129,$true),@(2,129,$true),@(3,129,$true),@(4,0,$true),@(5,1,$true))) {
     $failed=$false
     try {Assert-ReleaseMemberCount $case[0] $case[1]}catch{$failed=$true}
     Assert ($failed -eq $case[2]) ('Incorrect native release bound: '+($case -join ','))

@@ -55,7 +55,7 @@ def updater_specification(count):
     return value
 
 
-@pytest.mark.parametrize("count", [243, 512, 525])
+@pytest.mark.parametrize("count", [243, 512, 526])
 def test_coordinated_source_inventory_fits_fixed_adapter_packet(count):
     value = updater_specification(count)
     validate_updater_manifest(value)
@@ -69,7 +69,7 @@ def test_coordinated_source_inventory_fits_fixed_adapter_packet(count):
 
 def test_oversized_fixed_adapter_and_generic_inventory_remain_refused():
     with pytest.raises(ValueError, match="Bounded release inventory"):
-        validate_updater_manifest(updater_specification(526))
+        validate_updater_manifest(updater_specification(527))
     value = specification()
     value["members"] += [dict(name=f"extra-{i}.bin", sha256="e" * 64) for i in range(128)]
     with pytest.raises(ValueError, match="Bounded release inventory"):
@@ -93,7 +93,7 @@ if($guard.Count -ne 1){throw 'One actual member-count guard required'}
 . ([scriptblock]::Create($guard[0].Extent.Text))
 $results=@()
 foreach($version in @(1,2,3,4)) {
- foreach($count in @(0,1,128,129,512,525,526)) {
+ foreach($count in @(0,1,128,129,512,526,527)) {
   $accepted=$true
   try {Assert-ReleaseMemberCount $version $count} catch {$accepted=$false}
   $results+=@{version=$version;count=$count;accepted=$accepted}
@@ -118,7 +118,7 @@ ConvertTo-Json -InputObject $results -Compress
         check=True,
     )
     for case in json.loads(result.stdout):
-        limit = 525 if case["version"] == 4 else 128
+        limit = 526 if case["version"] == 4 else 128
         assert case["accepted"] == (1 <= case["count"] <= limit), case
         if case["version"] == 4 and case["count"] != 1:
             value = updater_specification(case["count"])
