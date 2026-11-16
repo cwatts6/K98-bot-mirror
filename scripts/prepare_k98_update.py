@@ -2202,7 +2202,9 @@ D4_MIGRATION = "20261111_001_p02_d4_combined"
 D4_PROFILE_HASH = "57944777e50b7dc9200220cfcc2ce767edb22a2e0972e02bc2cd6f04e23e8171"
 D4_SCRIPT_HASH = "8c0c99d92c14cac6da6e22076a5620927bac4c8af3deaa50950d66062381a8dc"
 D4_PREDECESSOR = "97abcce1b2a9e71b3959eff74525c57930a703e6"
-D4_SQL_COMMIT = "ba5c6acbefba0eb89cb18842a7f6c6811096759b"
+# D6 corrects the deployment helper's VM-only memory prerequisite. The fixed
+# migration, object images and three startup contracts retain their D5 hashes.
+D4_SQL_COMMIT = "8a7aace75c55a6d17c9051edef9026dc25355af8"
 D4_CONTRACT_TRANSITION = "p02_d4_combined_v1"
 D5_CONTRACT_TRANSITION = "p02_d5_qualified_combined_v1"
 D4_CONTRACT_PINS = {

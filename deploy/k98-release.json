@@ -4,7 +4,7 @@
   "bot_predecessors": [
     "97abcce1b2a9e71b3959eff74525c57930a703e6"
   ],
-  "sql_commit": "ba5c6acbefba0eb89cb18842a7f6c6811096759b",
+  "sql_commit": "8a7aace75c55a6d17c9051edef9026dc25355af8",
   "migrations": [
     {
       "id": "20261111_001_p02_d4_combined",

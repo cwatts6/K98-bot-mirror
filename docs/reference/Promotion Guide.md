@@ -6,6 +6,18 @@
 
 # K98 promotion and deployment — operator runbook
 
+## Resource gate scope: D6 correction, 16 November 2026
+
+The P02 8 GiB available-host-memory prerequisite applies before starting the
+isolated development VM. It is not a production SQL-host requirement. The
+production disk, log and version-store safeguards remain unchanged. Consult
+[Coding Execution Guidelines](K98%20Bot%20-%20Coding%20Execution%20Guidelines.md#resource-requirements-must-retain-their-scope)
+and SQL `docs/deployment-resource-scope.md` before interpreting resource readings.
+The D6 receipt's approximately 5.03 GiB available production memory is an
+observation, not a failed approved memory gate. The old pinned SQL helper did
+incorrectly reject it; deployment requires the reviewed corrected helper and
+matching Bot descriptor/updater, not an on-host edit or threshold bypass.
+
 For the local MGE finalisation release, use the [qualification packet](../task_packs/P1%20MGE%20Finalisation%20-%20Native%20SQL%20and%20Updater%20Qualification%20Packet%20-%202026-10-29.md).
 The reviewed candidate updater now represents its bounded rowversion/default/index/trigger
 bundle. Native qualification, an exact profile/descriptor and verification of the installed

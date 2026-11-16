@@ -37,6 +37,23 @@ def test_committed_descriptor_and_coordination_boundary():
     }
 
 
+def test_d6_resource_scope_uses_corrected_runner_without_changing_migration():
+    # The old runner transposed a development VM-start memory prerequisite onto
+    # the production SQL host. The corrected helper must be fetched by exact
+    # commit; do not let an otherwise identical migration select the old guard.
+    assert updater.D4_SQL_COMMIT == "8a7aace75c55a6d17c9051edef9026dc25355af8"
+    value = descriptor()
+    value["sql_commit"] = "ba5c6acbefba0eb89cb18842a7f6c6811096759b"
+    with pytest.raises(ValueError):
+        updater.validate_combined_description(encode(value))
+    assert updater.D4_PROFILE_HASH == (
+        "57944777e50b7dc9200220cfcc2ce767edb22a2e0972e02bc2cd6f04e23e8171"
+    )
+    assert updater.D4_SCRIPT_HASH == (
+        "8c0c99d92c14cac6da6e22076a5620927bac4c8af3deaa50950d66062381a8dc"
+    )
+
+
 @pytest.mark.parametrize("field", list(descriptor()) + ["extra"])
 def test_descriptor_drift_refuses(field):
     value = descriptor()

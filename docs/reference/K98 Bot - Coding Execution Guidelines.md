@@ -52,6 +52,27 @@ Use this priority order:
 Existing code patterns should be followed for consistency, but never used to justify keeping an
 anti-pattern when the standards require improvement or deferred capture.
 
+### Resource requirements must retain their scope
+
+Record the environment, measurement, units, timing and original approval for each
+resource gate. A qualification limit is not automatically a production contract.
+For P02, **8 GiB available host memory applies before starting the isolated
+development VM**. It is not an additional post-start reservation, a guest free-RAM
+floor or a production SQL-host requirement. Production does not run this test VM.
+The production disk reserve (8 GiB), log-use ceiling (below 70%) and version-store
+ceiling (below 512 MiB) are separate checks and remain in force.
+
+Before adding or interpreting a guard, trace abbreviated handover wording back to
+the original requirement. Code and a passing test can both encode the same wrong
+assumption. Do not ask the operator to free RAM, change SQL settings or lower a
+threshold to satisfy an invented condition. Preserve observed values and withdrawn
+interpretations, then correct the source and its exact release bindings through
+review. The SQL repository's `docs/deployment-resource-scope.md` and
+`tests/test_d4_release_runner.ps1` own the production-path regression; the Bot's
+`tests/test_p02_d4_release.py` rejects the obsolete runner revision while retaining
+the migration/profile identities. Any new production memory floor needs evidence
+and explicit approval defining its scope.
+
 ## 3. Mandatory Working Method
 
 ### 3.1 Review First
