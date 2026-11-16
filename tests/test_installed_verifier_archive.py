@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -41,7 +42,10 @@ def test_archive_is_deterministic_and_contains_exact_source_bytes(archive):
         assert tuple(z.namelist()) == verifier.CONTRACT_ARCHIVE_MEMBERS
         for name in z.namelist():
             assert z.read(name) == (ROOT / name).read_bytes().replace(b"\r\n", b"\n")
-    assert all(not n.startswith("core/") for n in verifier.CONTRACT_ARCHIVE_MEMBERS)
+    assert {n for n in verifier.CONTRACT_ARCHIVE_MEMBERS if n.startswith("core/")} == {
+        "core/sql_connection_custody.py",
+        "core/sql_operation_policy.py",
+    }
 
 
 @pytest.mark.parametrize(
@@ -150,6 +154,70 @@ else:raise AssertionError('unexpected package fallback')
         path,
         sha(archive),
         ROOT,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("installed_helpers", ["absent", "older"])
+def test_sealed_dependencies_work_without_target_checkout(tmp_path, archive, installed_helpers):
+    """An updated developer checkout must not satisfy missing predecessor imports."""
+    application = tmp_path / "installed-application"
+    application.mkdir()
+    # Retain real root-sensitive modules, but model the predecessor's missing
+    # helpers. The exact deployed predecessor is also rehearsed before handoff.
+    for package in ("core", "event_calendar"):
+        shutil.copytree(
+            ROOT / package,
+            application / package,
+            ignore=shutil.ignore_patterns(
+                "__pycache__", "sql_connection_custody.py", "sql_operation_policy.py"
+            ),
+        )
+    if installed_helpers == "older":
+        for helper in ("sql_connection_custody.py", "sql_operation_policy.py"):
+            (application / "core" / helper).write_text("raise AssertionError('OLD_HELPER_USED')")
+    path = tmp_path / verifier.CONTRACT_ARCHIVE
+    path.write_bytes(archive)
+    result = isolated(
+        """
+import importlib,pathlib,runpy,sys
+v=runpy.run_path(sys.argv[1]);v['activate_contract_archive'](sys.argv[2],sys.argv[3],sys.argv[4])
+root=pathlib.Path(sys.argv[4])
+assert str(pathlib.Path(sys.argv[1]).parent.parent) not in sys.path
+import core
+assert pathlib.Path(core.__file__)==root/'core/__init__.py'
+# Import every packaged module, not just the entry point that used to stop
+# before the combined-release branch. No SQL connection or runtime is started.
+for member in v['CONTRACT_ARCHIVE_MEMBERS']:
+ if member.endswith('.py'):
+  name=member[:-3].replace('/','.').removesuffix('.__init__')
+  module=importlib.import_module(name)
+  assert module.__file__.startswith(sys.argv[2]), name
+import core.export_release_seed as seed
+import core.export_sql_connection as sql
+assert pathlib.Path(seed.__file__)==root/'core/export_release_seed.py'
+assert pathlib.Path(sql.__file__)==root/'core/export_sql_connection.py'
+assert 'bot_config' not in sys.modules
+# Exercise the lazy custody import too, with a fake connection only.
+from kvk.dal.new_source_import_dal import transaction
+class Connection:
+ autocommit=False
+ def __init__(self):self.actions=[]
+ def cursor(self):return self
+ def execute(self,*args):self.actions.append('execute')
+ def commit(self):self.actions.append('commit')
+ def close(self):self.actions.append('close')
+connection=Connection()
+with transaction(lambda:connection):pass
+assert connection.actions==['execute','commit','close']
+try:import services.this_is_not_bundled
+except ModuleNotFoundError:pass
+else:raise AssertionError('unexpected package fallback')
+""",
+        ROOT / "scripts/verify_k98_update_pair.py",
+        path,
+        sha(archive),
+        application,
     )
     assert result.returncode == 0, result.stderr
 

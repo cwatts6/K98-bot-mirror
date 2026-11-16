@@ -174,6 +174,19 @@ Deployment requires **Windows PowerShell**, not PowerShell 7 (`pwsh`). Do not ac
 
 On MINI_AMD, do not manually pull/switch the live checkout, install packages, run formatters, reset/clean Git, start the task or restart ahead of the runner. The packet owns changes after the old process pair drains. Tests belong on the development PC or a separately reviewed isolated checkout.
 
+The installed verifier must include every dependency needed from the proposed
+release that is absent from the authenticated predecessor. Its fixed archive
+overlays only `core.sql_operation_policy` and `core.sql_connection_custody` within
+the installed `core` package; root-sensitive configuration and credential readers
+remain in the real application directory. Do not repair an import failure by
+copying target modules into the live checkout or relaxing archive authentication.
+Require the [installed updater dependency regression](K98%20Bot%20-%20Testing%20Standards.md#installed-updater-dependency-regression-p02-d6)
+and an offline complete preparation using the exact predecessor before handoff.
+If an updater upgrade completed but preparation failed, preserve both records;
+bind any reviewed replacement to the **now-installed** updater manifest and use
+a fresh continuation directory. Do not replay the original upgrade or infer that
+deployment ran from an observation file alone.
+
 ## Step 1 — Validate and prepare both PRs
 
 **Where:** Codex on the development PC. Skip if both PRs are already merged.

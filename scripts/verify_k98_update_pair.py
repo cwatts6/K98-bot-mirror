@@ -121,9 +121,12 @@ def p016_application_transition(before, bot):
     }
 
 
-# Fixed reviewed inventory: services/kvk and their metadata resources only.
-# core and root configuration retain the authenticated application's .env root.
+# Fixed reviewed inventory, including dependencies absent from older applications.
+# Only these two core helpers are overlaid; configuration/credential readers keep
+# the authenticated application's real root and must never move into the archive.
 CONTRACT_ARCHIVE_MEMBERS = (
+    "core/sql_connection_custody.py",
+    "core/sql_operation_policy.py",
     "deploy/p02_d4_activation_scope.json",
     "deploy/p02_phase1_activation_scope.json",
     "deploy/s11_activation_scope.json",
@@ -249,6 +252,15 @@ def activate_contract_archive(path, expected, application_root):
     validate_contract_archive(raw, expected)
     sys.dont_write_bytecode = True
     sys.path[:0] = [str(archive), str(root)]
+    # The archive deliberately has no core/__init__.py. Keep the authenticated
+    # application's package identity and root-relative configuration, while the
+    # exact sealed helpers win over missing or older installed versions. ZIP
+    # inventory validation above prevents arbitrary core modules being overlaid.
+    import core
+
+    if Path(core.__file__).resolve() != (root / "core/__init__.py").resolve():
+        raise ValueError("Authenticated application core package required")
+    core.__path__ = [str(archive / "core"), str(root / "core")]
 
 
 def activate_release_archive(config, directory):

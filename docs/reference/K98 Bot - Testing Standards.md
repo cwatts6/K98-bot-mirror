@@ -207,6 +207,24 @@ Do not ship changes with only:
 
 ## 11. Delivery Expectations
 
+### Installed updater dependency regression (P02 D6)
+
+Test sealed verifier imports against an application root that lacks newly added
+dependencies, as well as one containing older versions. Using the developer's
+current checkout as the only application root can hide a broken updater package.
+`tests/test_installed_verifier_archive.py` imports the complete sealed inventory
+in an isolated Python process and exercises the lazy SQL custody dependency with
+a fake connection. It also checks that configuration and credential readers keep
+the real installed application root and that unbundled services cannot fall back.
+
+Before host handoff, additionally rehearse the actual combined-release preparation
+against the exact authenticated predecessor and proposed target, using saved
+observations and acquired source files offline. An early deliberately invalid
+commit test or successful import alone is not proof that preparation completes.
+Retain the failing receipt separately, record the generated package hashes and
+unchanged SQL/startup contracts, and never use a live restart or import/export as
+a packaging test.
+
 When presenting a task pack or implementation, include a short test plan listing:
 
 - new tests to add
