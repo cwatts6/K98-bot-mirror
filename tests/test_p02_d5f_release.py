@@ -59,7 +59,7 @@ def bound_pair(monkeypatch):
 
 def test_all_89_historical_entries_preserved_and_current_family_exact():
     entries = update.reviewed_transitions()
-    assert len(entries) == 90
+    assert len(entries) == 91
     assert hashlib.sha256(encode(dict(version=1, transitions=entries[:89]))).hexdigest() == (
         "2dc508adfe1410609124eedeec41fb9c21855ab62e8d53e99f128eca45c04135"
     )
@@ -220,7 +220,7 @@ def test_registry_newline_forms_fit_unchanged_byte_cap(monkeypatch, newline):
         "read_bytes",
         lambda p: raw if p.name == "k98_update_transitions.json" else original(p),
     )
-    assert len(update.reviewed_transitions()) == 90
+    assert len(update.reviewed_transitions()) == 91
 
 
 def test_source_plan_binds_both_fixes_and_document_archive_without_new_runtime_pin(bound_pair):

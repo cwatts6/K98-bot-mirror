@@ -46,7 +46,7 @@ def test_partial_backup_patch_requires_combined_release(monkeypatch):
 
 def test_all_88_historical_entries_remain_unchanged():
     entries = updater.reviewed_transitions()
-    assert len(entries) == 90
+    assert len(entries) == 91
     assert hashlib.sha256(json.dumps(entries[:88], sort_keys=True).encode()).hexdigest() == (
         "44ea1d790395c62940fa38ce4aa63684a71310933658a247411477ae57af025a"
     )
