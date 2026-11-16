@@ -172,7 +172,9 @@ def test_registry_preserves_all_historical_entries_and_original_byte_bound():
 
 
 def test_partial_or_foreign_family_never_matches_installed_registry():
-    entry = updater.reviewed_transitions()[-1]
+    entry = next(
+        t for t in updater.reviewed_transitions() if t["id"] == updater.D4_CONTRACT_TRANSITION
+    )
     # Content need not be synthetic hash preimages: patch only the hashing
     # boundary, leaving complete-pair and unchanged-peer admission real.
     assert any(m["before_sha256"] == m["after_sha256"] for m in entry["members"])

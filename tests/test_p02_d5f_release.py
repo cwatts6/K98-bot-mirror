@@ -63,13 +63,16 @@ def test_all_89_historical_entries_preserved_and_current_family_exact():
     assert hashlib.sha256(encode(dict(version=1, transitions=entries[:89]))).hexdigest() == (
         "2dc508adfe1410609124eedeec41fb9c21855ab62e8d53e99f128eca45c04135"
     )
-    current = entries[-1]
+    current = next(t for t in entries if t["id"] == update.D5_CONTRACT_TRANSITION)
     assert current["id"] == update.D5_CONTRACT_TRANSITION
     assert {m["path"] for m in current["members"]} == update.P02_D5_COMBINED_PATHS
     assert len(current["members"]) == 80
     for member in current["members"]:
-        raw = (ROOT / member["path"]).read_bytes().replace(b"\r\n", b"\n")
-        assert hashlib.sha256(raw).hexdigest() == member["after_sha256"], member["path"]
+        from tests.updater_source_assertions import before_p02_maintenance_hash
+
+        assert before_p02_maintenance_hash(ROOT, member["path"]) == member["after_sha256"], member[
+            "path"
+        ]
     assert json.loads((ROOT / update.RELEASE_DESCRIPTION).read_bytes()) == descriptor()
 
 

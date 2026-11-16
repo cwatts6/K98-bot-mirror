@@ -24,6 +24,23 @@ def test_all_90_previous_transitions_remain_immutable():
     )
 
 
+@pytest.mark.parametrize("path", sorted(updater.P02_MAINTENANCE_COMPATIBILITY_PATHS))
+def test_historical_source_bridge_authenticates_each_successor_before_mapping(monkeypatch, path):
+    from tests.updater_source_assertions import before_p02_maintenance_hash
+
+    family = next(
+        t for t in updater.reviewed_transitions() if t["id"] == "p02_maintenance_compatibility_v1"
+    )
+    member = next(m for m in family["members"] if m["path"] == path)
+    assert before_p02_maintenance_hash(ROOT, path) == member["before_sha256"]
+    original = Path.read_bytes
+    monkeypatch.setattr(
+        Path, "read_bytes", lambda p: original(p) + (b"\n# unknown\n" if p == ROOT / path else b"")
+    )
+    with pytest.raises(AssertionError):
+        before_p02_maintenance_hash(ROOT, path)
+
+
 @pytest.fixture
 def bot(monkeypatch):
 
