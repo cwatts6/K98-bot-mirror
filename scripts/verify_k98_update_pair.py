@@ -79,6 +79,40 @@ PHASE1_PERMISSION_AFTER = "81d81816c1eeabb6071984890f6ff3f66bc117cee2cac49e2bb90
 PHASE1_PERMISSION_HASH = "e172bc534f02ab73efaee5e663bcb815ce36ec68209b3ba73320b9faab7adf96"
 PHASE1_PERMISSION_REVIEW = "ab403c8f-03f4-5b65-aeb6-dbcbdc8f0dd4"
 
+# Source-only correction over the exact installed D6 seed; no SQL replay or
+# observed-state adoption. The full structural/permission expectations remain.
+P02_MAINTENANCE_REPAIR = {
+    "version": 1,
+    "id": "p02_maintenance_compatibility_v1",
+    "predecessor": "729ece15c2dd665906525a4a457667d53516e805",
+    "sql_commit": "8a7aace75c55a6d17c9051edef9026dc25355af8",
+    "migration_id": "20261111_001_p02_d4_combined",
+    "migration_sha256": "57944777e50b7dc9200220cfcc2ce767edb22a2e0972e02bc2cd6f04e23e8171",
+}
+P02_MAINTENANCE_BEFORE = {
+    "sql_contract": "c257388a8d13e20d7903605f26596e5177d829b661dab1c60a086b4d87e6496c",
+    "legacy_sql_contract": "e74042f9ff6dd64da10d5d743104e06c2ac08c6903bd9916f5608fff48aada0f",
+    "application_sql_contract": "50fb90ecf0174a336c3f8b88e96a69cc3889ce3454c2608a4124caed04ac3092",
+}
+
+
+def p02_maintenance_transition(before, bot):
+    """Authenticate all installed contracts and opt into one reviewed policy."""
+    from services.application_maintenance_contract import POLICY
+    from services.export_execution_protocol import encode
+
+    if before != P02_MAINTENANCE_REPAIR["predecessor"]:
+        raise ValueError("Maintenance compatibility requires the exact deployed predecessor")
+    contracts = {}
+    for key, expected in P02_MAINTENANCE_BEFORE.items():
+        if hashlib.sha256(encode(bot[key])).hexdigest() != expected:
+            raise ValueError("Maintenance compatibility predecessor contract differs: " + key)
+        contracts[key] = {"before": deepcopy(bot[key]), "after": deepcopy(bot[key])}
+    contracts["application_sql_contract"]["after"].update(
+        maintenance_policy=POLICY, review_id="3edc8fa5-bb12-5d30-b676-ea2e86af67c2"
+    )
+    return {"contracts": contracts}
+
 
 def phase1_permission_transition(before, bot):
     """Correct one reviewed permission ordering without changing SQL rights."""
@@ -150,6 +184,8 @@ CONTRACT_ARCHIVE_MEMBERS = (
     "kvk/services/new_source_metadata.py",
     "kvk/services/new_source_parser.py",
     "services/__init__.py",
+    "services/application_maintenance_contract.py",
+    "services/application_maintenance_dal.py",
     "services/event_cache_service.py",
     "services/export_contention.py",
     "services/export_contract_resources.py",
@@ -430,6 +466,8 @@ def repair_verification_bot(config, predecessor, candidate):
         build_transition = p016_application_transition
     elif encode(repair) == encode(PHASE1_PERMISSION_REPAIR):
         build_transition = phase1_permission_transition
+    elif encode(repair) == encode(P02_MAINTENANCE_REPAIR):
+        build_transition = p02_maintenance_transition
     else:
         raise ValueError("Unreviewed application contract repair")
     if "sql" in config or "recovery_seed" in config:
@@ -505,9 +543,15 @@ def verify_bot_sql_contracts(bot):
             application = application_snapshot_for_contract(cursor, bot["application_sql_contract"])
             verify_application_installation_contract(application, bot["application_sql_contract"])
         finally:
-            cursor.close()
+            from core.sql_connection_custody import connection_retained
+
+            if not connection_retained(connection):
+                cursor.close()
     finally:
-        connection.close()
+        from core.sql_connection_custody import connection_retained
+
+        if not connection_retained(connection):
+            connection.close()
     print(json.dumps(dict(stage="STARTUP_SQL_CONTRACTS_VERIFIED", business_work=False)))
     # Return the complete actual catalog evidence, not expected contract fields.
     # Callers can retain and reverify this observation; no expectation is adopted

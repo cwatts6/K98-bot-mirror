@@ -46,6 +46,41 @@ def test_restarted_keep_prior_records_exact_choice_without_dispatch_or_reservati
     adapter.producer.inspect.assert_not_called()
 
 
+@pytest.mark.parametrize("blocked", [False, True])
+def test_closed_successor_remains_linked_without_claiming_publication_or_retry(blocked):
+    state, action, dal, adapter = fixture("retry_configuration")
+    state.update(
+        marker={"choice": "retry"},
+        child={"PreparationID": "latest-child"},
+        blocker={"owner": None} if blocked else None,
+        original_export_disposition="pipeline_export_v1",
+    )
+    adapter.producer.kind = "configuration_publication"
+    adapter.producer.inspect.return_value = (
+        {"outcome": "configuration_cancelled"},
+        "child-token",
+        True,
+    )
+    evidence, token, resolved = adapter.inspect("source")
+    assert not resolved
+    assert token == digest(state).hex()
+    assert evidence["outcome"] == (
+        "waiting_for_access" if blocked else "latest_configuration_cancelled"
+    )
+    assert evidence["recovery_links"] == [
+        {
+            "label": "Review latest closed attempt",
+            "kind": "configuration_publication",
+            "source_id": "latest-child",
+        }
+    ]
+    assert ("continue_configuration_export" in evidence["actions"]) is (not blocked)
+    assert "keep_prior" in evidence["actions"]
+    adapter.runner.assert_not_called()
+    dal.record.assert_not_called()
+    dal.reserve_for_reconciliation.assert_not_called()
+
+
 def test_stale_keep_prior_claim_cannot_replace_current_evidence():
     state, action, dal, adapter = fixture()
     state["current"]["scan_data"]["destinations"] = ["changed"]

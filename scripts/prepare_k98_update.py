@@ -1289,6 +1289,15 @@ P02_D4_COMBINED_PATHS = frozenset(
 )
 P02_D5_COMBINED_PATHS = P02_D4_COMBINED_PATHS | {"player_self_service/stats_runtime.py"}
 
+P02_MAINTENANCE_COMPATIBILITY_PATHS = frozenset(
+    {
+        "services/application_maintenance_contract.py",
+        "services/application_maintenance_dal.py",
+        "services/configuration_continuation.py",
+        "services/export_runtime_composition.py",
+    }
+)
+
 
 def reviewed_transitions():
     """Only the installed tool selects exact reviewed protocol transitions.
@@ -1303,7 +1312,17 @@ def reviewed_transitions():
     value = json.loads(raw)
     if set(value) != {"version", "transitions"} or value["version"] != 1:
         raise ValueError("Unsupported installed transition registry.")
-    if not isinstance(value["transitions"], list) or len(value["transitions"]) > 90:
+    if (
+        not isinstance(value["transitions"], list)
+        or len(value["transitions"]) > 91
+        or (
+            len(value["transitions"]) == 91
+            and not any(
+                isinstance(t, dict) and t.get("id") == "p02_maintenance_compatibility_v1"
+                for t in value["transitions"]
+            )
+        )
+    ):
         raise ValueError("Bounded installed transitions required.")
     identities = set()
     for item in value["transitions"]:
@@ -1417,6 +1436,10 @@ def reviewed_transitions():
             )
             fixed_p02_d4 = item["id"] == "p02_d4_combined_v1" and path in P02_D4_COMBINED_PATHS
             fixed_p02_d5 = item["id"] == D5_CONTRACT_TRANSITION and path in P02_D5_COMBINED_PATHS
+            fixed_p02_compatibility = (
+                item["id"] == "p02_maintenance_compatibility_v1"
+                and path in P02_MAINTENANCE_COMPATIBILITY_PATHS
+            )
             fixed_p02_phase1 = (
                 item["id"] == "p02_phase1_sql_exports_v1" and path in P02_PHASE1_SQL_EXPORT_PATHS
             )
@@ -1623,6 +1646,7 @@ def reviewed_transitions():
                     or fixed_p02_d3a
                     or fixed_p02_d3_cleanup
                     or fixed_p02_d3g
+                    or fixed_p02_compatibility
                     or fixed_p02_d3e
                     or fixed_p02_d3d
                     or fixed_p02_d3c
@@ -1697,6 +1721,11 @@ def reviewed_transitions():
                     continue
                 if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
                     raise ValueError("Exact reviewed protocol hashes required.")
+        if (
+            item["id"] == "p02_maintenance_compatibility_v1"
+            and paths != P02_MAINTENANCE_COMPATIBILITY_PATHS
+        ):
+            raise ValueError("Complete fixed maintenance compatibility transition required.")
         if (
             item["id"] == "application_schema_portable_v1"
             and paths != APPLICATION_SCHEMA_PORTABLE_PATHS
@@ -3161,6 +3190,7 @@ def prepare_update(
             for name, builder in (
                 ("P016_APPLICATION_REPAIR", "p016_application_transition"),
                 ("PHASE1_PERMISSION_REPAIR", "phase1_permission_transition"),
+                ("P02_MAINTENANCE_REPAIR", "p02_maintenance_transition"),
             )
             if config["before"] == verifier[name]["predecessor"]
         ),
@@ -3170,6 +3200,12 @@ def prepare_update(
         if recovery or description_raw != previous_description:
             raise ValueError("Application contract repair cannot combine another SQL release")
         repair, build_transition = application_repair
+        if repair["id"] == "p02_maintenance_compatibility_v1":
+            family = next(t for t in reviewed_transitions() if t["id"] == repair["id"])
+            if not matches_protocol_transition(
+                family, read_blob, config["before"], config["target"]
+            ):
+                raise ValueError("Exact maintenance compatibility source family required")
         mge_contracts = build_transition(config["before"], previous["bot-template.json"])
         config["application_contract_repair"] = deepcopy(repair)
     if recovery:

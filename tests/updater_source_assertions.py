@@ -51,6 +51,17 @@ _D4_CONTRACT_PAIRS = {
 def before_d5_qualification_hash(root, path):
     """Authenticate both qualified fixes before checking unchanged historical pins."""
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    # Authenticate the complete new source family before exposing its retained
+    # predecessor hash to historical assertions. Never repin historical evidence.
+    family = next(
+        t
+        for t in prepare_k98_update.reviewed_transitions()
+        if t["id"] == "p02_maintenance_compatibility_v1"
+    )
+    for member in family["members"]:
+        if member["path"] == path:
+            assert actual == member["after_sha256"], path
+            actual = member["before_sha256"]
     pairs = {
         "services/maintenance_dal.py": (
             "588f00f691779af53075ce990e13949cf48a37daa85d93d724ca72a5b525514b",

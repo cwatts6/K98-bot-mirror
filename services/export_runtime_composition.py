@@ -1020,9 +1020,15 @@ def _prepare_configured_runtime():
 
             require_recovery_snapshot_isolation(cursor)
         finally:
-            cursor.close()
+            from core.sql_connection_custody import connection_retained
+
+            if not connection_retained(connection):
+                cursor.close()
     finally:
-        connection.close()
+        from core.sql_connection_custody import connection_retained
+
+        if not connection_retained(connection):
+            connection.close()
     client = AuthorityClient(
         **{k: authority[k] for k in ("pipe_id", "authority_sid", "bot_sid", "deployment_hash")},
         **(
@@ -1637,6 +1643,8 @@ def validate_application_installation_contract(approved):
             raise SourceConflict("Phase 1 requires the portable application schema contract.")
     if d4:
         fields.add("d4_installation")
+    if isinstance(approved, dict) and "maintenance_policy" in approved:
+        fields.add("maintenance_policy")
     if isinstance(approved, dict) and approved.get("version") in (2, 3):
         from services.export_execution_dal import APPLICATION_ACTIVATION_SCOPE_HASH
 
@@ -1703,6 +1711,10 @@ def validate_application_installation_contract(approved):
         ):
             raise SourceConflict("Exact dynamic output and reviewed producer source required.")
         names.add(row["name"])
+    if "maintenance_policy" in approved:
+        from services.application_maintenance_contract import policy_objects
+
+        policy_objects(approved)
 
 
 def application_contract_scope(approved):
@@ -1731,6 +1743,16 @@ def application_snapshot_for_contract(cursor, approved):
     if scope is None:
         return application_installation_snapshot(cursor)
     if approved["version"] == 3:
+        if "maintenance_policy" in approved:
+            from services.application_maintenance_dal import maintenance_snapshot
+
+            return maintenance_snapshot(
+                cursor,
+                approved,
+                lambda: application_installation_snapshot(
+                    cursor, scope=scope, metadata_format=approved["fingerprint_format"]
+                ),
+            )
         return application_installation_snapshot(
             cursor, scope=scope, metadata_format=approved["fingerprint_format"]
         )
@@ -1745,6 +1767,8 @@ def verify_application_installation_contract(observed, approved):
     scope = application_contract_scope(approved)
     portable = approved["version"] == 3
     identity_fields = {"schema_identity"} if portable else set()
+    if "maintenance_policy" in approved:
+        identity_fields.add("maintenance_lifecycle")
     if (
         not isinstance(observed, dict)
         or set(observed)
@@ -1783,7 +1807,14 @@ def verify_application_installation_contract(observed, approved):
         )
 
         try:
-            metadata_hash = application_metadata_fingerprint(metadata, observed["schema_identity"])
+            if "maintenance_policy" in approved:
+                from services.application_maintenance_contract import lifecycle_fingerprint
+
+                metadata_hash = lifecycle_fingerprint(observed, approved)
+            else:
+                metadata_hash = application_metadata_fingerprint(
+                    metadata, observed["schema_identity"]
+                )
         except SchemaFingerprintError as exc:
             raise SourceConflict(
                 "Application schema identity is incomplete or unsupported."

@@ -192,7 +192,9 @@ def test_complete_packet_rebinds_seed_and_does_not_replay_sql(tmp_path, monkeypa
     )
 
 
-def assert_complete_repair_packet(tmp_path, monkeypatch, bot, repair, transition_name):
+def assert_complete_repair_packet(
+    tmp_path, monkeypatch, bot, repair, transition_name, *, family=None
+):
     from core.export_release_seed import successor_seed
     from tests.test_export_release_seed import predecessor
     from tests.updater_source_assertions import installed_tool_fixture
@@ -203,11 +205,16 @@ def assert_complete_repair_packet(tmp_path, monkeypatch, bot, repair, transition
     plan = initial["ManualProcessPairPlan-CANDIDATE.json"]
     plan["templates"]["bot"]["sha256"] = updater.sha256(encode(initial["bot-template.json"]))
     initial["AutomaticStartupPolicy.json"]["seed_plan"]["sha256"] = updater.sha256(encode(plan))
+    source_pins = {"application_feature.py": updater.sha256(b"old\n")}
+    if family:
+        source_pins = {
+            m["path"]: m["before_sha256"] for m in family["members"] if m["before_sha256"]
+        }
     previous = {
         name: json.loads(raw)
         for name, raw in successor_seed(
             initial,
-            {"application_feature.py": updater.sha256(b"old\n")},
+            source_pins,
             deployment_id=str(uuid4()),
             review_id=str(uuid4()),
             pipe_id=str(uuid4()),
@@ -246,9 +253,21 @@ def assert_complete_repair_packet(tmp_path, monkeypatch, bot, repair, transition
         (config["before"], "application_feature.py"): b"old\n",
         (config["target"], "application_feature.py"): b"new\n",
     }
+    changes = ["application_feature.py"]
+    if family:
+        changes = [m["path"] for m in family["members"]]
+        blobs = {(config["target"], p): b"new\n" for p in changes}
+        blobs.update(
+            {
+                (config["before"], m["path"]): b"old\n"
+                for m in family["members"]
+                if m["before_sha256"]
+            }
+        )
+        monkeypatch.setattr(updater, "reviewed_transitions", lambda: [family])
     result = updater.prepare_update(
         observation,
-        ["application_feature.py"],
+        changes,
         lambda *key: blobs.get(key),
         tmp_path / "packet",
         tools,

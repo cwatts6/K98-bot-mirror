@@ -62,6 +62,20 @@ class ConfigurationContinuation:
                 )
                 resolved = child_resolved
             else:
+                # A cancelled successor is still evidence of the latest approved
+                # action. Do not render the original choose screen as if that
+                # action had never happened or had successfully published.
+                evidence.update(
+                    outcome="latest_configuration_cancelled",
+                    explanation="The latest configuration continuation was closed without a new configuration publication. Its reservation is released; this does not complete capture or export. Review the linked attempt and its failure evidence before choosing another action.",
+                )
+                links.append(
+                    dict(
+                        label="Review latest closed attempt",
+                        kind=self.producer.kind,
+                        source_id=child["PreparationID"],
+                    )
+                )
                 child = None
         if not resolved and (not marker or (state["child"] and child is None)):
             actions.update(
