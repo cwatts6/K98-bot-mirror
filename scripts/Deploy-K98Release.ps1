@@ -25,7 +25,7 @@ function Get-BytesHash([byte[]]$Bytes) {
     finally { $hash.Dispose() }
 }
 function Assert-ReleaseMemberCount([int]$Version,[int]$Count) {
-    $limit=if($Version -eq 4){512}else{128}
+    $limit=if($Version -eq 4){525}else{128}
     if($Version -notin @(1,2,3,4) -or $Count -lt 1 -or $Count -gt $limit){throw 'Bounded release member inventory required'}
 }
 function Read-Pinned([string]$Path,[string]$Hash,[long]$Limit) {

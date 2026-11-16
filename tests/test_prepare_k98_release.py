@@ -1,6 +1,9 @@
 from copy import deepcopy
 import hashlib
 import json
+import os
+from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -52,7 +55,7 @@ def updater_specification(count):
     return value
 
 
-@pytest.mark.parametrize("count", [243, 512])
+@pytest.mark.parametrize("count", [243, 512, 525])
 def test_coordinated_source_inventory_fits_fixed_adapter_packet(count):
     value = updater_specification(count)
     validate_updater_manifest(value)
@@ -66,11 +69,66 @@ def test_coordinated_source_inventory_fits_fixed_adapter_packet(count):
 
 def test_oversized_fixed_adapter_and_generic_inventory_remain_refused():
     with pytest.raises(ValueError, match="Bounded release inventory"):
-        validate_updater_manifest(updater_specification(513))
+        validate_updater_manifest(updater_specification(526))
     value = specification()
     value["members"] += [dict(name=f"extra-{i}.bin", sha256="e" * 64) for i in range(128)]
     with pytest.raises(ValueError, match="Bounded release inventory"):
         validate_manifest(value)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell release gate")
+def test_native_and_python_release_member_bounds_agree(tmp_path):
+    """Exercise the actual runner guard without executing any release steps."""
+    runner = Path(__file__).resolve().parents[1] / "scripts/Deploy-K98Release.ps1"
+    script = tmp_path / "member-bound.ps1"
+    script.write_text(
+        r"""
+param([string]$Runner)
+$ErrorActionPreference='Stop'
+$tokens=$null;$errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile($Runner,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Runner syntax error'}
+$guard=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Assert-ReleaseMemberCount'},$true))
+if($guard.Count -ne 1){throw 'One actual member-count guard required'}
+. ([scriptblock]::Create($guard[0].Extent.Text))
+$results=@()
+foreach($version in @(1,2,3,4)) {
+ foreach($count in @(0,1,128,129,512,525,526)) {
+  $accepted=$true
+  try {Assert-ReleaseMemberCount $version $count} catch {$accepted=$false}
+  $results+=@{version=$version;count=$count;accepted=$accepted}
+ }
+}
+ConvertTo-Json -InputObject $results -Compress
+""",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(script),
+            str(runner),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    for case in json.loads(result.stdout):
+        limit = 525 if case["version"] == 4 else 128
+        assert case["accepted"] == (1 <= case["count"] <= limit), case
+        if case["version"] == 4 and case["count"] != 1:
+            value = updater_specification(case["count"])
+            if case["count"] == 0:
+                value["members"] = []
+            if case["accepted"]:
+                validate_updater_manifest(value)
+            else:
+                with pytest.raises(ValueError):
+                    validate_updater_manifest(value)
 
 
 def test_packet_preserves_exact_steps_and_calculates_pins_without_execution(tmp_path):

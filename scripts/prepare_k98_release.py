@@ -123,7 +123,9 @@ def _validate_manifest(value, *, versions):
     # Coordinated source updates include tests/docs as exact Git members too.
     # Keep generic packets at their original bound; v4 retains fixed adapters,
     # individual hashes and the independent 64 KiB manifest limit.
-    member_limit = 512 if value["version"] == 4 else 128
+    # D6's exact source and support payload requires 525 individually pinned
+    # members. This is separate from transition-registry and family-size limits.
+    member_limit = 525 if value["version"] == 4 else 128
     if not isinstance(members, list) or not 1 <= len(members) <= member_limit:
         raise ValueError("Bounded release inventory required.")
     names = set()
