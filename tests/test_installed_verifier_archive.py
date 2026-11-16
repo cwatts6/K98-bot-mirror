@@ -186,6 +186,8 @@ root=pathlib.Path(sys.argv[4])
 assert str(pathlib.Path(sys.argv[1]).parent.parent) not in sys.path
 import core
 assert pathlib.Path(core.__file__)==root/'core/__init__.py'
+assert core.__spec__.submodule_search_locations is core.__path__
+assert core.__spec__.submodule_search_locations==[str(pathlib.Path(sys.argv[2])/'core'),str(root/'core')]
 # Import every packaged module, not just the entry point that used to stop
 # before the combined-release branch. No SQL connection or runtime is started.
 for member in v['CONTRACT_ARCHIVE_MEMBERS']:

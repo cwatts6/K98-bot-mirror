@@ -260,7 +260,7 @@ def activate_contract_archive(path, expected, application_root):
 
     if Path(core.__file__).resolve() != (root / "core/__init__.py").resolve():
         raise ValueError("Authenticated application core package required")
-    core.__path__ = [str(archive / "core"), str(root / "core")]
+    core.__path__[:] = [str(archive / "core"), str(root / "core")]
 
 
 def activate_release_archive(config, directory):
