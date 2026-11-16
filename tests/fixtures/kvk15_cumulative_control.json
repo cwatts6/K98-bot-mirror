@@ -1,0 +1,84 @@
+{
+  "source": "Operator-supplied KVK15 Pass 7 and all-window comparison; one anonymised camp, compatible additive metrics only.",
+  "pass7_sha256": "0284f004c669cf91bab1e65996b71f73a3fe01f32a0ef08c67eea25e6af3b546",
+  "comparison_sha256": "91c0444f1a9c72ee05cbd5e61a360992307bdef69a3e9f76158460f8e84d2c1f",
+  "windows": [
+    "Pass 4",
+    "1st Altar",
+    "2nd Altar",
+    "3rd Altar",
+    "Pass 7"
+  ],
+  "metrics": {
+    "dkp": {
+      "fights": [
+        54047587380,
+        2357104150,
+        173910140,
+        938753210,
+        19076546300
+      ],
+      "cumulative": 76593901180
+    },
+    "kills_gain": {
+      "fights": [
+        2217125643,
+        123420901,
+        10653492,
+        53148267,
+        872606873
+      ],
+      "cumulative": 3276955176
+    },
+    "t4_kills": {
+      "fights": [
+        396817536,
+        16350391,
+        3915970,
+        14766029,
+        180609660
+      ],
+      "cumulative": 612459586
+    },
+    "t5_kills": {
+      "fights": [
+        1820308107,
+        107070510,
+        6737522,
+        38382238,
+        691997213
+      ],
+      "cumulative": 2664495590
+    },
+    "deads": {
+      "fights": [
+        341831247,
+        1304751,
+        0,
+        586204,
+        85762636
+      ],
+      "cumulative": 429484838
+    },
+    "kp_loss": {
+      "fights": [
+        26413887240,
+        2110109960,
+        426066880,
+        1381145480,
+        15675486760
+      ],
+      "cumulative": 46006696320
+    },
+    "healed_troops": {
+      "fights": [
+        1320694362,
+        105505498,
+        21303344,
+        69057274,
+        783774338
+      ],
+      "cumulative": 2300334816
+    }
+  }
+}

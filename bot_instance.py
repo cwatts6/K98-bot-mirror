@@ -1,0 +1,1876 @@
+# bot_instance.py
+import asyncio
+from collections.abc import Awaitable, Callable
+import csv
+from datetime import datetime, timedelta
+import json
+import logging
+import logging.handlers
+import os
+import platform
+import random
+import sys
+import traceback
+from typing import Any
+
+import discord
+from discord.ext import tasks
+
+from ark.ark_scheduler import schedule_ark_lifecycle
+from boot_safety import apply_boot_safety
+from bot_config import (
+    ACTIVITY_TRACKING_ENABLED,
+    ACTIVITY_UPLOAD_CHANNEL_ID,
+    ADMIN_USER_ID,
+    CALENDAR_PINNED_CHANNEL_ID,
+    CHANNEL_IDS,
+    GUILD_ID,
+    KVK_EVENT_CHANNEL_ID,
+    KVK_NOTIFICATION_CHANNEL_ID,
+    MEMBER_COUNT_CHANNEL_ID,
+    NOTIFY_CHANNEL_ID,
+    SERVER_STATUS_ENABLED,
+    STATUS_CHANNEL_ID,
+    UTC_CLOCK_CHANNEL_ID,
+)
+from bot_helpers import (
+    channel_queues,
+    connection_watchdog,
+    prune_restart_log,
+    queue_cleanup_loop,
+    queue_worker,
+)
+from bot_loader import bot
+from bot_startup_gate import claim_startup_once
+from constants import (
+    CSV_LOG,
+    FAILED_LOG,
+    INPUT_LOG,
+    LAST_RESTART_INFO,
+    LAST_SHUTDOWN_INFO,
+    RESTART_LOG_FILE,
+    SUMMARY_LOG,
+)
+from core.command_lifecycle import run_ready_command_sync
+from core.event_rehydration_lifecycle import (
+    run_ready_event_cache_rehydration,
+    run_ready_pinned_calendar_rehydration,
+    run_ready_tracked_view_rehydration,
+    wait_for_events,
+)
+from core.operation_evidence import optional as optional_observation
+from core.queue_lifecycle import run_ready_queue_lifecycle
+from core.scheduler_lifecycle import (
+    run_ready_calendar_scheduler_tasks,
+    run_ready_domain_scheduler_tasks,
+    run_ready_event_scheduler_tasks,
+    start_event_cache_refresh_loop,
+    start_legacy_reminder_cleanup,
+)
+from core.startup_lifecycle import StartupPhase, run_startup_phases
+from crystaltech_di import init_crystaltech_service
+from daily_KVK_overview_embed import post_or_update_daily_KVK_overview
+from embed_utils import expire_old_event_embeds, send_summary_embed
+from event_calendar.pinned_embed import update_calendar_embed
+from event_calendar.reminders import run_calendar_reminder_loop
+from event_calendar.service import get_calendar_service
+from event_embed_manager import rehydrate_live_event_views, update_live_event_embeds
+from event_scheduler import (
+    cleanup_orphaned_reminders,
+    refresh_reminder_format,
+    reminder_cleanup_loop,
+    schedule_event_reminders,
+)
+
+# added emit_telemetry_event import
+from file_utils import append_csv_line, emit_telemetry_event
+from logging_setup import (
+    LOG_DIR,
+    clean_old_lock_files,
+    is_pytest_logging_mode,
+)
+from mge.mge_scheduler import schedule_mge_lifecycle
+from proc_config_import import run_proc_config_import, run_proc_config_import_offload
+from server_activity import register_activity_listeners
+from server_activity.activity_store import ensure_activity_schema
+from server_status import run_member_count_channel_loop, run_utc_clock_channel_loop
+from subscription_tracker import load_subscriptions
+from utils import (
+    ensure_aware_utc,
+    load_live_queue_async,
+    save_live_queue_async,
+    update_live_queue_embed,
+    utcnow,
+)
+from voting.scheduler import schedule_voting_lifecycle
+
+# offload monitor integration
+try:
+    from offload_monitor_lib import monitor_loop_coro  # scheduled via task_monitor
+except Exception:
+    monitor_loop_coro = None
+
+# ensure asyncio is imported at top of file if not already
+
+apply_boot_safety()
+
+logger = logging.getLogger(__name__)
+telemetry_logger = logging.getLogger("telemetry")
+
+# Usage tracker (for component + autocomplete logging)
+from decoraters import usage_tracker  # lazy singleton; safe to import here
+from usage_tracker import start_usage_tracker, usage_jsonl_prune_loop
+
+
+def _aware(dt: datetime) -> datetime:
+    """Ensure dt is timezone-aware in UTC."""
+    return ensure_aware_utc(dt)
+
+
+START_TIME = _aware(utcnow())
+
+
+async def _with_timeout(coro, seconds: float, label: str, **observation):
+    from core.startup_diagnostics import run
+
+    return await run(coro, seconds, label, **observation)
+
+
+async def _jittered(min_s=0.4, max_s=1.2):
+    await asyncio.sleep(random.uniform(min_s, max_s))
+
+
+async def _refresh_mge_caches_on_startup() -> None:
+    try:
+        from mge.mge_cache import refresh_mge_caches
+
+        result = await asyncio.to_thread(refresh_mge_caches)
+        logger.info(
+            "[BOOT] MGE cache refresh complete commanders=%s variant_commanders=%s",
+            bool(result.get("commanders")),
+            bool(result.get("variant_commanders")),
+        )
+    except Exception:
+        logger.exception("[BOOT] MGE cache refresh failed")
+
+
+def schedule_bg(
+    name: str, timeout: float, coro_factory: Callable[[], Awaitable[Any]], **observation
+):
+    async def _runner():
+        await _jittered()
+        await _with_timeout(coro_factory(), timeout, name, **observation)
+
+    task_monitor.create(name, _runner)
+
+
+async def _run_pinned_calendar_refresh_once(*, source: str) -> None:
+    svc = get_calendar_service()
+    ch_id = CALENDAR_PINNED_CHANNEL_ID
+    if not ch_id:
+        logger.warning("[CALENDAR][PINNED] CALENDAR_PINNED_CHANNEL_ID not set; skipping")
+        return
+
+    try:
+        result = await svc.refresh_pipeline(
+            actor_user_id=None,
+            actor_source=source,
+            sheet_id=os.getenv("EVENT_CALENDAR_SHEET_ID"),
+            horizon_days=365,
+            force_empty=False,
+            scheduled=True,
+        )
+
+        if not result.get("ok"):
+            logger.error(
+                "[CALENDAR][PINNED] pipeline failed; preserving pinned message: %s",
+                result,
+            )
+            emit_telemetry_event(
+                {
+                    "event": "calendar_pinned_daily_refresh",
+                    "ok": False,
+                    "status": "pipeline_failed_preserved",
+                    "source": source,
+                }
+            )
+            return
+
+        if not svc.admission_open():
+            return
+        try:
+            upd = await update_calendar_embed(bot, ch_id)
+        except asyncio.CancelledError:
+            optional_observation(
+                svc.record_delivery, result.get("pipeline_run_id"), "unknown", "CancelledError"
+            )
+            raise
+        except Exception as error:
+            optional_observation(
+                svc.record_delivery, result.get("pipeline_run_id"), "failed", type(error).__name__
+            )
+            raise
+        optional_observation(
+            svc.record_delivery,
+            result.get("pipeline_run_id"),
+            "succeeded" if upd.get("ok") else "failed",
+        )
+        logger.info("[CALENDAR][PINNED] refresh result: %s", upd)
+        emit_telemetry_event(
+            {
+                "event": "calendar_pinned_daily_refresh",
+                "ok": bool(upd.get("ok")),
+                "status": upd.get("status"),
+                "source": source,
+            }
+        )
+    except Exception:
+        logger.exception("[CALENDAR][PINNED] refresh crashed (source=%s)", source)
+
+
+async def schedule_daily_pinned_calendar_refresh():
+    # immediate boot pass (so you don't wait until tomorrow)
+    await _run_pinned_calendar_refresh_once(source="startup_pinned_refresh")
+
+    while True:
+        now = _aware(utcnow())
+        target = now.replace(hour=8, minute=5, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+
+        delay = max(0, (target - now).total_seconds())
+        logger.info(
+            "[CALENDAR][PINNED] next daily refresh in %.0fs at %s", delay, target.isoformat()
+        )
+        await asyncio.sleep(delay)
+
+        await _run_pinned_calendar_refresh_once(source="scheduler_pinned_daily")
+
+
+_mge_start_attempted = False
+
+
+async def _start_mge_tasks_when_ready(max_wait_seconds: int = 300) -> None:
+    """
+    Start MGE background lifecycle scheduler once Discord cache/events are ready.
+    Idempotent via task_monitor key.
+    """
+    try:
+        ready = await wait_for_events(timeout_seconds=max_wait_seconds)
+        if not ready:
+            logger.warning(
+                "mge_scheduler_start_skipped reason=wait_for_events_timeout timeout_seconds=%s",
+                max_wait_seconds,
+            )
+            return
+
+        if task_monitor.is_running("mge_lifecycle"):
+            logger.info("mge_scheduler_already_running")
+            return
+
+        task_monitor.create(
+            "mge_lifecycle",
+            lambda: schedule_mge_lifecycle(bot),
+            replace=False,
+        )
+        logger.info("mge_scheduler_registered_via_task_monitor")
+    except Exception:
+        logger.exception("mge_scheduler_registration_failed")
+
+
+async def calendar_reminder_task():
+    """
+    Background loop for calendar DM reminders.
+    Isolated failure handling is inside run_calendar_reminder_loop().
+    """
+    await run_calendar_reminder_loop(bot)
+
+
+def _event_bundle():
+    from core.scheduler_lifecycle import EventTaskBundle, EventTaskMember, install_event_bundle
+    from event_cache import get_upcoming_event_cache_snapshot
+
+    return install_event_bundle(
+        EventTaskBundle(
+            [
+                EventTaskMember(
+                    "periodic_live_embed_update",
+                    lambda: task_monitor.create(
+                        "periodic_live_embed_update", periodic_live_embed_update
+                    ),
+                    registration=True,
+                ),
+                EventTaskMember(
+                    "daily_kvk_overview",
+                    lambda: task_monitor.create("daily_kvk_overview", schedule_daily_KVK_overview),
+                    registration=True,
+                ),
+                EventTaskMember(
+                    "schedule_event_reminders",
+                    lambda: task_monitor.create(
+                        "schedule_event_reminders",
+                        lambda: schedule_event_reminders(
+                            bot, KVK_NOTIFICATION_CHANNEL_ID, test_mode=False
+                        ),
+                    ),
+                    registration=True,
+                ),
+                EventTaskMember(
+                    "refresh_reminder_format",
+                    lambda: refresh_reminder_format(bot, KVK_NOTIFICATION_CHANNEL_ID),
+                    needs_events=True,
+                    observation_seconds=8.0,
+                ),
+                EventTaskMember(
+                    "rehydrate_live_event_views",
+                    lambda: rehydrate_live_event_views(bot, KVK_EVENT_CHANNEL_ID),
+                    needs_events=True,
+                ),
+                EventTaskMember(
+                    "event_embed_expiry",
+                    lambda: task_monitor.create("event_embed_expiry", schedule_event_embed_expiry),
+                    registration=True,
+                ),
+            ],
+            snapshot=get_upcoming_event_cache_snapshot,
+            is_running=task_monitor.is_running,
+        )
+    )
+
+
+async def _start_event_scheduler_tasks():
+    return await _event_bundle().tick()
+
+
+# wrap blockers
+async def run_blocking(func, *args, **kwargs):
+    from services.legacy_export_snapshot_service import drain_thread
+
+    return await drain_thread(func, *args, **kwargs)
+
+
+# --- Global asyncio loop exception handler (install once per process) ---
+def global_asyncio_exception_handler(loop, context):
+    try:
+        msg = context.get("message")
+        exc = context.get("exception")
+        where = context.get("future") or context.get("handle") or context.get("task")
+        where_info = f" where={where!r}" if where else ""
+
+        if exc is not None:
+            tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            logger.error("[LOOP EXC]%s %s\n%s", where_info, (msg or ""), tb)
+        else:
+            logger.error("[LOOP EXC]%s %s | context=%r", where_info, (msg or ""), context)
+    except Exception:
+        # Last-ditch: logging subsystem might be broken; write plain text to stderr
+        try:
+            sys.__stderr__.write("[LOOP EXC] (fallback) Unhandled loop exception\n")
+        except Exception:
+            pass
+
+
+def quiesce_logging():
+    """
+    Remove/disable any console-like stream handlers to avoid blocking writes
+    during teardown. Keep the QueueHandler (non-blocking) in place so logs
+    continue to flow to the QueueListener-owned file handlers until final shutdown.
+    """
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        try:
+            # Remove only console-ish stream handlers (stdout/stderr),
+            # but keep FileHandler/RotatingFileHandler and QueueHandler.
+            from logging.handlers import QueueHandler
+
+            is_file = isinstance(h, (logging.FileHandler, logging.handlers.RotatingFileHandler))
+            is_queue = isinstance(h, QueueHandler)
+            is_console_like = isinstance(h, logging.StreamHandler) and not is_file
+            if is_console_like and not is_queue:
+                root.removeHandler(h)
+                try:
+                    h.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+def _drop_console_handlers_once():
+    """Defensive: remove any console StreamHandlers a lib might have added."""
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        try:
+            is_file = isinstance(h, (logging.FileHandler, logging.handlers.RotatingFileHandler))
+            is_console_like = isinstance(h, logging.StreamHandler) and not is_file
+            if is_console_like:
+                root.removeHandler(h)
+                try:
+                    h.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+# ---------------- Usage logging helpers for interactions -------------------
+# DEBT: _clip is also defined as a nested function inside track_usage() in decoraters.py.
+# Consolidating to a shared utility is deferred — low risk, low value until a shared
+# core string-utils module is warranted.
+def _clip(s: str | None, n: int) -> str | None:
+    if s is None:
+        return None
+    s = str(s)
+    return s if len(s) <= n else s[:n]
+
+
+def _interaction_app_context(ir: discord.Interaction) -> str:
+    """
+    Map interaction types to our compact app_context values.
+    """
+    try:
+        # py-cord / discord.py expose Interaction.type as an enum; also expose .data for components
+        tname = (
+            getattr(getattr(ir, "type", None), "name", None) or str(getattr(ir, "type", "")).lower()
+        )
+        if "autocomplete" in (tname or "").lower():
+            return "autocomplete"
+        if "component" in (tname or "").lower():
+            # Distinguish button vs. select via component_type (2=button, 3/5/6/7/8=select variants)
+            data = ir.data or {}
+            ctype = data.get("component_type")
+            if ctype == 2:
+                return "button"
+            return "select"
+        if "application_command" in (tname or "").lower():
+            return "slash"
+        return (tname or "component").lower()
+    except Exception:
+        return "component"
+
+
+async def _log_interaction_usage(ir: discord.Interaction):
+    """
+    Best-effort, non-blocking log of buttons/selects/autocomplete.
+    We DO NOT log values the user typed; just the command/custom_id.
+    """
+    try:
+        app_ctx = _interaction_app_context(ir)
+        if app_ctx == "slash":
+            return  # slash commands are handled by @track_usage on handlers
+
+        # Derive a short name:
+        # - For autocomplete: "autocomplete:<command_name>"
+        # - For components:   custom_id (from your UI)
+        cmd_name: str | None = None
+        if app_ctx == "autocomplete":
+            data = ir.data or {}
+            # 'name' is the command the option belongs to; keep it short & neutral
+            cmd_name = f"autocomplete:{data.get('name', 'unknown')}"
+        else:
+            # component (button/select): prefer custom_id
+            data = ir.data or {}
+            cmd_name = data.get("custom_id") or "component"
+
+        # Enforce DB widths to avoid ODBC truncation errors
+        cmd_name = _clip(cmd_name, 64)
+        app_ctx_c = _clip(app_ctx, 16)
+        user_disp = _clip(getattr(ir.user, "display_name", None), 128)
+
+        evt = {
+            "executed_at_utc": _aware(utcnow()).isoformat(),
+            "command_name": cmd_name,
+            "version": None,
+            "app_context": app_ctx_c,
+            "user_id": getattr(ir.user, "id", None),
+            "user_display": user_disp,
+            "guild_id": (
+                getattr(getattr(ir, "guild", None), "id", None) if hasattr(ir, "guild") else None
+            ),
+            "channel_id": (
+                getattr(getattr(ir, "channel", None), "id", None)
+                if hasattr(ir, "channel")
+                else None
+            ),
+            "success": True,  # passive click/usage log; failures are captured by handlers
+            "error_code": None,
+            "latency_ms": None,
+            "args_shape": None,
+        }
+        # Fire-and-forget into the async tracker (which writes JSONL and batches to SQL)
+        asyncio.create_task(usage_tracker().log(evt))
+    except Exception:
+        # Absolutely do not break interaction handling due to logging
+        return
+
+
+# --- Heartbeat + Task Monitor ------------------------------------------------
+from file_utils import atomic_json_write as _atomic_json_write
+
+
+class TaskMonitor:
+    """Supervise background tasks; auto-restart on crash with capped backoff."""
+
+    def __init__(self):
+        self._tasks: dict[str, asyncio.Task] = {}
+        self._restarts: dict[str, int] = {}
+        self._last_error: dict[str, str | None] = {}
+        self._backoff: dict[str, float] = {}
+        self._factories: dict[str, Callable[[], Awaitable[Any]]] = {}
+        self._active = True
+
+    def is_running(self, name: str) -> bool:
+        t = self._tasks.get(name)
+        return bool(t and not t.done())
+
+    def create(self, name: str, coro_factory, *, replace: bool = False):
+        """
+        Register and start a background task from a coroutine FACTORY.
+        Pass the function (no parentheses). If the task is already running
+        and replace==False, this is a no-op and does not instantiate the coroutine.
+        """
+        if self.is_running(name) and not replace:
+            logger.warning("[MONITOR] Task %s already running; not creating a duplicate.", name)
+            return self._tasks[name]
+
+        # Store/overwrite the factory so restarts use the same one
+        self._factories[name] = coro_factory
+
+        # Build coroutine *only when we intend to schedule it*
+        coro = coro_factory()
+        t = asyncio.create_task(coro, name=name)
+        self._tasks[name] = t
+        self._last_error.setdefault(name, None)
+        self._restarts.setdefault(name, 0)
+        self._backoff.setdefault(name, 1.0)
+        t.add_done_callback(lambda fut, n=name: asyncio.create_task(self._on_done(n, fut)))
+        logger.info("[MONITOR] Task started: %s", name)
+        return t
+
+    async def _on_done(self, name: str, fut: asyncio.Task):
+        if not self._active:
+            return
+        try:
+            exc = fut.exception()
+        except asyncio.CancelledError:
+            exc = None
+        except Exception as e:
+            exc = e
+
+        if exc:
+            tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            self._last_error[name] = f"{type(exc).__name__}: {exc}\n{tb}"
+            self._restarts[name] += 1
+
+            delay = min(60.0, self._backoff.get(name, 1.0))
+            self._backoff[name] = min(60.0, max(1.0, delay * 2))
+            logger.error("[MONITOR] Task %s crashed; restarting in %.1fs\n%s", name, delay, tb)
+            await asyncio.sleep(delay)
+
+            # Restart via the stored factory if available
+            factory = self._factories.get(name)
+            if factory:
+                self.create(name, factory)
+            else:
+                logger.error("[MONITOR] No factory stored for %s; cannot restart.", name)
+        else:
+            self._backoff[name] = 1.0
+            self._last_error[name] = None
+            logger.info("[MONITOR] Task %s completed.", name)
+
+    def list(self):
+        out = []
+        for name, task in self._tasks.items():
+            out.append(
+                {
+                    "name": name,
+                    "done": task.done(),
+                    "cancelled": task.cancelled(),
+                    "restarts": self._restarts.get(name, 0),
+                    "last_error": self._last_error.get(name),
+                }
+            )
+        return out
+
+    # In TaskMonitor
+    async def stop(self):
+        self._active = False
+        tasks = [t for t in self._tasks.values() if not t.done()]
+        for t in tasks:
+            t.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._tasks.clear()  # optional
+        logger.info("[MONITOR] Stop requested; tasks cancelled where applicable.")
+
+
+task_monitor = TaskMonitor()
+
+
+async def heartbeat_loop():
+    """Write periodic health snapshot to LOG_DIR/heartbeat.json."""
+    hb_path = os.path.join(LOG_DIR, "heartbeat.json")
+    pid = os.getpid()
+    while True:
+        try:
+            # Collect metrics
+            now = _aware(utcnow())
+            uptime = (now - START_TIME).total_seconds()
+            latency = getattr(bot, "latency", None)
+            try:
+                guild_count = len(bot.guilds)
+            except Exception:
+                guild_count = None
+            try:
+                cmd_count = len(bot.application_commands)
+            except Exception:
+                cmd_count = None
+
+            # Optional memory stats via psutil if present
+            mem_info = None
+            try:
+                import psutil  # optional
+
+                p = psutil.Process(pid)
+                mem = p.memory_info()
+                mem_info = {"rss": mem.rss, "vms": mem.vms}
+            except Exception:
+                mem_info = None
+
+            data = {
+                "ts": now.isoformat(),
+                "pid": pid,
+                "platform": platform.platform(),
+                "python": sys.version.split()[0],
+                "uptime_sec": int(uptime),
+                "latency_sec": float(latency) if latency is not None else None,
+                "guilds": guild_count,
+                "commands": cmd_count,
+                "tasks": task_monitor.list(),
+            }
+            if mem_info:
+                data["memory"] = mem_info
+
+            _atomic_json_write(hb_path, data)
+
+        except Exception as e:
+            logger.error("[HEARTBEAT] Failed to write heartbeat: %s", e)
+
+        await asyncio.sleep(30)
+
+
+# === Passive health dashboard =============================================
+HEALTH_MSG_ID_PATH = os.path.join(LOG_DIR, "health_msg_id.json")
+STALENESS_THRESHOLD_MIN = 15  # Card delivery age, not provider-observation freshness.
+HEALTH_REFRESH_MINUTES = 5
+_last_health_alert_ts: datetime | None = None
+_last_health_embed_update_ts: datetime | None = None
+_health_alert_attempts = {}
+_health_view = None
+_health_registered_id = None
+_health_creation_unconfirmed = False
+LAST_DISCONNECT_UTC: datetime | None = None
+LAST_RESUME_UTC: datetime | None = None
+
+
+def _health_projection():
+    from services.operator_status_service import snapshot
+
+    return snapshot()
+
+
+def _health_card(projection=None):
+    from ui.views.health_view import build_health_embed
+
+    entries = task_monitor.list()
+    local = dict(
+        connected=bool(bot.is_ready() and not bot.is_closed()),
+        shutting_down=_shutdown_once.is_set(),
+        notify_channel_id=NOTIFY_CHANNEL_ID,
+        uptime_seconds=max(0, (_aware(utcnow()) - START_TIME).total_seconds()),
+        tasks=(
+            sum(1 for e in entries if not e["done"] and not e["cancelled"]),
+            sum(1 for e in entries if e["done"] and e.get("last_error")),
+            sum(int(e.get("restarts", 0) or 0) for e in entries),
+        ),
+    )
+    return build_health_embed(
+        projection if projection is not None else _health_projection(), local=local
+    )
+
+
+def _get_health_view():
+    global _health_view
+    from ui.views.health_view import HealthView
+
+    if _health_view is not None and _health_view._closed and _health_view._active is None:
+        _health_view.stop()
+        _health_view = None
+    if _health_view is None:
+        _health_view = HealthView(
+            guild_id=GUILD_ID, channel_id=STATUS_CHANNEL_ID, render=_health_card
+        )
+    return _health_view
+
+
+def _bind_health_view(message_id):
+    global _health_registered_id, _health_view
+    if _health_registered_id is not None and _health_registered_id != message_id:
+        _health_view.close_admission()
+        _health_view.stop()
+        _health_view = None
+    view = _get_health_view()
+    view.message_id = message_id
+    if _health_registered_id != message_id:
+        bot.add_view(view, message_id=message_id)
+        _health_registered_id = message_id
+    return view
+
+
+def _restore_health_view():
+    # Existing identity bookkeeping only; not part of passive snapshot assembly.
+    try:
+        with open(HEALTH_MSG_ID_PATH, encoding="utf-8") as source:
+            message_id = json.load(source).get("id")
+        if type(message_id) is int and message_id > 0:
+            try:
+                _bind_health_view(message_id)
+            except Exception as exc:
+                logger.warning(
+                    "health_view_registration_unavailable error_type=%s", type(exc).__name__
+                )
+            return message_id
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return None
+
+
+async def _ensure_pinned_health_message(channel):
+    global _health_creation_unconfirmed
+    message_id = _health_registered_id or _restore_health_view()
+    if message_id:
+        try:
+            await channel.fetch_message(message_id)
+            return message_id
+        except discord.NotFound:
+            # Retain and drain the old view before replacing its ownership.
+            await _get_health_view().shutdown()
+        except Exception as exc:
+            logger.warning("health_message_unavailable error_type=%s", type(exc).__name__)
+            return None
+    if _shutdown_once.is_set() or _health_creation_unconfirmed:
+        return None
+    # An uncertain send must not post another card on every scheduled render.
+    _health_creation_unconfirmed = True
+    try:
+        message = await channel.send(embed=_health_card(), view=_get_health_view())
+    except (discord.Forbidden, discord.NotFound):
+        # Confirmed non-delivery can recover on the existing five-minute update.
+        _health_creation_unconfirmed = False
+        raise
+    _bind_health_view(message.id)
+    _health_creation_unconfirmed = False
+    try:
+        with open(HEALTH_MSG_ID_PATH, "w", encoding="utf-8") as target:
+            json.dump({"id": message.id}, target)
+    except Exception as exc:
+        logger.warning("health_identity_save_unavailable error_type=%s", type(exc).__name__)
+    try:
+        await message.pin()
+    except Exception as exc:
+        logger.warning("health_pin_unavailable error_type=%s", type(exc).__name__)
+    return message.id
+
+
+async def _health_alerts(projection):
+    global _last_health_alert_ts
+    if is_pytest_logging_mode() or _shutdown_once.is_set():
+        return
+    now = _aware(utcnow())
+    if _last_health_alert_ts and (now - _last_health_alert_ts).total_seconds() < 1800:
+        return
+    pending = []
+    for name in ("sql", "sheets"):
+        row = projection["components"][name]
+        # Raw failure text is not an action classifier. Generic failures stay on the card.
+        if (
+            row.get("action") != "verify_access"
+            or row.get("outcome") != "failure"
+            or row.get("freshness") != "fresh"
+        ):
+            continue
+        key = row.get("reference")
+        if key and _health_alert_attempts.get(name, (None,))[0] != key:
+            pending.append(
+                (name, key, f"{name}: access denied; verify the configured access permissions.")
+            )
+    if (
+        _last_health_embed_update_ts
+        and (now - _last_health_embed_update_ts).total_seconds() >= STALENESS_THRESHOLD_MIN * 60
+    ):
+        key = _last_health_embed_update_ts.isoformat()
+        if _health_alert_attempts.get("delivery", (None,))[0] != key:
+            pending.append(
+                (
+                    "delivery",
+                    key,
+                    "The health card could not be updated; check the status-channel permissions and message availability.",
+                )
+            )
+    if not pending:
+        return
+    _last_health_alert_ts = now
+    for name, key, _ in pending:
+        _health_alert_attempts[name] = (key, "attempted_unconfirmed")
+    text = "Bot Health: action required\n" + "\n".join(reason for _, _, reason in pending)
+    if _health_registered_id:
+        text += (
+            f"\nhttps://discord.com/channels/{GUILD_ID}/{STATUS_CHANNEL_ID}/{_health_registered_id}"
+        )
+    try:
+        owner = await bot.fetch_user(ADMIN_USER_ID)
+        await owner.send(text, allowed_mentions=discord.AllowedMentions.none())
+        for name, key, _ in pending:
+            _health_alert_attempts[name] = (key, "acknowledged")
+    except Exception as exc:
+        logger.warning("health_alert_unconfirmed error_type=%s", type(exc).__name__)
+
+
+async def _update_health_embed():
+    global _last_health_embed_update_ts
+    if _shutdown_once.is_set():
+        return
+    projection = _health_projection()
+    channel = bot.get_channel(STATUS_CHANNEL_ID)
+    if channel is None or getattr(getattr(channel, "guild", None), "id", None) != GUILD_ID:
+        logger.warning("health_status_channel_unavailable")
+        await _health_alerts(projection)
+        return
+    try:
+        message_id = await _ensure_pinned_health_message(channel)
+        if message_id is not None and not _shutdown_once.is_set():
+            message = await channel.fetch_message(message_id)
+            await message.edit(
+                embed=_health_card(projection), view=_bind_health_view(message_id), attachments=[]
+            )
+            _last_health_embed_update_ts = _aware(utcnow())
+    except Exception as exc:
+        logger.warning("health_card_update_unavailable error_type=%s", type(exc).__name__)
+    await _health_alerts(projection)
+
+
+async def _stop_health_dashboard():
+    from core.owned_work import drain_awaitable
+
+    task = health_dashboard_task.get_task()
+    if _health_view is not None:
+        _health_view.close_admission()
+    if task is asyncio.current_task():
+        health_dashboard_task.stop()
+    else:
+        health_dashboard_task.cancel()
+    if task is not None and task is not asyncio.current_task():
+        await drain_awaitable(asyncio.gather(task, return_exceptions=True))
+    if _health_view is not None:
+        await _health_view.shutdown()
+
+
+@tasks.loop(minutes=HEALTH_REFRESH_MINUTES)
+async def health_dashboard_task():
+    try:
+        await _update_health_embed()
+    except Exception as e:
+        logger.warning(f"[HEALTH] loop error: {e}")
+
+
+@health_dashboard_task.before_loop
+async def _wait_ready_health():
+    await bot.wait_until_ready()
+
+
+# Daily summary send gate state
+_daily_summary_last_sent_date = None  # UTC date() of last send
+
+
+@tasks.loop(minutes=1)
+async def daily_summary():
+    from utils import async_log_csv
+
+    global _daily_summary_last_sent_date
+    now = _aware(utcnow())
+    # Send once per UTC day at/around 21:00. The once-per-day guard avoids dupes.
+    if now.hour == 21 and now.minute in (0, 1) and (_daily_summary_last_sent_date != now.date()):
+        try:
+            channel = bot.get_channel(NOTIFY_CHANNEL_ID)
+            if not channel:
+                logger.warning("❌ daily_summary could not find NOTIFY_CHANNEL_ID")
+                return
+
+            await send_summary_embed(channel, days=1)
+            _daily_summary_last_sent_date = now.date()
+            logger.info(
+                "[SCHEDULED] Daily summary sent to %s at %s",
+                channel.name,
+                now.strftime("%Y-%m-%d %H:%M UTC"),
+            )
+
+            await async_log_csv(
+                CSV_LOG,
+                {
+                    "timestamp": now.isoformat(),
+                    "event": "daily_summary",
+                    "filename": "",
+                    "user": "BOT",
+                    "status": "Success",
+                },
+            )
+
+        except Exception as e:
+            logger.exception("[ERROR] Failed to send daily summary")
+            await async_log_csv(
+                CSV_LOG,
+                {
+                    "timestamp": now.isoformat(),
+                    "event": "daily_summary",
+                    "filename": "",
+                    "user": "BOT",
+                    "status": f"Failure: {e!s}",
+                },
+            )
+
+
+@daily_summary.before_loop
+async def _before_daily_summary():
+    # Ensure client is ready before the loop runs
+    await bot.wait_until_ready()
+    logger.info("[TASK] daily_summary loop armed (minute cadence; 21:00 UTC gate).")
+
+
+@tasks.loop(hours=6)
+async def refresh_event_cache_task():
+    try:
+        logger.info("[TASK] Starting event cache refresh...")
+        from event_cache import refresh_event_cache_result
+
+        await refresh_event_cache_result()
+    except Exception as e:
+        logger.warning(f"[TASK] Event cache refresh failed: {e}")
+
+
+@refresh_event_cache_task.before_loop
+async def before_refresh_cache():
+    await bot.wait_until_ready()
+    now = _aware(utcnow())
+    # Align the first run to 03:00 or 15:00 UTC, otherwise next day 03:00
+    if now.hour < 3:
+        target = now.replace(hour=3, minute=0, second=0, microsecond=0)
+    elif now.hour < 15:
+        target = now.replace(hour=15, minute=0, second=0, microsecond=0)
+    else:
+        target = (now + timedelta(days=1)).replace(hour=3, minute=0, second=0, microsecond=0)
+    delay = max(0, (target - now).total_seconds())
+    logger.info(f"[TASK] Waiting {int(delay)}s to start 6-hour event cache refresh task.")
+    await asyncio.sleep(delay)
+
+
+async def periodic_live_embed_update():
+    await asyncio.sleep(random.uniform(0, 3))  # jitter
+    while True:
+        try:
+            await update_live_event_embeds(bot, event_channel_id=KVK_EVENT_CHANNEL_ID)
+        except Exception:
+            logger.exception("[ERROR] Failed to update live embeds")
+        await asyncio.sleep(600 + random.uniform(0, 3))
+
+
+async def schedule_daily_KVK_overview():
+    while True:
+        now = _aware(utcnow())
+        target = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        delay = (target - now).total_seconds()
+        await asyncio.sleep(delay)
+        try:
+            disposition = await post_or_update_daily_KVK_overview(
+                bot, event_channel_id=KVK_EVENT_CHANNEL_ID
+            )
+            logger.info("[SCHEDULE] Daily KVK overview disposition=%s", disposition)
+        except Exception:
+            logger.exception("[SCHEDULE] Failed to post/update Daily KVK overview")
+
+
+async def schedule_event_embed_expiry():
+    while True:
+        now = _aware(utcnow())
+        target = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        delay = (target - now).total_seconds()
+
+        await asyncio.sleep(delay)
+
+        try:
+            await expire_old_event_embeds(bot)
+            logger.info("[SCHEDULE] Expired old /nextevent and /nextfight embeds.")
+        except Exception as e:
+            logger.error(f"[SCHEDULE] Failed to expire event embeds: {e}")
+
+
+# --- Graceful teardown ------------------
+_shutdown_once = asyncio.Event()
+_teardown_task = None
+_QUEUE_SHUTDOWN_DRAIN_SECONDS = 3.0
+_QUEUE_SHUTDOWN_SAVE_SECONDS = 5.0
+
+
+async def _drain_shutdown_queues(timeout_seconds: float = _QUEUE_SHUTDOWN_DRAIN_SECONDS) -> None:
+    """Briefly let queue workers finish pending channel queue items before cancellation."""
+    queues = list(channel_queues.items())
+    if not queues:
+        logger.info("[SHUTDOWN] No channel queues configured for drain.")
+        return
+
+    pending_before = {channel_id: queue.qsize() for channel_id, queue in queues}
+    total_pending = sum(pending_before.values())
+    if total_pending <= 0:
+        logger.info(
+            "[SHUTDOWN] Channel queues have no pending items; waiting up to %.1fs for "
+            "any in-flight queue work to finish.",
+            timeout_seconds,
+        )
+    else:
+        logger.info(
+            "[SHUTDOWN] Draining %d queued message(s) across %d channel queue(s) for up to %.1fs.",
+            total_pending,
+            len(queues),
+            timeout_seconds,
+        )
+    joins = [queue.join() for _channel_id, queue in queues]
+    try:
+        await asyncio.wait_for(asyncio.gather(*joins), timeout=timeout_seconds)
+        logger.info("[SHUTDOWN] Channel queues drained before task cancellation.")
+    except TimeoutError:
+        pending_after = {channel_id: queue.qsize() for channel_id, queue in queues}
+        logger.warning(
+            "[SHUTDOWN] Channel queue drain timed out; pending_before=%s pending_after=%s",
+            pending_before,
+            pending_after,
+        )
+
+
+async def _flush_live_queue_state(timeout_seconds: float = _QUEUE_SHUTDOWN_SAVE_SECONDS) -> None:
+    """Persist live queue state before logging and process resources shut down."""
+    try:
+        await asyncio.wait_for(save_live_queue_async(), timeout=timeout_seconds)
+        logger.info("[SHUTDOWN] Live queue state persisted.")
+    except TimeoutError:
+        logger.warning(
+            "[SHUTDOWN] Timed out persisting live queue state after %.1fs.",
+            timeout_seconds,
+        )
+    except Exception:
+        logger.exception("[SHUTDOWN] Failed persisting live queue state.")
+
+
+async def _graceful_teardown():
+    global _teardown_task
+    from core.owned_work import drain_awaitable
+
+    if _teardown_task is None:
+        _shutdown_once.set()
+        _close_teardown_admission()
+        _teardown_task = asyncio.create_task(_perform_graceful_teardown())
+    return await drain_awaitable(_teardown_task)
+
+
+def _close_teardown_admission():
+    from player_self_service.stats_runtime import get_runtime
+    from services import upload_lifecycle
+
+    get_calendar_service().close_admission()
+    upload_lifecycle.close_admission()
+    # Close first-use admission before any drain can yield to a new interaction.
+    get_runtime().close_admission()
+
+
+async def _perform_graceful_teardown():
+    from player_self_service.stats_runtime import current_runtime
+    from services import upload_lifecycle
+
+    calendar = get_calendar_service()
+    stats = current_runtime()
+    calendar_drain = await calendar.drain()
+    if not calendar_drain["ok"]:
+        logger.error("[SHUTDOWN] Calendar cleanup remains unconfirmed: %s", calendar_drain)
+        raise RuntimeError("Calendar physical cleanup is unconfirmed")
+    await upload_lifecycle.drain()
+    if stats is not None and not await stats.drain():
+        raise RuntimeError("Personal Stats physical cleanup is unconfirmed")
+    await _stop_health_dashboard()
+    from event_cache import refresh_service
+    from profile_cache import _service as profile_service
+    from target_utils import close_name_admission
+
+    profile_service.close()
+    close_name_admission()
+    refresh_service.close_admission()
+    _event_bundle().close_admission()
+    from core.interaction_safety import close_private_operations, drain_private_operations
+    from mge.mge_embed_manager import close_refresh_admission, drain_refreshes
+    import reminder_task_registry
+    from services import event_delivery_service, operator_status_service
+    from services.gsheets_health_service import _probe as sheets_probe
+
+    close_private_operations()
+    close_refresh_admission()
+    await drain_private_operations()
+    await drain_refreshes()
+    event_delivery_service.close_admission()
+    operator_status_service.close_admission()
+    sheets_probe.close()
+    reminder_task_registry.close_admission()
+    logger.info("[SHUTDOWN] Graceful teardown initiated.")
+    from services.export_coordination_service import stop_export_admission
+
+    stop_export_admission()
+    from services.export_runtime_composition import drain_runtime
+
+    await drain_runtime()
+
+    # Diagnostic sends must finish their reservation finalizers before client teardown.
+    try:
+        from stats_alerts.diagnostics import runner as prekvk_diagnostic_runner
+
+        await prekvk_diagnostic_runner.shutdown()
+    except Exception:
+        logger.exception(
+            "[SHUTDOWN] Failed draining Pre-KVK diagnostics; preserve session evidence."
+        )
+
+    try:
+        from stats_alerts.kvk_diagnostics import runner as kvk_preview_runner
+
+        await kvk_preview_runner.shutdown()
+    except Exception:
+        logger.exception("[SHUTDOWN] Failed draining KVK previews; preserve session evidence.")
+
+    # Stop task loops...
+    try:
+        if daily_summary.is_running():
+            daily_summary.stop()
+            logger.info("[SHUTDOWN] Stopped daily_summary loop.")
+    except Exception:
+        logger.exception("[SHUTDOWN] Failed stopping daily_summary.")
+
+    try:
+        if refresh_event_cache_task.is_running():
+            refresh_event_cache_task.stop()
+            logger.info("[SHUTDOWN] Stopped refresh_event_cache_task loop.")
+    except Exception:
+        logger.exception("[SHUTDOWN] Failed stopping refresh_event_cache_task.")
+
+    try:
+        await _drain_shutdown_queues()
+    except Exception:
+        logger.exception("[SHUTDOWN] Queue drain failed.")
+
+    try:
+        await _flush_live_queue_state()
+    except Exception:
+        logger.exception("[SHUTDOWN] Live queue flush failed.")
+
+    # Drain event-owned work before cancelling its observers/client users.
+    await _event_bundle().shutdown()
+    await refresh_service.shutdown()
+    await event_delivery_service.shutdown()
+    await operator_status_service.shutdown()
+    await sheets_probe.shutdown()
+
+    # Cancel supervised tasks
+    try:
+        await task_monitor.stop()
+    except Exception:
+        logger.exception("[SHUTDOWN] TaskMonitor stop failed.")
+
+    # Ensure reminder_task_registry tasks are cancelled and awaited (best-effort).
+    # This ensures user DM reminder tasks are cancelled while logging and bot resources are still available.
+    try:
+        import reminder_task_registry as _rtr
+
+        try:
+            cancelled = await _rtr.cancel_all_and_wait(timeout=5.0)
+            logger.info(
+                "[SHUTDOWN] reminder_task_registry: requested cancellation of %d tasks (best-effort).",
+                cancelled,
+            )
+        except AttributeError:
+            # Back-compat path if only TaskRegistry exists
+            try:
+                from reminder_task_registry import TaskRegistry
+
+                cancelled = await TaskRegistry.cancel_all(timeout=5.0)
+                logger.info(
+                    "[SHUTDOWN] reminder_task_registry.TaskRegistry: requested cancellation of %d tasks.",
+                    cancelled,
+                )
+            except Exception:
+                logger.exception(
+                    "[SHUTDOWN] Failed to cancel tasks via reminder_task_registry.TaskRegistry."
+                )
+        except Exception:
+            logger.exception("[SHUTDOWN] Failed to cancel reminder_task_registry tasks.")
+    except Exception:
+        # Non-fatal: continue shutdown even if registry import/cancel fails
+        logger.debug(
+            "[SHUTDOWN] reminder_task_registry not available or failed to import.", exc_info=True
+        )
+
+    # Heartbeat marker
+    try:
+        _atomic_json_write(
+            os.path.join(LOG_DIR, "shutdown_heartbeat.json"),
+            {
+                "ts": _aware(utcnow()).isoformat(),
+                "reason": "graceful_shutdown",
+                "tasks": task_monitor.list(),
+            },
+        )
+    except Exception:
+        logger.exception("[SHUTDOWN] Failed writing shutdown heartbeat.")
+
+    # Ensure usage tracker flushes any queued events
+    try:
+        await usage_tracker().stop()
+        logger.info("[SHUTDOWN] Usage tracker stopped.")
+    except Exception:
+        logger.exception("[SHUTDOWN] Failed stopping usage tracker.")
+
+    # Business owners have settled; keep entered diagnostic I/O owned through shutdown.
+    from services import optional_upload_lifecycle
+
+    await optional_upload_lifecycle.shutdown()
+
+    # **NEW**: drop webhook/HTTP/stream handlers but keep file handlers alive
+    try:
+        quiesce_logging()
+    except Exception:
+        pass
+
+
+async def run_graceful_teardown():
+    await _graceful_teardown()
+
+
+@bot.event
+async def on_graceful_shutdown():
+    try:
+        await run_graceful_teardown()
+    except Exception:
+        logger.exception("[SHUTDOWN] on_graceful_shutdown failed.")
+
+
+_startup_loaded_reminder_ids: set[Any] = set()
+
+
+@bot.event
+async def on_ready():
+    # Gate: only the first on_ready() does startup work
+    if not await claim_startup_once():
+        logger.info("[STARTUP] on_ready called again — startup already completed; skipping.")
+        return
+
+    from logging_setup import configure_operation_diagnostics
+
+    configure_operation_diagnostics()
+    from constants import CSV_LOG
+    from services import optional_upload_lifecycle
+
+    optional_upload_lifecycle.configure(CSV_LOG)
+
+    await run_startup_phases(
+        [
+            StartupPhase("ready_runtime_bootstrap", _run_ready_runtime_bootstrap),
+            StartupPhase("ready_runtime_services", _run_ready_runtime_services),
+        ]
+    )
+
+    try:
+        logger.info(f"✅ Bot is ready – logged in as {bot.user} (ID: {bot.user.id})")
+        await run_startup_phases([StartupPhase("ready_command_sync", _run_ready_command_sync)])
+
+        await run_startup_phases(
+            [StartupPhase("ready_event_cache_rehydration", _run_ready_event_cache_rehydration)]
+        )
+        await run_startup_phases(
+            [StartupPhase("ready_event_scheduler_tasks", _run_ready_event_scheduler_tasks)]
+        )
+
+        try:
+            from target_utils import refresh_name_result, verify_name_completion
+
+            schedule_bg(
+                "warm_name_cache",
+                8.0,
+                refresh_name_result,
+                cancel_on_deadline=False,
+                completion_check=verify_name_completion,
+            )
+            logger.info("[CACHE] Governor name cache warm scheduled")
+        except Exception as e:
+            logger.warning(f"[CACHE] Failed to load Governor name cache (will retry later): {e}")
+
+        # NEW: warm the player profile cache on startup
+        try:
+            from profile_cache import refresh_async
+            from services.profile_cache_startup import verify_completion as verify_profile
+
+            schedule_bg(
+                "warm_profile_cache",
+                12.0,
+                lambda: refresh_async(origin="startup"),
+                cancel_on_deadline=False,
+                completion_check=verify_profile,
+            )
+            logger.info("[CACHE] Player profile cache warm scheduled")
+        except Exception as e:
+            logger.warning(f"[CACHE] Failed to warm player profile cache: {e} — will retry later")
+
+        # OPTIONAL: ensure stats cache (KVK) is populated too
+        try:
+            from services.player_stats_cache_service import build_startup, verify_startup
+
+            schedule_bg(
+                "build_player_stats_cache",
+                20.0,
+                build_startup,
+                cancel_on_deadline=False,
+                completion_check=verify_startup,
+            )
+            logger.info("[CACHE] Player stats (KVK) cache build scheduled")
+        except Exception as e:
+            logger.warning(f"[CACHE] Failed to build stats cache (will retry on next cycle): {e}")
+
+        # Last-KVK belongs to the main composition, including pre-entry fallback.
+
+        await cleanup_orphaned_reminders(_startup_loaded_reminder_ids)
+
+        # The reminder scheduler owns DM tracker initialization. Do not reload
+        # its mappings after it has started restoring/scheduling work.
+
+        # Ensure subscription cache is loaded
+        try:
+            load_subscriptions()
+            logger.info("[SUBSCRIPTIONS] Subscription file loaded successfully.")
+        except Exception:
+            logger.exception("[SUBSCRIPTIONS] Failed to load at startup")
+
+        await run_startup_phases(
+            [StartupPhase("ready_event_cache_refresh_loop", _run_ready_event_cache_refresh_loop)]
+        )
+
+        await run_startup_phases(
+            [StartupPhase("ready_view_rehydration", _run_ready_view_rehydration)]
+        )
+        await run_startup_phases(
+            [StartupPhase("ready_domain_scheduler_tasks", _run_ready_domain_scheduler_tasks)]
+        )
+
+        logger.info("[DEBUG] Calling full_startup_sequence...")
+        try:
+            await full_startup_sequence()
+        except Exception:
+            logger.exception("[STARTUP] ❌ full_startup_sequence failed")
+        await start_legacy_reminder_cleanup(
+            task_monitor_create=task_monitor.create,
+            reminder_cleanup_loop=reminder_cleanup_loop,
+        )
+
+        await run_startup_phases(
+            [
+                StartupPhase(
+                    "ready_pinned_calendar_rehydration",
+                    _run_ready_pinned_calendar_rehydration,
+                )
+            ]
+        )
+
+        await run_startup_phases(
+            [StartupPhase("ready_calendar_scheduler_tasks", _run_ready_calendar_scheduler_tasks)]
+        )
+
+    except Exception:
+        logger.exception("[CRITICAL] Exception during on_ready")
+
+
+async def _run_ready_runtime_bootstrap() -> None:
+    # Install the global asyncio loop exception handler once the loop exists.
+    try:
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(global_asyncio_exception_handler)
+        logger.info("[BOOT] Global asyncio exception handler installed on running loop.")
+    except Exception as e:
+        logger.warning(f"[BOOT] Failed to set global loop exception handler: {e}")
+
+    # Defensive: ensure no console handlers linger (QueueHandler only).
+    try:
+        _drop_console_handlers_once()
+    except Exception:
+        pass
+
+
+async def _run_ready_command_sync() -> None:
+    await run_ready_command_sync(bot)
+
+
+async def _run_ready_event_cache_rehydration() -> None:
+    global _startup_loaded_reminder_ids
+    _startup_loaded_reminder_ids = await run_ready_event_cache_rehydration(
+        bot=bot,
+        schedule_bg=schedule_bg,
+    )
+
+
+async def _run_ready_event_scheduler_tasks() -> None:
+    await run_ready_event_scheduler_tasks(
+        start_event_scheduler_tasks=_start_event_scheduler_tasks,
+        wait_for_events=wait_for_events,
+        task_monitor_create=task_monitor.create,
+    )
+
+
+async def _run_ready_view_rehydration() -> None:
+    await run_ready_tracked_view_rehydration(bot=bot, schedule_bg=schedule_bg)
+
+
+async def _run_ready_event_cache_refresh_loop() -> None:
+    await start_event_cache_refresh_loop(refresh_event_cache_task=refresh_event_cache_task)
+
+
+async def _run_ready_domain_scheduler_tasks() -> None:
+    await run_ready_domain_scheduler_tasks(
+        task_monitor_create=task_monitor.create,
+        task_monitor_is_running=task_monitor.is_running,
+        schedule_ark_lifecycle=lambda: schedule_ark_lifecycle(bot),
+        refresh_mge_caches_on_startup=_refresh_mge_caches_on_startup,
+        schedule_mge_lifecycle=lambda: schedule_mge_lifecycle(bot),
+        schedule_voting_lifecycle=lambda: schedule_voting_lifecycle(bot),
+    )
+
+
+async def _run_ready_pinned_calendar_rehydration() -> None:
+    await run_ready_pinned_calendar_rehydration(bot=bot, schedule_bg=schedule_bg)
+
+
+async def _run_ready_calendar_scheduler_tasks() -> None:
+    await run_ready_calendar_scheduler_tasks(
+        task_monitor_create=task_monitor.create,
+        task_monitor_is_running=task_monitor.is_running,
+        schedule_daily_pinned_calendar_refresh=schedule_daily_pinned_calendar_refresh,
+        calendar_reminder_task=calendar_reminder_task,
+    )
+
+
+async def _run_ready_queue_lifecycle() -> None:
+    await run_ready_queue_lifecycle(
+        channel_ids=CHANNEL_IDS,
+        task_monitor_create=task_monitor.create,
+        queue_worker=queue_worker,
+        load_live_queue=load_live_queue_async,
+        update_live_queue_embed=update_live_queue_embed,
+        bot=bot,
+        notify_channel_id=NOTIFY_CHANNEL_ID,
+        queue_cleanup_loop=queue_cleanup_loop,
+        connection_watchdog=connection_watchdog,
+    )
+
+
+async def _run_ready_runtime_services() -> None:
+    from kvk.services.new_source_recovery_service import register_recovery
+    from services.export_coordination_service import register_exports
+    from services.export_runtime_composition import install_configured_runtime
+    from services.legacy_export_snapshot_service import drain_thread
+
+    try:
+        await drain_thread(install_configured_runtime)
+    except Exception as exc:
+        logger.warning(
+            "[BOOT] S11 export admission remains closed error_type=%s", type(exc).__name__
+        )
+    register_recovery(task_monitor)
+    register_exports(task_monitor)
+    from services.processing_outcome_worker import register_processing_outcomes
+
+    register_processing_outcomes(task_monitor)
+    from core.recovery_lifecycle import register_recovery_monitor
+
+    register_recovery_monitor(bot, task_monitor)
+
+    # Start heartbeat now that the loop is running
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        task_monitor.create("heartbeat", heartbeat_loop)
+        logger.info("[BOOT] Heartbeat loop started; writing to %s/heartbeat.json", LOG_DIR)
+    except Exception:
+        logger.exception("[BOOT] Failed to start heartbeat loop")
+
+    try:
+        if not _shutdown_once.is_set() and not health_dashboard_task.is_running():
+            _restore_health_view()
+            health_dashboard_task.start()
+            logger.info("[BOOT] Health dashboard task started")
+    except Exception:
+        logger.exception("[BOOT] Failed to start health_dashboard_task")
+
+    # Start offload monitor as a supervised TaskMonitor task if available
+    try:
+        if monitor_loop_coro is not None:
+            # avoid duplicate creation if already scheduled
+            if not task_monitor.is_running("offload_monitor"):
+                # run with reasonable defaults; adjust via env or later config if needed
+                task_monitor.create(
+                    "offload_monitor",
+                    lambda: monitor_loop_coro(
+                        interval_seconds=int(os.getenv("OFFLOAD_MONITOR_INTERVAL", "300")),
+                        rotate_days=int(os.getenv("OFFLOAD_MONITOR_ROTATE_DAYS", "30")),
+                        max_entries=int(os.getenv("OFFLOAD_MONITOR_MAX_ENTRIES", "2000")),
+                    ),
+                )
+                logger.info("[BOOT] Offload monitor scheduled via TaskMonitor")
+            else:
+                logger.info("[BOOT] Offload monitor already running; skipping schedule")
+    except Exception:
+        logger.exception("[BOOT] Failed to schedule offload monitor")
+
+    # 🔒 Prevent accidental Image.show() calls that invoke tkinter
+    try:
+        from PIL import Image
+
+        def disabled_show(*args, **kwargs):
+            import warnings
+
+            warnings.warn("⚠️ Image.show() disabled to prevent tkinter-based crashes.")
+
+        Image.show = disabled_show
+        logger.info("[BOOT] PIL.Image.show() disabled at startup.")
+    except Exception as e:
+        logger.warning(f"[BOOT] Failed to patch Image.show(): {e}")
+
+    try:
+        clean_old_lock_files(LOG_DIR)
+        logger.info("[LOCK_FILES] Cleared old LOCK Files on Startup")
+    except Exception as e:
+        logger.warning(f"[LOCK_FILES] Failed to clean lock files: {e}")
+
+    # Make sure usage tracking and retention pruning are alive (idempotent)
+    try:
+        start_usage_tracker()
+        logger.info("[BOOT] Usage tracker started.")
+    except Exception:
+        logger.exception("[BOOT] Failed to start usage tracker.")
+
+    try:
+        task_monitor.create("usage_jsonl_prune", usage_jsonl_prune_loop)
+        logger.info(
+            "[BOOT] Usage JSONL prune loop started (retention=%s days).",
+            os.getenv("USAGE_JSONL_RETENTION_DAYS", "30"),
+        )
+    except Exception:
+        logger.exception("[BOOT] Failed to start usage JSONL prune loop.")
+
+    try:
+        if not daily_summary.is_running():
+            daily_summary.start()
+            logger.info("[BOOT] daily_summary loop started")
+    except Exception:
+        logger.exception("[BOOT] Failed to start daily_summary loop")
+
+    if ACTIVITY_TRACKING_ENABLED:
+        try:
+            await run_blocking(ensure_activity_schema)
+            register_activity_listeners(bot)
+            logger.info("[BOOT] Server activity tracking initialized")
+        except Exception:
+            logger.exception("[BOOT] Failed to initialize server activity tracking")
+
+    if SERVER_STATUS_ENABLED:
+        if UTC_CLOCK_CHANNEL_ID:
+            try:
+                if not task_monitor.is_running("utc_clock_channel"):
+                    task_monitor.create(
+                        "utc_clock_channel",
+                        lambda: run_utc_clock_channel_loop(bot),
+                        replace=False,
+                    )
+                    logger.info("[BOOT] UTC clock status channel loop started")
+            except Exception:
+                logger.exception("[BOOT] Failed to start UTC clock status channel loop")
+        else:
+            logger.debug(
+                "[BOOT] UTC clock status channel loop skipped – UTC_CLOCK_CHANNEL_ID not set"
+            )
+
+        if MEMBER_COUNT_CHANNEL_ID:
+            try:
+                if not task_monitor.is_running("member_count_channel"):
+                    task_monitor.create(
+                        "member_count_channel",
+                        lambda: run_member_count_channel_loop(bot),
+                        replace=False,
+                    )
+                    logger.info("[BOOT] Member count status channel loop started")
+            except Exception:
+                logger.exception("[BOOT] Failed to start member count status channel loop")
+        else:
+            logger.debug(
+                "[BOOT] Member count status channel loop skipped – MEMBER_COUNT_CHANNEL_ID not set"
+            )
+
+
+@bot.event
+async def on_disconnect():
+    global LAST_DISCONNECT_UTC
+    LAST_DISCONNECT_UTC = _aware(utcnow())
+    logger.warning("⚠️ Bot disconnected from Discord")
+
+
+@bot.event
+async def on_resumed():
+    global LAST_RESUME_UTC
+    LAST_RESUME_UTC = _aware(utcnow())
+    logger.info("🔄 Bot session resumed")
+
+
+@bot.listen("on_interaction")
+async def _usage_on_interaction(interaction: discord.Interaction):
+    """
+    Passive listener to log button/select/autocomplete usage.
+    Using @bot.listen avoids overriding default routing.
+    """
+    try:
+        await _log_interaction_usage(interaction)
+    except Exception:
+        # Never disrupt Discord's interaction flow
+        pass
+
+
+async def full_startup_sequence():
+    logger.info("[BOOT] Entered full_startup_sequence()")
+    for attempt in range(3):
+        try:
+            logger.warning(f"🤖 Logged in as {bot.user} (ID: {bot.user.id})")
+            logger.warning("✅ Bot is ready.")
+
+            notify_channel = bot.get_channel(NOTIFY_CHANNEL_ID)
+            if not notify_channel:
+                logger.error(f"❌ Could not find notify channel ID {NOTIFY_CHANNEL_ID}")
+                return
+
+            if os.path.exists(LAST_RESTART_INFO):
+                try:
+                    with open(LAST_RESTART_INFO, encoding="utf-8") as f:
+                        data = json.load(f)
+                        restart_time = _aware(datetime.fromisoformat(data.get("timestamp", "")))
+                        user_id = data.get("user_id", "SYSTEM")
+                        reason = data.get("reason", "manual")
+
+                    uptime_seconds = (_aware(utcnow()) - restart_time).total_seconds()
+                    uptime_str = str(timedelta(seconds=int(uptime_seconds)))
+
+                    embed = discord.Embed(
+                        title="✅ Bot Restarted Successfully",
+                        description=f"The bot is back online after **{uptime_str}** of downtime.",
+                        color=0x2ECC71,
+                    )
+                    embed.add_field(name="Triggered By", value=f"<@{user_id}>", inline=False)
+                    embed.add_field(name="Reason", value=reason, inline=False)
+                    embed.add_field(name="Uptime", value=uptime_str, inline=False)
+                    embed.timestamp = _aware(utcnow())
+                    await notify_channel.send(embed=embed)
+
+                    await append_csv_line(
+                        RESTART_LOG_FILE,
+                        [_aware(utcnow()).isoformat(), reason, user_id, "success", "", reason, ""],
+                    )
+                    prune_restart_log()
+                except Exception as e:
+                    logger.warning(f"[RESTART] Failed to process last_restart.json: {e}")
+                finally:
+                    try:
+                        os.remove(LAST_RESTART_INFO)
+                    except Exception as e:
+                        logger.warning(f"[RESTART] Failed to remove last_restart.json: {e}")
+
+            elif os.path.exists(LAST_SHUTDOWN_INFO):
+                try:
+                    with open(LAST_SHUTDOWN_INFO, encoding="utf-8") as f:
+                        data = json.load(f)
+                    shutdown_time = _aware(datetime.fromisoformat(data.get("timestamp", "")))
+                    reason = data.get("reason", "graceful shutdown")
+
+                    uptime_seconds = (_aware(utcnow()) - shutdown_time).total_seconds()
+                    uptime_str = str(timedelta(seconds=int(uptime_seconds)))
+
+                    embed = discord.Embed(
+                        title="💤 Graceful Server Restart Detected",
+                        description=f"The bot was cleanly shut down and restarted after **{uptime_str}** of downtime.",
+                        color=0x3498DB,
+                    )
+                    embed.add_field(name="Triggered By", value="shutdown bot", inline=False)
+                    embed.add_field(
+                        name="Reason", value="graceful shutdown before server restart", inline=False
+                    )
+                    embed.add_field(name="Uptime", value=uptime_str, inline=False)
+                    embed.timestamp = _aware(utcnow())
+                    await notify_channel.send(embed=embed)
+
+                    logger.info(f"[BOOT] Reported graceful restart after shutdown: {data}")
+                    os.remove(LAST_SHUTDOWN_INFO)
+
+                except Exception as e:
+                    logger.warning(f"[RESTART] Could not process LAST_SHUTDOWN_INFO: {e}")
+
+            else:
+                uptime_seconds = (_aware(utcnow()) - START_TIME).total_seconds()
+                uptime_str = str(timedelta(seconds=int(uptime_seconds)))
+                logger.warning(
+                    "[BOOT] No restart or shutdown marker found — assuming crash recovery"
+                )
+                embed = discord.Embed(
+                    title="⚠️ Crash Recovery Detected",
+                    description="The bot has restarted after an unexpected crash.",
+                    color=0xE67E22,
+                )
+                embed.add_field(name="Uptime Since Start", value=uptime_str, inline=False)
+                embed.timestamp = _aware(utcnow())
+                await notify_channel.send(embed=embed)
+
+            try:
+                if os.path.exists(".last_disconnect_reason"):
+                    os.remove(".last_disconnect_reason")
+            except Exception as e:
+                logger.warning(f"[RESTART] Could not remove .last_disconnect_reason: {e}")
+
+            # --- ProcConfig import: schedule in background with explicit start/finish logs ---
+            try:
+                logger.warning("Scheduling ProcConfig import in background.")
+
+                async def _proc_import_wrapper():
+                    # Choose once before entry. Never retry an offload exception via fallback.
+                    if callable(globals().get("run_proc_config_import_offload")):
+                        return await run_proc_config_import_offload(
+                            dry_run=False,
+                            prefer_process=True,
+                            meta={"trigger": "startup"},
+                            source_provenance={"trigger": "startup"},
+                        )
+                    return await run_blocking(
+                        run_proc_config_import, source_provenance={"trigger": "startup"}
+                    )
+
+                # Give it a generous envelope (e.g., 180s) to cover Sheets/SQL work
+                from services.configuration_attempt_recovery import verify_startup_import
+
+                schedule_bg(
+                    "proc_config_import",
+                    180.0,
+                    _proc_import_wrapper,
+                    cancel_on_deadline=False,
+                    completion_check=verify_startup_import,
+                )
+            except Exception as e:
+                logger.error("[BOOT] Failed to schedule ProcConfig import: %s", e)
+
+            for log_file, headers in [
+                (CSV_LOG, ["Timestamp", "Channel", "Filename", "Author", "SavedPath"]),
+                (INPUT_LOG, ["Timestamp", "User", "Kingdom Rank", "Kingdom Seed"]),
+                (
+                    RESTART_LOG_FILE,
+                    [
+                        "Timestamp",
+                        "Reason",
+                        "UserID",
+                        "Status",
+                        "WS_Code",
+                        "WS_Description",
+                        "WS_Timestamp",
+                    ],
+                ),
+                (
+                    SUMMARY_LOG,
+                    [
+                        "Timestamp",
+                        "Channel",
+                        "Filename",
+                        "Author",
+                        "SavedPath",
+                        "Excel Success",
+                        "Archive Success",
+                        "SQL Success",
+                        "Export Success",
+                        "Duration (sec)",
+                    ],
+                ),
+                (
+                    FAILED_LOG,
+                    [
+                        "Timestamp",
+                        "Filename",
+                        "User",
+                        "Rank",
+                        "Seed",
+                        "Excel Success",
+                        "Archive Success",
+                        "SQL Success",
+                        "Export Success",
+                        "Duration (sec)",
+                    ],
+                ),
+            ]:
+                if not os.path.exists(log_file):
+                    needs_header = True
+                else:
+                    try:
+                        with open(log_file, encoding="utf-8") as fh:
+                            first = fh.readline().strip().split(",")
+                        needs_header = first != headers
+                    except Exception as e:
+                        logger.warning(f"[LOG INIT] Could not read {log_file}: {e}")
+                        needs_header = True
+
+                if needs_header:
+                    with open(log_file, "w", newline="", encoding="utf-8") as f:
+                        csv.writer(f).writerow(headers)
+                        logger.info(f"[LOG INIT] Initialized headers for {log_file}")
+
+            await run_startup_phases(
+                [StartupPhase("ready_queue_lifecycle", _run_ready_queue_lifecycle)]
+            )
+
+            # --- CrystalTech config load & validate at startup ---
+            try:
+                report = await init_crystaltech_service(fail_on_warn=False)
+                logger.info("[CRYSTALTECH] %s", report.summary())
+                # Optional: if you want to halt the feature when invalid:
+                if not report.ok:
+                    logger.error(
+                        "[CRYSTALTECH] Validation failed. Feature will remain loaded but flagged until fixed."
+                    )
+            except Exception as e:
+                logger.exception("[CRYSTALTECH] Failed to initialize CrystalTechService: %s", e)
+
+            try:
+                owner = await bot.fetch_user(ADMIN_USER_ID)
+                await owner.send("✅ DL Bot has started and is now online.")
+                logger.warning("📬 Startup DM sent to owner.")
+                logger.info(
+                    f"👀 Monitoring channels: {CHANNEL_IDS}, ACT ID: {ACTIVITY_UPLOAD_CHANNEL_ID}"
+                )
+            except Exception as e:
+                logger.warning(f"❌ Failed to send startup DM: {e}")
+
+            break
+        except Exception as e:
+            logger.error(f"[BOOT] on_ready attempt {attempt + 1} failed: {e}")
+            await asyncio.sleep(5)
+    logger.info("[BOOT] full_startup_sequence completed successfully")
