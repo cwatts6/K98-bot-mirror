@@ -181,9 +181,12 @@ def test_registered_source_family_and_archive_are_exact():
             == m["after_sha256"]
         )
     assert tuple(sorted(verifier.CONTRACT_ARCHIVE_MEMBERS)) == verifier.CONTRACT_ARCHIVE_MEMBERS
-    assert (
-        updater.P02_MAINTENANCE_COMPATIBILITY_PATHS - {"services/configuration_continuation.py"}
-    ) <= set(verifier.CONTRACT_ARCHIVE_MEMBERS)
+    assert {
+        "services/application_maintenance_contract.py",
+        "services/application_maintenance_dal.py",
+        "services/export_runtime_composition.py",
+        "kvk/dal/new_source_import_dal.py",
+    } <= set(verifier.CONTRACT_ARCHIVE_MEMBERS)
     assert {"core/sql_connection_custody.py", "core/sql_operation_policy.py"} <= set(
         verifier.CONTRACT_ARCHIVE_MEMBERS
     )

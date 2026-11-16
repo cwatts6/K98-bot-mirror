@@ -111,6 +111,7 @@ def rows(cursor):
 def transaction(connect):
     from core.sql_connection_custody import (
         SqlCleanupUnknown,
+        connection_retained,
         preserve_failure,
         require_sql_admission,
         retain_connection,
@@ -139,7 +140,7 @@ def transaction(connect):
         committed = True
     except BaseException as error:
         failure = error
-        if not commit_attempted:
+        if not commit_attempted and not connection_retained(connection):
             try:
                 diagnostic_call("rollback", connection.rollback)
             except BaseException as cleanup:

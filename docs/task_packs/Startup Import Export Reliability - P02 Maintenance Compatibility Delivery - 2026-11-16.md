@@ -46,7 +46,9 @@ take the global writer lock: actual producer verification can use a different
 connection from the outer writer admission owner and would otherwise self-block.
 Acquisition refusal does not retry. Lost acquisition/release acknowledgement
 retains connection custody and closes further SQL admission; callers must not
-close retained handles. The helper performs no business SQL or ledger updates.
+close retained handles or roll back their connection. Configuration import,
+KVK import, source transactions and player reporting now honor that custody at
+their outer cleanup boundary. The helper performs no business SQL or ledger updates.
 
 Startup, writer admission, the actual producer cursor and the packaged update
 verifier use the same classifier and collection path. The updater archive keeps
@@ -59,8 +61,9 @@ attempt and explicitly avoids claiming publication/capture/export success.
 The source-only repair is pinned to private predecessor
 `729ece15c2dd665906525a4a457667d53516e805`, the existing three protected startup
 contracts and SQL commit `8a7aace75c55a6d17c9051edef9026dc25355af8`.
-The exact four-member source transition binds both new helpers, runtime
-composition and continuation diagnostics. Every historical transition is retained.
+The exact eight-member source transition binds both new helpers, runtime
+composition, continuation diagnostics and the four producer cleanup owners.
+Every historical transition is retained.
 The only seed amendment is the reviewed policy and review identity; unchanged
 metadata/permission/source pins are checked. Any added SQL or recovery seed work
 is refused. The new sealed verifier validates the exact candidate policy during
@@ -81,6 +84,14 @@ unknown cleanup, no retries and no transaction changes. Delivery tests cover the
 complete source/seed/start/readiness packet, exact predecessor refusal, archive
 imports and rejection of additional SQL/recovery work. Continuation tests prove
 the closed attempt remains linked without dispatch or a success claim.
+
+The initial Changes review and PR #540 review identified the same broader caller
+gap: a retained schema-observation failure could still reach unconditional close
+or rollback in four outer owners. Regression cases inject both lost acquisition
+and lost release through all four real owners. They require the original failure,
+closed admission, retained handles, no business work, no rollback/close and no
+retry. Existing ordinary cleanup/retry tests remain required. Preserve the initial
+review and its immutable head `4bf9730d`; review the correction as a new diff.
 
 Run the full offline pytest suite with native SQL/Windows fault opt-ins disabled,
 log isolation, lint, architecture/deferred/security-routing validators, test

@@ -15,6 +15,7 @@ from constants import (
     SERVER,
     USERNAME,
 )
+from core.sql_connection_custody import connection_retained
 from gsheet_module import run_kvk_proc_exports_with_alerts
 from kvk.dal import kvk_all_import_dal
 from kvk.schemas.kvk_all_schema import SCHEMA_VERSION, KvkAllSchemaValidationError
@@ -157,7 +158,8 @@ def _ingest_validated_workbook(
         )
     finally:
         try:
-            con.close()
+            if not connection_retained(con):
+                con.close()
         except Exception:
             pass
 

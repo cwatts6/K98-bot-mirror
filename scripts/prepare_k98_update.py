@@ -1291,6 +1291,10 @@ P02_D5_COMBINED_PATHS = P02_D4_COMBINED_PATHS | {"player_self_service/stats_runt
 
 P02_MAINTENANCE_COMPATIBILITY_PATHS = frozenset(
     {
+        "proc_config_import.py",
+        "kvk_all_importer.py",
+        "kvk/dal/new_source_import_dal.py",
+        "player_stats_cache.py",
         "services/application_maintenance_contract.py",
         "services/application_maintenance_dal.py",
         "services/configuration_continuation.py",

@@ -448,7 +448,12 @@ def _execute_sp_with_retries(
     max_backoff: float = 10.0,
 ) -> None:
     """Bound each report statement; retry only an acknowledged pre-commit rollback."""
-    from core.sql_connection_custody import SqlCleanupUnknown, custody_snapshot, retain_connection
+    from core.sql_connection_custody import (
+        SqlCleanupUnknown,
+        connection_retained,
+        custody_snapshot,
+        retain_connection,
+    )
     from core.sql_operation_policy import METADATA_LOCK_MILLISECONDS
     from kvk.dal.new_source_import_dal import UncertainCommit
     from services.legacy_export_snapshot_service import (
@@ -496,6 +501,8 @@ def _execute_sp_with_retries(
                     if current_owner() is None:
                         record_writer_completion(procedure="dbo.SP_Stats_for_Upload")
                 except BaseException as original:
+                    if connection_retained(cn):
+                        raise
                     if commit_attempted:
                         raise UncertainCommit(
                             "Read the retained player-report receipt before retrying."

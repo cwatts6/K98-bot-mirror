@@ -24,6 +24,7 @@ from constants import (
     SERVER,
     _conn_import,
 )
+from core.sql_connection_custody import retain_connection_resource
 from gsheet_module import (
     DEFAULT_SHEETS_BACKOFF_FACTOR,
     DEFAULT_SHEETS_MAX_RETRIES,
@@ -1336,8 +1337,9 @@ def run_proc_config_import(
         _set_last_import_report(report)
         return False, report
     finally:
+        retained = conn is not None and retain_connection_resource(conn, cursor)
         try:
-            if cursor:
+            if cursor and not retained:
                 try:
                     cursor.close()
                 except Exception:
@@ -1345,7 +1347,7 @@ def run_proc_config_import(
         except Exception:
             pass
         try:
-            if conn:
+            if conn and not retained:
                 conn.close()
         except Exception:
             pass
