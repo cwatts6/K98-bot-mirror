@@ -282,6 +282,7 @@ def test_fetch_recent_import_history_filters(monkeypatch):
     assert "TOP (25)" in sql
     assert "KVK_NO = ?" in sql
     assert "ImportStatus = ?" in sql
+    assert "[RowCount] AS [RowCount]" in sql
     assert params == (13, "failed")
 
 

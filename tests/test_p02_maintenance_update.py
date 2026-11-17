@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_all_90_previous_transitions_remain_immutable():
     transitions = updater.reviewed_transitions()
-    assert len(transitions) == 91
-    assert transitions[-1]["id"] == "p02_maintenance_compatibility_v1"
+    assert len(transitions) == 92
+    assert transitions[-2]["id"] == "p02_maintenance_compatibility_v1"
     assert hashlib.sha256(json.dumps(transitions[:90], sort_keys=True).encode()).hexdigest() == (
         "06255ea6b75c30801cc080b41c405d0489bd67bb6554b451f04b565158057ec7"
     )
@@ -195,7 +195,9 @@ def test_complete_source_seed_start_readiness_packet_never_replays_sql(tmp_path,
     )
 
 
-def test_registered_source_family_and_archive_are_exact():
+def test_historical_registered_source_family_and_current_archive_are_exact():
+    from tests.updater_source_assertions import before_schema_transaction_fix_hash
+
     family = next(
         t
         for t in updater.reviewed_transitions()
@@ -203,10 +205,7 @@ def test_registered_source_family_and_archive_are_exact():
     )
     assert {m["path"] for m in family["members"]} == updater.P02_MAINTENANCE_COMPATIBILITY_PATHS
     for m in family["members"]:
-        assert (
-            updater.sha256((ROOT / m["path"]).read_bytes().replace(b"\r\n", b"\n"))
-            == m["after_sha256"]
-        )
+        assert before_schema_transaction_fix_hash(ROOT, m["path"]) == m["after_sha256"]
     assert tuple(sorted(verifier.CONTRACT_ARCHIVE_MEMBERS)) == verifier.CONTRACT_ARCHIVE_MEMBERS
     assert {
         "services/application_maintenance_contract.py",

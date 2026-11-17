@@ -85,6 +85,12 @@ repos:
         # stages: [pre-push]
   - repo: local
     hooks:
+      - id: validate-sql-identifiers
+        name: Validate SQL reserved identifiers across source inventory
+        entry: python scripts/validate_sql_aliases.py
+        language: system
+        pass_filenames: false
+        files: '\.(py|ps1|sql)$'
       - id: forbid-logging-basicconfig
         name: Forbid logging.basicConfig
         entry: python

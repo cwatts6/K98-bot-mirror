@@ -273,8 +273,20 @@ def test_policy_does_not_mask_unrelated_drift(sample, damage):
 
 
 class Cursor:
-    def __init__(self, outputs, *, failure=None, mode="NoLock", isolation=2):
-        self.connection = SimpleNamespace(autocommit=False)
+    def __init__(
+        self,
+        outputs,
+        *,
+        failure=None,
+        mode="NoLock",
+        isolation=2,
+        transaction_count=0,
+        transaction_mode="NoLock",
+        autocommit=False,
+    ):
+        self.connection = SimpleNamespace(autocommit=autocommit)
+        self.transaction_count = transaction_count
+        self.transaction_mode = transaction_mode
         self.outputs, self.failure, self.mode, self.isolation = outputs, failure, mode, isolation
         self.calls, self.answer, self.held = [], None, False
 
@@ -290,7 +302,17 @@ class Cursor:
             self.answer = (-1,) if self.failure == "busy" else (0,)
             self.held = self.failure != "busy"
         elif "dm_exec_sessions" in sql:
-            self.answer = (self.mode, "NoLock", self.isolation)
+            # Model the engine constraint that the former fixture omitted.
+            # Separate SQL shape tests prove the conditional branch; this
+            # simulation is not a substitute for the packet's native proof.
+            conditional = "IF @@TRANCOUNT>0 SET @transaction_mode=APPLOCK_MODE" in sql
+            if not self.transaction_count and "'Transaction'" in sql and not conditional:
+                raise RuntimeError("SQL3918: user transaction required")
+            self.answer = (
+                self.mode,
+                self.transaction_mode if self.transaction_count else "NoLock",
+                self.isolation,
+            )
         else:
             assert self.held
             assert "OPENJSON(?)" in sql and len(args) == 1

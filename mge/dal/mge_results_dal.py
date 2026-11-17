@@ -169,7 +169,7 @@ def _update_import_status(
                 """
                 UPDATE dbo.MGE_ResultImports
                 SET ImportStatus = 'completed',
-                    RowCount = ?,
+                    [RowCount] = ?,
                     UpdatedUtc = ?
                 WHERE ImportId = ?;
                 SELECT @@ROWCOUNT AS Affected;

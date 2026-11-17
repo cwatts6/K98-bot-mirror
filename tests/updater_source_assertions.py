@@ -48,9 +48,24 @@ _D4_CONTRACT_PAIRS = {
 }
 
 
+def before_schema_transaction_fix_hash(root, path):
+    """Test-only exact bridge; production successor registration is still required."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path == "services/application_maintenance_dal.py":
+        assert actual == "1e87fba0ab8b6d35311799dd00b8ce66d9925a950cf3a516c526ee2770c99260", path
+        return "d712f0436d3358662c73fadd2d431c5cee44755342bc6b0cf062894d24055264"
+    return actual
+
+
 def before_p02_maintenance_hash(root, path):
     """Authenticate this successor before exposing its exact retained predecessor."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_schema_transaction_fix_hash(root, path)
+    # Test-only bridge for the exact SQL identifier correction. Preserve the
+    # historic MGE transition; a production successor transition is separately
+    # required at release pinning. This does not authorize installation.
+    if path == "mge/dal/mge_results_dal.py":
+        assert actual == "af56bf6f2a748bf4d1040248c22bc17a7032e51bffb80977356a21574dd6b64e", path
+        return "d65edd74bd66e4182e5afc46d77947a9b59566653cc3664ce68ab817b3db35da"
     if path not in prepare_k98_update.P02_MAINTENANCE_COMPATIBILITY_PATHS:
         return actual
     # Authenticate the complete new source family before exposing its retained

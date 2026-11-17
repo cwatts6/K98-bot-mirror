@@ -207,6 +207,51 @@ Do not ship changes with only:
 
 ## 11. Delivery Expectations
 
+### SQL query inventory regression (P02, 2026-11-17)
+
+Run `python scripts/validate_sql_aliases.py` for SQL-bearing changes. The pre-commit
+hook and ordinary pytest regression discover tracked and untracked Python,
+PowerShell and SQL source; they do not maintain a list of yesterday's affected
+files. This lexical guard catches the known reserved-identifier family, including
+bare `RowCount` columns. It is not a general SQL Server grammar test.
+
+Grouped P02 packet preparation also requires `scripts/p02_sql_inventory.py` and
+the local Microsoft ScriptDom parser through `scripts/Test-P02SqlGrammar.ps1`.
+Static queries at execution interfaces are discovered automatically. New dynamic
+lab expressions require a reviewed materializer; SQL-like literals through other
+wrappers and new SQL in host/guest orchestration must not bypass the inventory.
+Test new files, concatenation, f-strings, leading comments, CTEs, and failure/final
+accounting branches. Check generated SQL with an independent parser rather than
+only asserting text also written by the implementation. A missing parser blocks
+packet preparation; it must not become a successful skip.
+
+Keep complete-batch grammar results separate from forwarding sites, retained
+dynamic SQL evidence, header/assembly fragments, schema validation and native
+execution. Preserve the actual inventory, tooling and hashes with the packet.
+See the [SQL inventory correction review](../task_packs/P02%20-%20SQL%20Inventory%20Correction%20Review%20-%202026-11-17.md).
+
+### Catalogue collation regression (P02, 2026-11-17)
+
+A valid SQL parse and a mocked cursor result do not prove that SQL Server can bind
+the query against the actual server and database collations. Restored preparation
+v1 failed with error 451 because it combined server and database principal names
+with UNION ALL. For existence checks, prefer EXISTS with a numeric result over
+combining text that the caller never uses. Do not change database collation to
+make a diagnostic query pass.
+
+The packet SQL inventory now invokes `scripts/p02_sql_collation.py` automatically.
+Set operations involving distinct sys catalogue sources require an exact-query
+review in `scripts/p02_sql_collation_reviews.json`; additions and text changes
+cannot inherit a previous review. This is a conservative offline review trigger,
+including sys.databases and explicit master references, not a general SQL type
+checker. Whole-batch false positives need a concrete explanation of why no text
+crosses catalogue boundaries. It is not a new runtime or production guard.
+
+Retain tests using the actual failed query, newly discovered helper files,
+UNION/UNION ALL/INTERSECT/EXCEPT, quoted identifiers, comments, parser-only callers
+and invalidated review hashes. Separately record native binding, schema and
+permission evidence; never label syntax success as native compatibility proof.
+
 ### Installed updater dependency regression (P02 D6)
 
 Test sealed verifier imports against an application root that lacks newly added
@@ -260,3 +305,99 @@ For protected filesystem/updater changes, cover production-like inheritance/defa
 
 The [Windows ownership and access contract](Windows%20ownership%20and%20access%20contract.md)
 is required reading for this work and defines the operation matrix and validation details.
+
+For a test runner that changes Windows identity, test the complete dependency
+access path: working/source directories, dependency environment, required native
+modules and actual imports. Development-account imports and substituted identity
+APIs prove packaging only. An actual restricted child must establish access before
+fixture/data installation; an administrator's successful probe is not equivalent.
+Offline regressions should cover a dependency tree readable by an older account
+but not the new actor, preservation of existing ACLs/ownership, read-only grants,
+and failure diagnostics containing the exact safe path, operation and OS code
+without credentials. Keep real-account proof explicitly pending until observed.
+Use reusable lab fixtures and recorded attempts; do not infer that every setup
+failure requires production-style recovery machinery or new infrastructure.
+
+### Installation evidence must match the environment
+
+Production deployment-history rows and separate lab qualification receipts are
+different evidence types. Before introducing an acceptance guard, trace its
+expected facts to the actual environment's installation path and retained
+evidence. A lab that ran reviewed SQL directly must not be required to possess
+deployment-history rows its installer never writes. Do not fabricate those rows
+or weaken the independent schema, permission or ownership checks to compensate.
+
+Regression coverage must include a hash-pinned retained-history case, not only a
+success fixture that repeats the new guard's assumptions. Test missing production
+history with valid lab lineage, invalid lineage, and incorrect current object
+definitions independently. Production history requirements remain unchanged.
+Receipt tests must distinguish completed actions from later verification failure
+and connection disposition, so a failed check cannot imply that a committed
+restore or other completed action should be repeated.
+
+Exercise that distinction through every downstream verifier, including the fresh
+process and sealed archive used by the final check. A baseline-only test cannot
+prove that a later production-history guard accepts an approved lab installation.
+`tests/test_p02_lab_evidence_verifier.py` replays all three contract comparisons
+against pinned retained evidence and tests each legacy observation category
+independently. Actual observations must remain unmodified; any lab-only projection
+belongs in the independently validated expectation. Confirm the production
+verifier still rejects missing production receipts. Save observations before
+comparison and include safe mismatch categories in failure receipts.
+
+### Shared SQL helpers must cover transaction state
+
+For transaction-sensitive SQL functions, test both zero and nonzero server
+transaction counts independently of the driver's autocommit setting. Manual
+commit mode does not prove that a transaction is active. Review every caller,
+including startup/updater verification and business cursors borrowed by import,
+reporting and recovery paths. Do not start a transaction in a wrapper merely to
+hide an invalid shared-helper precondition.
+
+For `schema_observation`, preserve caller transaction count, isolation and
+existing locks. Model SQL3918 for an unconditional transaction-owned
+`APPLOCK_MODE` call without a transaction; verify the original query fails that
+model. Cover refusal of session/transaction-owned locks and unknown acquisition
+or release. The caller inventory test must flag new direct helper/contract/
+producer entry points for review. Query discovery and grammar checks are useful
+but do not establish engine semantics. A prepared native probe must execute the
+real shared helper in both states on its own connection and record before,
+inside and after state; keep native acceptance pending until receipts pass.
+Tests: `test_application_schema_transaction_states.py` and
+`test_p02_transaction_probe.py`.
+
+### Retained evidence and maintenance controls
+
+Replay real retained observations through the same scalar encoding used by the
+receipt writer before comparing SQL values to saved JSON. Include dates,
+datetimes, decimals and bytes; prove that real value changes still fail. Keep raw
+SQL observations for comparisons within a single run. An all-string fixture
+cannot detect a native SQL date versus JSON string mismatch.
+
+Before holding an artificial blocker for a maintenance test, inspect the actual
+worker's access order and lock timeout. A worker that touches the blocked table
+before acquiring its schema guard may fail before the intended assertion. Use
+the exact guard as a deterministic refusal control and run the real worker after
+acknowledged release when that is the reviewed claim; do not describe those
+separate checks as proof of simultaneous worker/observer overlap. Check process
+receipt labels against the actual connection mode as well as child exit status.
+Coverage: `test_p02_restored_qualification.py`, including retained preflight/final
+replay, exact packet imports and native PowerShell flow with effects replaced.
+
+### Complete evidence transport, not only individual cases
+
+Exercise the actual orchestration return through the actual completion emitter
+with production-sized retained observations. Passing each case receipt does not
+prove that an aggregate completion message fits the transport limit. Keep full
+evidence once and return a compact manifest of event/occurrence references;
+the host inventory hashes bind the saved bytes. Do not hash a Python value and
+assume it matches a PowerShell-reserialized receipt (float precision and escaping
+can differ). Failed emissions must not create successful references.
+
+Test one byte below, at and above the unchanged receipt byte limit, plus the real
+retained oversized aggregate. Parent protocol tests with tiny synthetic values
+are useful for sequencing but do not cover payload size. Completion-only packets
+must prove that invalid retained pins or child identity stop before retirement,
+and that failed retirement or verification cannot reach later checks. Preserve
+completed case receipts and do not replay business writes to recover a summary.
+Coverage: `test_p02_completion_receipts.py` and `test_p02_completion_packet.py`.

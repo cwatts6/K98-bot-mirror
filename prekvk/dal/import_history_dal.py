@@ -117,7 +117,7 @@ def fetch_recent_import_history(
             HashPrefix,
             ImportStatus,
             Phase,
-            [RowCount] AS RowCount,
+            [RowCount] AS [RowCount],
             ScanID,
             ErrorType,
             ErrorText,

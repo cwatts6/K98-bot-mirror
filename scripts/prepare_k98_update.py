@@ -1301,6 +1301,11 @@ P02_MAINTENANCE_COMPATIBILITY_PATHS = frozenset(
         "services/export_runtime_composition.py",
     }
 )
+P02_QUALIFIED_COMPATIBILITY_PATHS = P02_MAINTENANCE_COMPATIBILITY_PATHS | {
+    "mge/dal/mge_results_dal.py",
+    "prekvk/dal/import_history_dal.py",
+}
+P02_QUALIFIED_TRANSITION = "p02_maintenance_qualified_v1"
 
 
 def reviewed_transitions():
@@ -1318,7 +1323,14 @@ def reviewed_transitions():
         raise ValueError("Unsupported installed transition registry.")
     if (
         not isinstance(value["transitions"], list)
-        or len(value["transitions"]) > 91
+        or len(value["transitions"]) > 92
+        or (
+            len(value["transitions"]) == 92
+            and not any(
+                isinstance(t, dict) and t.get("id") == P02_QUALIFIED_TRANSITION
+                for t in value["transitions"]
+            )
+        )
         or (
             len(value["transitions"]) == 91
             and not any(
@@ -1443,6 +1455,8 @@ def reviewed_transitions():
             fixed_p02_compatibility = (
                 item["id"] == "p02_maintenance_compatibility_v1"
                 and path in P02_MAINTENANCE_COMPATIBILITY_PATHS
+            ) or (
+                item["id"] == P02_QUALIFIED_TRANSITION and path in P02_QUALIFIED_COMPATIBILITY_PATHS
             )
             fixed_p02_phase1 = (
                 item["id"] == "p02_phase1_sql_exports_v1" and path in P02_PHASE1_SQL_EXPORT_PATHS
@@ -1725,6 +1739,8 @@ def reviewed_transitions():
                     continue
                 if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
                     raise ValueError("Exact reviewed protocol hashes required.")
+        if item["id"] == P02_QUALIFIED_TRANSITION and paths != P02_QUALIFIED_COMPATIBILITY_PATHS:
+            raise ValueError("Complete fixed qualified maintenance transition required.")
         if (
             item["id"] == "p02_maintenance_compatibility_v1"
             and paths != P02_MAINTENANCE_COMPATIBILITY_PATHS
@@ -3205,9 +3221,12 @@ def prepare_update(
             raise ValueError("Application contract repair cannot combine another SQL release")
         repair, build_transition = application_repair
         if repair["id"] == "p02_maintenance_compatibility_v1":
-            family = next(t for t in reviewed_transitions() if t["id"] == repair["id"])
-            if not matches_protocol_transition(
-                family, read_blob, config["before"], config["target"]
+            # Both direct source pairs amend the same exact deployed seed. Keep
+            # the original family immutable; never compose intermediate releases.
+            if not any(
+                matches_protocol_transition(t, read_blob, config["before"], config["target"])
+                for t in reviewed_transitions()
+                if t["id"] in {repair["id"], P02_QUALIFIED_TRANSITION}
             ):
                 raise ValueError("Exact maintenance compatibility source family required")
         mge_contracts = build_transition(config["before"], previous["bot-template.json"])

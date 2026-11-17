@@ -41,3 +41,14 @@ def test_import_identity_is_returned_by_insert_batch(monkeypatch):
 def test_import_missing_identity_fails_transaction_callback(monkeypatch, result):
     with pytest.raises(RuntimeError, match="INSERT returned no ImportId"):
         create_batch(monkeypatch, ImportCursor(result))
+
+
+def test_import_completion_quotes_reserved_column_and_preserves_binding(monkeypatch):
+    cursor = ImportCursor()
+    monkeypatch.setattr(cursor, "fetchone", lambda: (1,))
+    monkeypatch.setattr(mge_results_dal, "exec_with_cursor", lambda fn: fn(cursor))
+    mge_results_dal.mark_import_completed(37, 23)
+    query, parameters = cursor.calls[0]
+    assert "[RowCount] = ?" in query
+    assert parameters[0] == 23 and parameters[2] == 37
+    assert len(parameters) == query.count("?") == 3

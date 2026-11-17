@@ -27,8 +27,15 @@ def schema_observation(cursor):
 
     require_sql_admission()
     cursor.execute(
+        # Transaction-owned APPLOCK_MODE raises SQL3918 without a user
+        # transaction. Branch in SQL on actual session state, not the driver's
+        # autocommit flag (manual mode need not have started a transaction yet).
+        # IF keeps the function out of the no-transaction execution path.
+        "DECLARE @transaction_mode nvarchar(32)=N'NoLock'; "
+        "IF @@TRANCOUNT>0 "
+        "SET @transaction_mode=APPLOCK_MODE('public',?,'Transaction'); "
         "SELECT APPLOCK_MODE('public',?,'Session'),"
-        "APPLOCK_MODE('public',?,'Transaction'),transaction_isolation_level "
+        "@transaction_mode,transaction_isolation_level "
         "FROM sys.dm_exec_sessions WHERE session_id=@@SPID",
         RESOURCE,
         RESOURCE,

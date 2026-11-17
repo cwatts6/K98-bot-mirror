@@ -60,3 +60,23 @@ existing emitted-DAL `[RowCount]` check and the preview alias regression in
 T-SQL parser. The existing opt-in compiler restriction above remains unchanged.
 
 Core guidance: [Coding Execution Guidelines, SQL comparison and accounting](../K98%20Bot%20-%20Coding%20Execution%20Guidelines.md#comparing-submitted-sql-with-stored-procedure-definitions).
+
+## Recurrence and enforcement correction — 2026-11-17
+
+The grouped P02 lab preflight emitted `AS RowCount` again. The previous tests
+enumerated older query sites, while the new test mocked the cursor and asserted
+the invalid SQL text itself. Documentation and those passing assertions did not
+enforce the rule across new queries. This was a coverage and review failure.
+
+The broader review corrected three lab sites, an older PreKvK history alias and
+an older MGE completion update using a bare `RowCount` column. The runtime changes
+only delimit identifiers. The failed attempt and its unsettled accounting remain
+preserved; no replay or cleanup is implied.
+
+The new repository-wide lexical gate, automatic packet query inventory, mandatory
+offline Microsoft SQL grammar gate and adversarial discovery tests are described
+in [Testing Standards](../K98%20Bot%20-%20Testing%20Standards.md#sql-query-inventory-regression-p02-2026-11-17).
+The parser checks complete emitted batches, including nested migration module
+bodies; it does not establish live schema binding, permissions, execution or
+delivery. Retained dynamic statements and incomplete fragments remain explicitly
+identified rather than counted as parser passes.
