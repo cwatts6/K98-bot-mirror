@@ -118,6 +118,20 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     )
 
     for transition in update.reviewed_transitions():
+        if transition["id"] == update.P02_QUALIFIED_TRANSITION:
+            # This is a complete direct jump from the deployed D6 image, not
+            # the next link in the older linear histories checked below.
+            # Authenticate both real endpoints without rebasing those histories.
+            from tests.test_p02_qualified_release import blobs
+
+            data = blobs()
+            assert {m["path"] for m in transition["members"]} == (
+                update.P02_QUALIFIED_COMPATIBILITY_PATHS
+            )
+            assert update.matches_protocol_transition(
+                transition, lambda *key: data.get(key), "old", "new"
+            )
+            continue
         if transition["id"] == update.D4_CONTRACT_TRANSITION:
             # The combined installed-to-D4 jump spans the historical chains below.
             # Authenticate its complete current image independently, retaining
