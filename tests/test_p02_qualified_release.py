@@ -30,7 +30,9 @@ def blobs():
         result["new", path] = (ROOT / path).read_bytes()
         if member["before_sha256"] is not None:
             for base in BASES:
-                probe = subprocess.run(["git", "show", base + ":" + path], capture_output=True)
+                probe = subprocess.run(
+                    ["git", "show", base + ":" + path], cwd=ROOT, capture_output=True
+                )
                 if probe.returncode == 0:
                     result["old", path] = probe.stdout
                     break
