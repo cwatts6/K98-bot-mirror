@@ -1,0 +1,1894 @@
+{
+  "qualification_date": "2026-10-28",
+  "status": "complete_for_named_cases",
+  "sql_version": "16.0.1210.3",
+  "schema_revision": "7e91989f619deb46836194c7e705b0a9eb2ebe11",
+  "schema_sha256": {
+    "dbo.MGE_Variants.Table.sql": "6b2a3ef1f9be67dafa0a53c8ecd1aba97429cfcaffc8b616ebbee6ab9bc8c296",
+    "dbo.MGE_Commanders.Table.sql": "494dc7e67b3c53ee8c20bb2f858b1aa2f5e5c4c0f8cb377382e071806be8b0b4",
+    "dbo.MGE_Events.Table.sql": "d533d4f73b97ce23f0b930562ff8b6b8cbd55e0678f46bbd2bb6ef23ccd70b0d",
+    "dbo.MGE_Signups.Table.sql": "e8b18aac0da31c9ff6780e103cce0c78398b62bf68c10234938bd8b28db81f78",
+    "dbo.MGE_SignupAudit.Table.sql": "fb73ac4d5972582cafd9d3be9a15adc5b94b539df2a045e46cf4606946bd0a67",
+    "dbo.MGE_Awards.Table.sql": "e1216cf680dbdf86d0f04313930101c21a6a8ff1787fdabc4a9705cdda2b6c99",
+    "dbo.MGE_AwardAudit.Table.sql": "c616bcae2b0955d27d6175156eec29dd462aa002b915787a8b314e50e37860b9"
+  },
+  "source_sha256": {
+    "bot_instance.py": "6b9fefa805e52cb7c285eadbed88a72d9d4fdc5c3b5b3b06adfe0d5e599ff646",
+    "core/coalesced_work.py": "2ad9cd8d09bc8d2c3c2eebf779a3af8e4a009f4c25fba42f5a2b49b81dee9e1e",
+    "core/interaction_safety.py": "9142fd9cebcb475582d7ff8b5b74fb7dd9dffd1c02af81e08ad70206241e7c7c",
+    "core/operation_outcome.py": "5d03ed01d0aabb6ba874e93b64bdac635a0f939dff9969cf5327ce9708b6376e",
+    "core/owned_work.py": "1c0a51b42003b8bcf407c78340bbe4e640b9dc8e9818bf28ccf8b75a29d900f9",
+    "mge/dal/mge_roster_dal.py": "bf158a69f64179f5a748f5bdf5d058d69ec5ca31954b23819619bdbf15cf83c5",
+    "mge/dal/mge_signup_dal.py": "ef2e348a54cf15994f0e046b45edbea81aa71576d7a1a7869710f88d143ce839",
+    "mge/dal/mge_signup_mutation_dal.py": "548a050f127a579a4fee3340c053c15d58d7e58512ca3eee6d05e83ff0ddee35",
+    "mge/mge_board_delivery_adapter.py": "b1e4194adcd9d129b148a1131eca7959ffc650f25ec84c6e2364149e8afad209",
+    "mge/mge_embed_manager.py": "7ce9e4bb622d1438a638463dd16a0dca8e38bc3b5d4ad2a42b005f5a046629f8",
+    "mge/mge_roster_execution.py": "4edc226c66f7ac724b3b0e43ffe804cf1cad13f4d26314097cc9b26d30e01ead",
+    "mge/mge_scheduler.py": "5d6d411636922fa61f0bc8af70fe7e08a6ce319b7319f2d180c47bb45b712259",
+    "mge/mge_signup_service.py": "62308cafa9be57fcfc5d64289f5a8bd43ec544051c158e6138f0205a3002dd5c",
+    "services/event_delivery_service.py": "922d6ef1fcc7017946c7bcba8bde0395486fec6fc06f3a7c56d7d5a29dbf1fe4",
+    "services/legacy_export_snapshot_service.py": "d3cd0a44b4707f9eb9c8f4c120cd1f94fd11daa8d421cefb27147abef1605942",
+    "ui/views/mge_admin_completion_view.py": "328571488be0e80fae26a69c3d6aa41b83b19c2541379a84208cc319320a9db5",
+    "ui/views/mge_admin_view.py": "29d8618ea778092f9f091d03568329ff02382a864586432d361387abcaae20a3",
+    "ui/views/mge_commander_admin_view.py": "8be4c07524be59db367bebe2792697961947d7d2e8e6faa482b3277c09e9298b",
+    "ui/views/mge_publish_view.py": "0df8da2d0e6338970f424d2ab9df89ee6477651eddf3b2c0e025c6afe67a7e15",
+    "ui/views/mge_roster_builder_view.py": "4a43c04ba1c4e8b5c0792429ea91055983477836d1442d02ff8356c6c25350f7",
+    "ui/views/mge_rules_edit_view.py": "6cb9fd02fa5aa5accbb0a3c7103538cb84067fb6970d6f9ddd1bbe24942ac4a3",
+    "ui/views/mge_signup_modal.py": "c7359381461905fd0202639995aa16d750fb40023857ffd98f24c2fbc884b63a",
+    "ui/views/mge_signup_view.py": "27018bc212e64584c16b741ccb72eb7cb6c9deedda7b1ba72c5a8aa02e52d914",
+    "ui/views/mge_simplified_leadership_view.py": "295c9469fd9bc2abfa1701023493b06ef37dc4f41af34cd4747623e1b959d1f3",
+    "ui/views/mge_simplified_signup_form_view.py": "4b918e9a9b40e9bf8af90e9d2dda7b18f1611ea9b215aa886a3c45235031d6a7",
+    "ui/views/mge_simplified_signup_view.py": "d41a42bb780efa1740c2c4c1a0b178413671879eee8d8711ccc749772fa7914d",
+    "ui/views/prepared_modal_view.py": "e26c0f39e71aa2b4f18d2c0b3144e2a174ae05ff654319491f3d9d19e69fb2b6"
+  },
+  "harness_sha256": {
+    "mge_native_qualification.py": "4d9fc284c9ab552a466f12dfed0d40fe50c45b589e8739e2fc52c7f06947cf24",
+    "mge_native_costs.py": "c0c5172a37abd771fe378014c84b096b22d88ceb13b276ac25c1707bd65f0e41"
+  },
+  "target": {
+    "database": "K98_P1_MGE_Qualification_20261028",
+    "tables": [
+      "MGE_AwardAudit",
+      "MGE_Awards",
+      "MGE_Commanders",
+      "MGE_Events",
+      "MGE_SignupAudit",
+      "MGE_Signups",
+      "MGE_Variants"
+    ],
+    "recovery_model": "SIMPLE",
+    "broker_enabled": false,
+    "retained": true
+  },
+  "method": {
+    "duration": "22 create/edit/withdraw cycles per mode; first 2 warm-up, 20 measured; nearest-rank p95. Local warm database, sequential baseline then candidate, ODBC pooling unchanged. Duration surrounds real DAL persistence workflow, excluding UI/service/provider reads.",
+    "baseline": "Reconstructed original separate DAL calls using preserved SQL statements; same guarded factory and synthetic inputs; fixture explicitly closes legacy context-managed connections.",
+    "withdrawal": "Duration/read-cost fixture has no award to remove. Required award cleanup and audit atomicity are separately exercised with an award in fault-injection cases.",
+    "costs": "Separate 20-cycle runs after plan fixture, using logical_reads/cpu_time/reads/writes deltas from sys.dm_exec_sessions around each connection. Aggregate across an operation. Observer connections excluded. Observer overhead means timings from this pass are not used.",
+    "plans": "Actual STATISTICS XML and IO/TIME for exact receipt lookup at 0/100/1000 event audit rows; existing indexes; no forced plan, schema change, statistics reset or cache flush.",
+    "limits": [
+      "SQL CPU millisecond resolution produces mostly zero; not zero CPU cost.",
+      "Local fixture timings are not production speed guarantees or live Discord end-to-end benchmarks.",
+      "Lock gating proves ownership; it is not a production contention load test.",
+      "Maximum 3 concurrent mutation workers; no deadlock or timeout observed in named cases."
+    ]
+  },
+  "cases": [
+    {
+      "name": "create commits signup and audit",
+      "passed": true
+    },
+    {
+      "name": "edit commits with audit",
+      "passed": true
+    },
+    {
+      "name": "native rollback: UPDATE dbo.MGE_Signups",
+      "passed": true,
+      "outcome": "rolled_back"
+    },
+    {
+      "name": "native rollback: DELETE FROM dbo.MGE_Awards",
+      "passed": true,
+      "outcome": "rolled_back"
+    },
+    {
+      "name": "native rollback: INSERT INTO dbo.MGE_AwardAudit",
+      "passed": true,
+      "outcome": "rolled_back"
+    },
+    {
+      "name": "native rollback: INSERT INTO dbo.MGE_SignupAudit",
+      "passed": true,
+      "outcome": "rolled_back"
+    },
+    {
+      "name": "rollback acknowledgement failure stays unknown",
+      "passed": true,
+      "outcome": "unknown"
+    },
+    {
+      "name": "lost commit acknowledgement stays unknown after real commit",
+      "passed": true,
+      "outcome": "unknown"
+    },
+    {
+      "name": "exact native receipt reconciles without replay",
+      "passed": true
+    },
+    {
+      "name": "stale edit and published event rejected natively",
+      "passed": true
+    },
+    {
+      "name": "unrelated native event progresses while owner held",
+      "passed": true,
+      "elapsed_ms": 4.794600000423088
+    },
+    {
+      "name": "two native creates preserve unique active signup",
+      "passed": true,
+      "outcomes": [
+        "committed",
+        "rolled_back"
+      ],
+      "observed_wait_types": [
+        "LCK_M_U"
+      ],
+      "blocking_owner_matched": true
+    },
+    {
+      "name": "withdrawal prevents a following roster insert",
+      "passed": true,
+      "observed_wait_types": [
+        "LCK_M_U"
+      ],
+      "blocking_owner_matched": true
+    },
+    {
+      "name": "competing native roster insert admits one rank",
+      "passed": true
+    },
+    {
+      "name": "all observed fixture connections closed",
+      "passed": true
+    }
+  ],
+  "duration_benchmarks": {
+    "baseline_separate_transactions": {
+      "create": {
+        "samples_ms": [
+          1.6906999999264372,
+          2.2678000004816568,
+          1.9753000005948707,
+          1.9690999997692415,
+          1.840500000071188,
+          1.7206000002261135,
+          1.7020000004777103,
+          1.9579999998313724,
+          1.6342999997505103,
+          1.6709999999875436,
+          2.0569999996951083,
+          1.6439999999420252,
+          1.719700000649027,
+          2.2531999993589125,
+          1.6980999998850166,
+          1.686600000539329,
+          2.0204000002195244,
+          1.7742999998517917,
+          1.7452000001867418,
+          4.686300000685151
+        ],
+        "median_ms": 1.7597500000192667,
+        "p95_ms": 2.2678000004816568,
+        "costs": [
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 3,
+            "commits": 2
+          }
+        ]
+      },
+      "edit": {
+        "samples_ms": [
+          1.5536999999312684,
+          1.85090000013588,
+          1.7702000004646834,
+          1.7298000002483604,
+          1.6193000001294422,
+          1.6050000003815512,
+          1.5543999998044455,
+          1.5474000001631794,
+          1.530800000182353,
+          1.5241999999489053,
+          1.57630000012432,
+          1.4741999993930222,
+          1.5515999994022422,
+          1.7192999994222191,
+          1.4752000006410526,
+          1.5231999996103696,
+          1.8689999997150153,
+          1.582300000336545,
+          2.3443000000042957,
+          1.920800000334566
+        ],
+        "median_ms": 1.5793000002304325,
+        "p95_ms": 1.920800000334566,
+        "costs": [
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          },
+          {
+            "connections": 2,
+            "statements": 2,
+            "commits": 2
+          }
+        ]
+      },
+      "withdraw": {
+        "samples_ms": [
+          2.1665000003849855,
+          2.1219999998720596,
+          2.09409999933996,
+          2.4728999997023493,
+          1.7618000001675682,
+          1.7222999995283317,
+          2.563199999713106,
+          1.7416999999113614,
+          1.7711000000417698,
+          2.2146999999677064,
+          1.7555000003994792,
+          1.6865000006873743,
+          2.110700000230281,
+          1.8109000002368703,
+          1.6924999999901047,
+          2.022399999987101,
+          1.8743000000540633,
+          1.8225999992864672,
+          2.147000000150001,
+          1.9083000006503426
+        ],
+        "median_ms": 1.891300000352203,
+        "p95_ms": 2.4728999997023493,
+        "costs": [
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          },
+          {
+            "connections": 3,
+            "statements": 3,
+            "commits": 3
+          }
+        ]
+      }
+    },
+    "candidate_atomic": {
+      "create": {
+        "samples_ms": [
+          2.2712999998475425,
+          1.7370000005030306,
+          1.5420999998241314,
+          1.4883000003464986,
+          1.6328000001522014,
+          1.6415999998571351,
+          1.5827999995963182,
+          1.6918999999688822,
+          1.9805000001724693,
+          1.4697000005980954,
+          1.888699999653909,
+          1.5277000002242858,
+          1.8656000002010842,
+          2.430900000035763,
+          1.4743000001544715,
+          1.8731000000116182,
+          2.100099999552185,
+          1.8139000003429828,
+          2.8707999999824096,
+          1.7413000005035428
+        ],
+        "median_ms": 1.7391500005032867,
+        "p95_ms": 2.430900000035763,
+        "costs": [
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          }
+        ]
+      },
+      "edit": {
+        "samples_ms": [
+          1.8480000007912167,
+          2.443499999571941,
+          1.5152999994825223,
+          1.9015999996554456,
+          1.9539000004442642,
+          1.634600000215869,
+          1.640899999983958,
+          1.4796000004935195,
+          1.9929999998566927,
+          1.3687999999092426,
+          1.6516000005140086,
+          1.9265999999333872,
+          1.7257999998037121,
+          1.748300000144809,
+          1.433099999303522,
+          1.6639000004943227,
+          1.9499999998515705,
+          1.7760999999154592,
+          1.9146999993608915,
+          1.6924999999901047
+        ],
+        "median_ms": 1.7370499999742606,
+        "p95_ms": 1.9929999998566927,
+        "costs": [
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 5,
+            "commits": 1
+          }
+        ]
+      },
+      "withdraw": {
+        "samples_ms": [
+          1.2273000002096524,
+          1.4043000001038308,
+          1.2645999995584134,
+          1.560800000333984,
+          1.6219999997701962,
+          1.2492999994719867,
+          1.8110999999407795,
+          1.2471999998524552,
+          1.2359000002106768,
+          1.334800000222458,
+          1.3535000007323106,
+          1.735700000608631,
+          1.605599999493279,
+          1.4275000003181049,
+          2.092400000037742,
+          1.5193999997791252,
+          1.6020000002754387,
+          2.1517000004678266,
+          1.4971000000514323,
+          1.4614000001529348
+        ],
+        "median_ms": 1.4792500001021835,
+        "p95_ms": 2.092400000037742,
+        "costs": [
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          },
+          {
+            "connections": 1,
+            "statements": 6,
+            "commits": 1
+          }
+        ]
+      }
+    }
+  },
+  "receipt_plans": [
+    {
+      "event_audit_rows": 0,
+      "sha256": "364d6c72511412e1c95f97839b32c2e9302b677fd6e450b3ae2ea50d30376ad1",
+      "operators": [
+        {
+          "physical": "Filter",
+          "logical": "Filter",
+          "estimated_cost": "0.0125088"
+        },
+        {
+          "physical": "Compute Scalar",
+          "logical": "Compute Scalar",
+          "estimated_cost": "0.0123413"
+        },
+        {
+          "physical": "Clustered Index Scan",
+          "logical": "Clustered Index Scan",
+          "estimated_cost": "0.0123271"
+        }
+      ],
+      "counters": [
+        {
+          "Thread": "0",
+          "ActualRows": "0",
+          "Batches": "0",
+          "ActualElapsedms": "0",
+          "ActualCPUms": "0",
+          "ActualEndOfScans": "1",
+          "ActualExecutions": "1",
+          "ActualExecutionMode": "Row"
+        },
+        {
+          "Thread": "0",
+          "ActualRows": "0",
+          "Batches": "0",
+          "ActualElapsedms": "0",
+          "ActualCPUms": "0",
+          "ActualScans": "1",
+          "ActualLogicalReads": "15",
+          "ActualPhysicalReads": "0",
+          "ActualReadAheads": "0",
+          "ActualLobLogicalReads": "0",
+          "ActualLobPhysicalReads": "0",
+          "ActualLobReadAheads": "0",
+          "ActualRowsRead": "142",
+          "ActualEndOfScans": "1",
+          "ActualExecutions": "1",
+          "ActualExecutionMode": "Row"
+        }
+      ],
+      "messages": [
+        [
+          "[01000] (3613)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 1 ms."
+        ],
+        [
+          "[01000] (3613)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 1 ms."
+        ],
+        [
+          "[01000] (3615)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Table 'MGE_SignupAudit'. Scan count 1, logical reads 15, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0."
+        ],
+        [
+          "[01000] (3612)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]\n SQL Server Execution Times:\n   CPU time = 0 ms,  elapsed time = 1 ms."
+        ]
+      ]
+    },
+    {
+      "event_audit_rows": 100,
+      "sha256": "c5331b6dd05b4edb570c5cd1fd5b2a9899afa3bc135084fa106871dbbe9e106c",
+      "operators": [
+        {
+          "physical": "Filter",
+          "logical": "Filter",
+          "estimated_cost": "0.0125088"
+        },
+        {
+          "physical": "Compute Scalar",
+          "logical": "Compute Scalar",
+          "estimated_cost": "0.0123413"
+        },
+        {
+          "physical": "Clustered Index Scan",
+          "logical": "Clustered Index Scan",
+          "estimated_cost": "0.0123271"
+        }
+      ],
+      "counters": [
+        {
+          "Thread": "0",
+          "ActualRows": "1",
+          "Batches": "0",
+          "ActualElapsedms": "0",
+          "ActualCPUms": "0",
+          "ActualEndOfScans": "1",
+          "ActualExecutions": "1",
+          "ActualExecutionMode": "Row"
+        },
+        {
+          "Thread": "0",
+          "ActualRows": "100",
+          "Batches": "0",
+          "ActualElapsedms": "0",
+          "ActualCPUms": "0",
+          "ActualScans": "1",
+          "ActualLogicalReads": "17",
+          "ActualPhysicalReads": "0",
+          "ActualReadAheads": "0",
+          "ActualLobLogicalReads": "0",
+          "ActualLobPhysicalReads": "0",
+          "ActualLobReadAheads": "0",
+          "ActualRowsRead": "242",
+          "ActualEndOfScans": "1",
+          "ActualExecutions": "1",
+          "ActualExecutionMode": "Row"
+        }
+      ],
+      "messages": [
+        [
+          "[01000] (3613)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms."
+        ],
+        [
+          "[01000] (3613)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms."
+        ],
+        [
+          "[01000] (3615)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Table 'MGE_SignupAudit'. Scan count 1, logical reads 17, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0."
+        ],
+        [
+          "[01000] (3612)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]\n SQL Server Execution Times:\n   CPU time = 0 ms,  elapsed time = 1 ms."
+        ]
+      ]
+    },
+    {
+      "event_audit_rows": 1000,
+      "sha256": "4ceddd6ee5595912159748c24c704bf0421c8ae01ef7ac5d805b5b26327e3948",
+      "operators": [
+        {
+          "physical": "Filter",
+          "logical": "Filter",
+          "estimated_cost": "0.0267407"
+        },
+        {
+          "physical": "Compute Scalar",
+          "logical": "Compute Scalar",
+          "estimated_cost": "0.0253931"
+        },
+        {
+          "physical": "Clustered Index Scan",
+          "logical": "Clustered Index Scan",
+          "estimated_cost": "0.0252789"
+        }
+      ],
+      "counters": [
+        {
+          "Thread": "0",
+          "ActualRows": "1",
+          "Batches": "0",
+          "ActualElapsedms": "0",
+          "ActualCPUms": "0",
+          "ActualEndOfScans": "1",
+          "ActualExecutions": "1",
+          "ActualExecutionMode": "Row"
+        },
+        {
+          "Thread": "0",
+          "ActualRows": "1000",
+          "Batches": "0",
+          "ActualElapsedms": "0",
+          "ActualCPUms": "0",
+          "ActualScans": "1",
+          "ActualLogicalReads": "31",
+          "ActualPhysicalReads": "0",
+          "ActualReadAheads": "0",
+          "ActualLobLogicalReads": "0",
+          "ActualLobPhysicalReads": "0",
+          "ActualLobReadAheads": "0",
+          "ActualRowsRead": "1142",
+          "ActualEndOfScans": "1",
+          "ActualExecutions": "1",
+          "ActualExecutionMode": "Row"
+        }
+      ],
+      "messages": [
+        [
+          "[01000] (3613)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms."
+        ],
+        [
+          "[01000] (3613)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]SQL Server parse and compile time: \n   CPU time = 7 ms, elapsed time = 7 ms."
+        ],
+        [
+          "[01000] (3613)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]SQL Server parse and compile time: \n   CPU time = 0 ms, elapsed time = 0 ms."
+        ],
+        [
+          "[01000] (3613)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]SQL Server parse and compile time: \n   CPU time = 7 ms, elapsed time = 7 ms."
+        ],
+        [
+          "[01000] (3615)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Table 'MGE_SignupAudit'. Scan count 1, logical reads 31, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0."
+        ],
+        [
+          "[01000] (3612)",
+          "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]\n SQL Server Execution Times:\n   CPU time = 0 ms,  elapsed time = 1 ms."
+        ]
+      ]
+    }
+  ],
+  "session_cost_samples": {
+    "baseline_separate_transactions": {
+      "create": [
+        {
+          "logical_reads": 64,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 61,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 48,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 46,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        }
+      ],
+      "edit": [
+        {
+          "logical_reads": 48,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 30,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        }
+      ],
+      "withdraw": [
+        {
+          "logical_reads": 59,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 45,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 41,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 39,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 38,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 67,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 2
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 37,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        }
+      ]
+    },
+    "candidate_atomic": {
+      "create": [
+        {
+          "logical_reads": 132,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 82,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 83,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 83,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 84,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 84,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 85,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 85,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 86,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 86,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 87,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 87,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 88,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 88,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 89,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 89,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 90,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 90,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 91,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 91,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        }
+      ],
+      "edit": [
+        {
+          "logical_reads": 86,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 83,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 69,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 89,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 70,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 85,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 71,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 86,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 72,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 87,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 73,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 88,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 74,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 89,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 75,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 90,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 76,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 91,
+          "cpu_ms": 16,
+          "physical_reads": 0,
+          "writes": 1
+        },
+        {
+          "logical_reads": 77,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 97,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 1
+        }
+      ],
+      "withdraw": [
+        {
+          "logical_reads": 93,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 76,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 76,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 77,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 77,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 78,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 78,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 79,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 79,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 80,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 80,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 81,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 81,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 82,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 82,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 83,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 83,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 84,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 84,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        },
+        {
+          "logical_reads": 85,
+          "cpu_ms": 0,
+          "physical_reads": 0,
+          "writes": 0
+        }
+      ]
+    }
+  },
+  "cost_phase_start_audit_rows": 1142,
+  "final_audit_rows": 1262,
+  "connections_closed": true,
+  "unexecuted": [
+    "Live Discord/provider end-to-end acceptance",
+    "Production-size receipt cardinality and sustained contention/load",
+    "Protected updater deployment/production promotion"
+  ]
+}

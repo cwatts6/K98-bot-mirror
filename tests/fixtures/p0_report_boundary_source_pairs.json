@@ -1,0 +1,47 @@
+[
+  {
+    "after": "6316cbcf5e016ac01ec143de44ba158d82fb4e8ee81c6f8cd201b21d53fb9a83",
+    "before": "2f733e6e39e88ecfb5e50dc0984f94881a4da81bb35efe3ff908845bc41f0bde",
+    "path": "services/export_execution_dal.py"
+  },
+  {
+    "after": "c2713e2ff09b3f8b0790dd041225c2eda25acc4d9a230fdc835af65b5fa5c0d7",
+    "before": "ef49be02185c2ac81e09d903fd844c54871ff95ca24415cebd00da76cd4f3b7d",
+    "path": "services/export_failure_diagnostics.py"
+  },
+  {
+    "after": "3c71ee89331b17810a93e9c00d8dbb2c767d6ced48241aaeb2f16a609e7959fa",
+    "before": "b557116f5a4b03c66727ba03f0449893717028f9dbc949ccf4192f5e0f3c46f5",
+    "path": "services/export_sql_direct_permissions.py"
+  },
+  {
+    "after": "27a73b75961cce8ba61634fb94a838af81c470b55c90b4de6bbc100e0e73b0a1",
+    "before": "66293dad65ace68c0684ff33f5962db12108f313f6b4ba24176363202abc8557",
+    "path": "services/recovery_dal.py"
+  },
+  {
+    "after": "819620ffce52e3aad56cc6b5adb047758c473f2e9e5277c09f772dcd867dc032",
+    "before": null,
+    "path": "services/recovery_failure_diagnostics.py"
+  },
+  {
+    "after": "0288f7bd02b3d9c907d61c10ad6fb4b79d3a0e817050791e3de792a0c792ebff",
+    "before": "bd081e2909b5bed37d55d1b36362a076b6a02ebb29b137e0b13f9c05b35f26f1",
+    "path": "services/recovery_report.py"
+  },
+  {
+    "after": "7cf50ef7237a93a34254cb5e21816709189ef1dc33615745398cd1e86dc1f56b",
+    "before": "2f6c93b762bdba5520fe9804dfdff79a120c7d76f5d837e4e3117293a1973905",
+    "path": "services/recovery_service.py"
+  },
+  {
+    "after": "87453c4ad4b65b4e8801df70c318b790a489f0cec0338eb66ea1f7cf6aeb23ab",
+    "before": "dcc122f18f78bae1ab7621be0eda588a94fff134e02a5c3f316aed027bfde546",
+    "path": "services/stats_report_continuation_dal.py"
+  },
+  {
+    "after": "c0ccc3ea1c54296bdcb9d6c56fafebf7697759912def7dfe9fbc705373092736",
+    "before": "21715b3c6e975220624dff0564361495446009cb2ec463751e30725c97374dd6",
+    "path": "ui/views/recovery_view.py"
+  }
+]
