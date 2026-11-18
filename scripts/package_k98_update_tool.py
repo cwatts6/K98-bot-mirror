@@ -191,6 +191,8 @@ def package(output, source=None, *, previous_manifest=None, retirement=None):
     if previous_manifest is not None:
         previous_raw = Path(previous_manifest).read_bytes()
         previous = json.loads(previous_raw)
+        if not isinstance(previous, dict) or not isinstance(previous.get("files"), dict):
+            raise ValueError("Exact installed predecessor tool manifest required for upgrade.")
         legacy_names = set(names) - {"K98-FailedReadiness.ps1"}
         registry = legacy_names - {
             "p0a_release.py",

@@ -143,6 +143,30 @@ def test_package_binds_profile_and_installs_shared_support(packaged):
     )
 
 
+@pytest.mark.parametrize(
+    "shape", ["null", "list", "scalar", "missing", "null_files", "scalar_files", "list_files"]
+)
+def test_package_rejects_malformed_predecessor_before_creating_upgrade(packaged, tmp_path, shape):
+    root, _, _ = packaged
+    previous = json.loads((root / "previous.json").read_bytes())
+    malformed = {
+        "null": None,
+        "list": [],
+        "scalar": "invalid",
+        "missing": {"version": 1},
+        "null_files": {"version": 1, "files": None},
+        "scalar_files": {"version": 1, "files": 1},
+        "list_files": {"version": 1, "files": list(previous["files"])},
+    }[shape]
+    manifest = tmp_path / "previous.json"
+    manifest.write_text(json.dumps(malformed), encoding="utf-8")
+    output = tmp_path / "output"
+    with pytest.raises(ValueError, match="Exact installed predecessor"):
+        package(output, previous_manifest=manifest, retirement=root / "profile.json")
+    assert not (output / "Upgrade-K98InstalledUpdater.ps1").exists()
+    assert not (output / "Retire-FailedReadiness.json").exists()
+
+
 def test_windows_retirement_state_and_native_file_harness(tmp_path):
     if os.name != "nt":
         pytest.skip("Actual Windows PowerShell 5.1 and NTFS fixture operations")
