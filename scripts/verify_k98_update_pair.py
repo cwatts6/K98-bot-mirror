@@ -585,7 +585,7 @@ def repair_verification_bot(config, predecessor, candidate):
     return candidate
 
 
-def verify_sql_contracts(config, policy, *, preflight=False):
+def verify_sql_contracts(config, policy, *, preflight=False, connection_factory=None):
     """Reuse complete startup comparators without constructing the runtime/IPC."""
     from core.export_startup_windows import administrative_path
 
@@ -608,10 +608,12 @@ def verify_sql_contracts(config, policy, *, preflight=False):
                 read(administrative_path(old["Path"], private=True), old["SHA256"])
             )
             bot = repair_verification_bot(config, bot_from_policy(predecessor_policy), bot)
-    verify_bot_sql_contracts(bot)
+    if connection_factory is None:
+        return verify_bot_sql_contracts(bot)
+    return verify_bot_sql_contracts(bot, connection_factory=connection_factory)
 
 
-def verify_bot_sql_contracts(bot):
+def verify_bot_sql_contracts(bot, *, connection_factory=None):
     """Check all three reviewed contracts against actual SQL before recording proof."""
     from datetime import datetime
     from functools import partial
@@ -630,7 +632,7 @@ def verify_bot_sql_contracts(bot):
     )
 
     approved = bot["sql_contract"]
-    factory = partial(configured_connection, sql_profile=approved["profile"])
+    factory = connection_factory or partial(configured_connection, sql_profile=approved["profile"])
     installation = ExportExecutionDAL(factory).installation_snapshot(
         **({"migrations": installation_migrations(approved)} if approved["version"] == 4 else {})
     )

@@ -303,7 +303,7 @@ $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $Root 'scripts/K98-SourceUpdate.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Parser failed'}
 foreach($func in $ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst]},$true)) {
- if($func.Name -in @('Verify-Native','Check-Readiness','Import-ExportStatus')) {
+ if($func.Name -in @('Verify-Native','Check-Readiness','Import-ExportStatus','Read-StartupText')) {
   $file=Join-Path $PSScriptRoot ($func.Name+'.ps1');[IO.File]::WriteAllText($file,$func.Extent.Text);. $file
  }
 }

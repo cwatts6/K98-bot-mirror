@@ -48,9 +48,24 @@ _D4_CONTRACT_PAIRS = {
 }
 
 
+def before_running_verification_hash(root, path):
+    """Require exact successor bytes without changing historical release evidence."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path in prepare_k98_update.P02_VERIFICATION_PATHS:
+        transition = next(
+            t
+            for t in prepare_k98_update.reviewed_transitions()
+            if t["id"] == prepare_k98_update.P02_VERIFICATION_TRANSITION
+        )
+        member = next(m for m in transition["members"] if m["path"] == path)
+        assert actual == member["after_sha256"], path
+        actual = member["before_sha256"]
+    return actual
+
+
 def before_admission_hash(root, path):
     """Authenticate current admission bytes before exposing their historical hash."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_running_verification_hash(root, path)
     if path in prepare_k98_update.P02_ADMISSION_PATHS:
         transition = next(
             t

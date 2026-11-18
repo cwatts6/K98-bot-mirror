@@ -882,22 +882,38 @@ function Import-ExportStatus([string]$StartupText) {
  # is not a successful import or provider probe. Missing evidence is degradation,
  # never an inferred healthy result. Do not run business work to test deployment.
  $reason='fresh_import_export_health_evidence_unavailable'
- if($StartupText -match 'S11 export admission remains closed|Export admission disabled:|Export coordinator unavailable') {
+ # ObservationBusy is a temporary, non-authoritative observer result, not the
+ # initial admission outcome. Verify-Native separately requires that exact
+ # successor's successful admission and all current SQL contracts. Unknown
+ # coordinator errors and actual closed/disabled admission still fail closed.
+ $lines=@($StartupText -split "`n")
+ if($StartupText -match 'S11 export admission remains closed|Export admission disabled:' -or
+    @($lines | Where-Object {$_ -match 'Export coordinator unavailable' -and $_ -notmatch 'error_type=ObservationBusy(?:\s|$)'}).Count) {
   $reason='runtime_admission_unavailable'
  }
  return @{status='degraded';import_status='degraded';export_status='degraded';reason=$reason;provider_delivery_verified=$false}
+}
+function Read-StartupText($Start) {
+ $log=Join-Path $c.root 'logs\log.txt'
+ $stream=[IO.File]::Open($log,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+ try {
+  if($stream.Length -lt [long]$Start.log_offset -or $stream.Length-[long]$Start.log_offset -gt 8MB){throw 'Startup log rotated/exceeded bound; readiness unresolved'}
+  $null=$stream.Seek([long]$Start.log_offset,[IO.SeekOrigin]::Begin)
+  $buffer=[byte[]]::new(8MB+1);$count=0
+  while($count -lt $buffer.Length) {
+   $read=$stream.Read($buffer,$count,$buffer.Length-$count)
+   if($read -eq 0){break};$count+=$read
+  }
+  if($count -gt 8MB){throw 'Startup log grew beyond bound'}
+  $text=[Text.Encoding]::UTF8.GetString($buffer,0,$count)
+ }finally{$stream.Dispose()}
+ return $text
 }
 function Check-Readiness {
  Assert-Drained -SuccessorRunning;Assert-Source $c.new_pins $c.target
  if(-not(Seed-Complete)){throw 'Successor seed missing'}
  $start=Read-Json (Join-Path $PSScriptRoot 'start-requested.json')
- $log=Join-Path $c.root 'logs\log.txt'
- $stream=[IO.File]::Open($log,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
- try {
-  if($stream.Length -lt [long]$start.log_offset -or $stream.Length-[long]$start.log_offset -gt 8MB){throw 'Startup log rotated/exceeded bound; readiness unresolved'}
-  $null=$stream.Seek([long]$start.log_offset,[IO.SeekOrigin]::Begin)
-  $reader=[IO.StreamReader]::new($stream);$text=$reader.ReadToEnd()
- }finally{$stream.Dispose()}
+ $text=Read-StartupText $start
  if($text -notmatch '\[BOOT\] full_startup_sequence completed successfully' -or $text -notmatch 'Logged in as'){return $false}
  $health=Import-ExportStatus $text
  if($health.reason -ceq 'runtime_admission_unavailable'){throw 'Discord is online but protected runtime admission failed; deployment health is unconfirmed. Preserve state; do not restart or replay work.'}

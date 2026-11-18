@@ -13,6 +13,18 @@ from kvk.dal.new_source_import_dal import SourceConflict
 from services.application_maintenance_contract import POLICY, RESOURCE, policy_objects
 
 
+class SchemaObservationRefused(SourceConflict):
+    """An acknowledged refusal owns no schema lock and proves no schema drift.
+
+    Preserve SourceConflict compatibility for business callers. Only the separate
+    verification-only entry point classifies -1 as pending, with no retry.
+    """
+
+    def __init__(self, result):
+        self.result = result
+        super().__init__("Application schema observation is busy or refused; no retry performed.")
+
+
 @contextmanager
 def schema_observation(cursor):
     """Exclude both publishers and maintenance without taking a second writer lock.
@@ -61,9 +73,7 @@ def schema_observation(cursor):
         if result[0] in {-1, -2, -3, -999}:
             # A negative acknowledged return owns no lock. Do not retry.
             attempted = False
-            raise SourceConflict(
-                "Application schema observation is busy or refused; no retry performed."
-            )
+            raise SchemaObservationRefused(result[0])
         if result[0] not in {0, 1}:
             raise SqlCleanupUnknown("Application schema observation acquisition result is unknown.")
         acquired = True
