@@ -1,0 +1,7 @@
+# B03 bounded pilot accepted
+
+Operator-supplied B03a.rpt retained byte-for-byte (4267bytes). Identity08:23:11.0865843Z matches development master, expected original login/sysadmin and SQL16.0.1200.5. No warning/error in supplied complete report. Read1024rows,436082canonical bytes: materialization8ms,hashing94ms,aggregation0ms,overall121ms. Completion08:23:11.2078541Z, client sameUTC time. Schema digest matches sealed B02scope; pilot sorted row-hash digest E254FEA225469B28484B24222DD475533D546E3260AB4C92C0BD243FB7DA20E5 retained. First key(13,1,18075),last(13,1,44990547).
+
+This supports bounded materialize-then-hash on the first1024ordered rows only. It does not diagnose the earlier B02timeout or prove full-table performance/completeness. Do not mix pilot chunk digest with B02table digest. No new live observation or hash pass performed by assistant.
+
+Next local design can use strictly advancing keyset boundaries, a versioned chunk manifest, bounded per-operation row/time limits and explicit exhaustion evidence. No automatic loop or continuation is authorized by pilot success. Preserve3completed ProcConfig results and this pilot rather than rerun them. Other12table baselines remain incomplete; all352out-of-scope tables remain protected. Restoration/CHECKDB accepted independently, seven typed G4 proofs and installation/rollout/G5 still open. Existing window ends09:23:23Z. Reset query timeout10seconds after return as instructed; no new confirmation requested.
