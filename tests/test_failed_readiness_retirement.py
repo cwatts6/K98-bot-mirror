@@ -182,3 +182,76 @@ def test_profile_input_preserved():
     before = deepcopy(value)
     retirement_profile(json.dumps(value).encode())
     assert value == before
+
+
+def test_generated_package_passes_actual_normal_updater_inventory(packaged, tmp_path):
+    """Run the real consumer block without executing host/updater entrypoints."""
+    import base64
+
+    if os.name != "nt":
+        pytest.skip("Actual Windows PowerShell consumer")
+    _, _, files = packaged
+    payload = tmp_path / "tool"
+    payload.mkdir()
+    for name, encoded in files.items():
+        (payload / name).write_bytes(base64.b64decode(encoded))
+    harness = tmp_path / "consumer.ps1"
+    harness.write_text(
+        r"""
+param([string]$ToolDirectory)
+Set-StrictMode -Version Latest
+$ErrorActionPreference='Stop'
+$tokens=$null;$errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $ToolDirectory 'K98-SourceUpdate.ps1'),[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Library parse failed'}
+foreach($name in @('Hash','Read-Bytes','Read-Json')) {
+ $definition=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true)
+ . ([scriptblock]::Create($definition.Extent.Text))
+}
+function Assert-Protected([string]$Path) {
+ if(-not [IO.Path]::GetFullPath($Path).StartsWith(($ToolDirectory+'\'),[StringComparison]::OrdinalIgnoreCase)){throw 'Fixture escaped'}
+}
+$ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $ToolDirectory 'Update-K98.ps1'),[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Updater parse failed'}
+$nodes=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.IfStatementAst] -and $n.Clauses[0].Item1.Extent.Text -ceq 'Test-Path -LiteralPath $toolManifestPath'},$true))
+if($nodes.Count -ne 1){throw 'Exact actual inventory block required'}
+$body='$PSScriptRoot=$ToolDirectory'+"`n"+(($nodes[0].Clauses[0].Item2.Statements|ForEach-Object {$_.Extent.Text}) -join "`n")
+$toolManifestPath=Join-Path $ToolDirectory 'update-tool.json'
+$original=[IO.File]::ReadAllBytes($toolManifestPath)
+& ([scriptblock]::Create($body))
+function Reject([string]$Pattern) {
+ try {& ([scriptblock]::Create($body));throw 'DID_NOT_REJECT'}
+ catch {if($_.Exception.Message -notlike $Pattern){throw}}
+}
+$manifest=[Text.Encoding]::UTF8.GetString($original)|ConvertFrom-Json
+$manifest.files.PSObject.Properties.Remove('K98-FailedReadiness.ps1')
+[IO.File]::WriteAllText($toolManifestPath,($manifest|ConvertTo-Json -Depth 5))
+Reject '*Exact update tool inventory*'
+$manifest.files|Add-Member NoteProperty 'unexpected.ps1' ('a'*64)
+[IO.File]::WriteAllText($toolManifestPath,($manifest|ConvertTo-Json -Depth 5))
+Reject '*K98-FailedReadiness.ps1*'
+[IO.File]::WriteAllBytes($toolManifestPath,$original)
+[IO.File]::WriteAllText((Join-Path $ToolDirectory 'K98-FailedReadiness.ps1'),'changed')
+Reject '*checksum differs*'
+Write-Output 'ACTUAL_CONSUMER_PASS: package accepted; missing, substituted and changed helper refused'
+""",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(harness),
+            "-ToolDirectory",
+            str(payload),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "ACTUAL_CONSUMER_PASS" in result.stdout

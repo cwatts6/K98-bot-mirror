@@ -100,6 +100,14 @@ that review, final-head hosted reviews/checks and no unresolved actionable threa
 before merge. SQL has no diff and no new contract, so its separate Changes review
 is a documented no-diff skip. No full-codebase audit is selected.
 
+Independent review of the first correction commit found a stale consumer inventory:
+the new package included the retirement helper but the normal updater still required
+13 members. That would fail closed during fresh preparation. The exact consumer now
+requires all 14 members; a regression executes its actual PowerShell block against
+the generated payload and rejects missing, substituted or changed helper bytes.
+The initial 526 passing tests did not cover this consumer; their result and the
+review discovery remain retained. Review of the corrected final head is required.
+
 ## Release and verification sequence
 
 1. Finish local validation and the mirror's reviews/checks, then merge it. Apply
