@@ -223,7 +223,7 @@ def test_registry_newline_forms_fit_unchanged_byte_cap(monkeypatch, newline):
         "read_bytes",
         lambda p: raw if p.name == "k98_update_transitions.json" else original(p),
     )
-    assert len(update.reviewed_transitions()) == 93
+    assert len(update.reviewed_transitions()) == 94
 
 
 def test_source_plan_binds_both_fixes_and_document_archive_without_new_runtime_pin(bound_pair):

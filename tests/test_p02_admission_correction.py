@@ -638,14 +638,13 @@ def test_exact_source_transition_preserves_history_and_rejects_partial_or_unknow
         hashlib.sha256(json.dumps(transitions[:92], sort_keys=True).encode()).hexdigest()
         == "dd43727c31772fae5c4945cb1e1520a219641a934d073f3b85c114bb872eaaff"
     )
-    transition = transitions[-1]
+    transition = next(t for t in transitions if t["id"] == updater.P02_ADMISSION_TRANSITION)
     assert transition["id"] == updater.P02_ADMISSION_TRANSITION
     assert {m["path"] for m in transition["members"]} == updater.P02_ADMISSION_PATHS
     for member in transition["members"]:
-        assert (
-            hashlib.sha256((root / member["path"]).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
-            == member["after_sha256"]
-        )
+        from tests.updater_source_assertions import before_running_verification_hash
+
+        assert before_running_verification_hash(root, member["path"]) == member["after_sha256"]
     raw = {
         m["path"]: (root / m["path"]).read_bytes().replace(b"\r\n", b"\n")
         for m in transition["members"]
@@ -654,6 +653,9 @@ def test_exact_source_transition_preserves_history_and_rejects_partial_or_unknow
     # release fixtures, use inert authenticated preimages for family selection.
     # The offline release rehearsal separately reads the actual predecessor Git blobs.
     marker = b"test-only-pinned-sha256:"
+    for member in transition["members"]:
+        if member["path"] in updater.P02_VERIFICATION_PATHS:
+            raw[member["path"]] = marker + member["after_sha256"].encode()
     real_hash = updater.sha256
     monkeypatch.setattr(
         updater,

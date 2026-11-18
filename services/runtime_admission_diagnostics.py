@@ -72,7 +72,11 @@ def _emit(attempt, outcome, error=None):
             "Installed application schema/dependencies differ from reviewed source shapes.": "application_schema_mismatch",
             "Application schema observation retained for cleanup review.": "schema_cleanup_unconfirmed",
         }
-        if type(error).__name__ in {"SourceConflict", "SqlCleanupUnknown"}:
+        if type(error).__name__ in {
+            "SourceConflict",
+            "SchemaObservationRefused",
+            "SqlCleanupUnknown",
+        }:
             record["reason"] = reasons.get(str(error), "admission_failed")
     logger.info("%s%s", MARKER, json.dumps(record, sort_keys=True, separators=(",", ":")))
 

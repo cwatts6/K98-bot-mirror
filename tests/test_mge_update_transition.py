@@ -61,7 +61,7 @@ def test_registry_byte_bound_is_enforced(monkeypatch, extra_byte):
         with pytest.raises(ValueError, match="registry exceeds bound"):
             updater.reviewed_transitions()
     else:
-        assert len(updater.reviewed_transitions()) == 93
+        assert len(updater.reviewed_transitions()) == 94
 
 
 def test_registry_entry_beyond_installed_bound_is_rejected(monkeypatch):
