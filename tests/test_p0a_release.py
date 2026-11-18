@@ -333,6 +333,11 @@ def test_compatibility_requires_complete_installed_coordinated_tool(monkeypatch)
     for name in ("p0a_release.py", "p0a_release_spec.json", "recovery_release_seed.py"):
         installed["files"].pop(name)
     installed["files"].pop("contract_verifier.zip")
+    # Mixed current/legacy inventories are refused; only the exact historical
+    # inventory may classify as an upgradeable predecessor.
+    with pytest.raises(ValueError, match="supported installed-tool manifest"):
+        classify()
+    installed["files"].pop("K98-FailedReadiness.ps1")
     assert classify()["classification"] == "UPDATER_UPGRADE_REQUIRED"
 
 

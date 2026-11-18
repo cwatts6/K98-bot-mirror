@@ -374,25 +374,39 @@ def test_pair_bootstrap_authenticates_source_before_selecting_archive(monkeypatc
     assert steps == ["source", "archive", "sql"]
 
 
-@pytest.mark.parametrize("damage", ["missing", "changed"])
+@pytest.mark.parametrize("damage", ["missing", "changed", "legacy_missing"])
 def test_source_compatibility_cannot_claim_current_archive_without_its_hash(damage):
     from scripts.validate_k98_update_compatibility import classify
     from tests.test_update_application_compatibility import NEW, OLD, PATH, installed_manifest
 
     installed = installed_manifest()
-    if damage == "missing":
+    if damage in {"missing", "legacy_missing"}:
         del installed["files"]["contract_verifier.zip"]
+        if damage == "legacy_missing":
+            del installed["files"]["K98-FailedReadiness.ps1"]
     else:
         installed["files"]["contract_verifier.zip"] = "0" * 64
-    result = classify(
-        "a" * 40,
-        "b" * 40,
-        [PATH],
-        lambda commit, path: OLD if commit == "a" * 40 else NEW,
-        installed,
-    )
+
+    def classify_installed():
+        return classify(
+            "a" * 40,
+            "b" * 40,
+            [PATH],
+            lambda commit, path: OLD if commit == "a" * 40 else NEW,
+            installed,
+        )
+
+    if damage == "missing":
+        # A retirement-capable inventory without its archive is unsupported,
+        # whereas the exact historical inventory remains upgradeable below.
+        with pytest.raises(ValueError, match="supported installed-tool manifest"):
+            classify_installed()
+        return
+    result = classify_installed()
     assert result["classification"] == "UPDATER_UPGRADE_REQUIRED"
     assert "contract_verifier.zip" in result["updater_members"]
+    if damage == "legacy_missing":
+        assert "scripts/K98-FailedReadiness.ps1" in result["updater_members"]
 
 
 def test_native_manifest_and_archive_gates_in_windows_powershell(tmp_path):
@@ -444,6 +458,11 @@ foreach($file in Get-ChildItem -LiteralPath $Tools -File){if($file.Name -notin @
 $manifest.files.PSObject.Properties.Remove('contract_verifier.zip')
 $oldRaw=[Text.Encoding]::UTF8.GetBytes(($manifest|ConvertTo-Json -Depth 5 -Compress))
 [IO.File]::WriteAllBytes((Join-Path $old 'update-tool.json'),$oldRaw)
+Must-Refuse { Assert-UpgradeTool $old (Upgrade-Hash $oldRaw) }
+$manifest.files.PSObject.Properties.Remove('K98-FailedReadiness.ps1')
+Remove-Item -LiteralPath (Join-Path $old 'K98-FailedReadiness.ps1')
+$oldRaw=[Text.Encoding]::UTF8.GetBytes(($manifest|ConvertTo-Json -Depth 5 -Compress))
+[IO.File]::WriteAllBytes((Join-Path $old 'update-tool.json'),$oldRaw)
 Assert-UpgradeTool $old (Upgrade-Hash $oldRaw);$checked++
 function Read-Bytes([string]$Path,[string]$Expected,[long]$Limit) {
  if($Limit -ne 2MB -or $Expected -cne $ArchiveHash -or (Split-Path -Leaf $Path) -cne 'contract_verifier.zip'){throw 'Archive read not exactly bound'}
@@ -475,4 +494,4 @@ $c.extra_members=@([pscustomobject]@{name='contract_verifier.zip';sha256=$Archiv
         timeout=45,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert json.loads(result.stdout)["checks"] == 10
+    assert json.loads(result.stdout)["checks"] == 11
