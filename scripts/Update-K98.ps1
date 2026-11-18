@@ -50,13 +50,18 @@ Assert-UpdaterCustody $PSCommandPath
 $library=Join-Path $PSScriptRoot 'K98-SourceUpdate.ps1'
 Assert-UpdaterCustody $library
 . $library -Action Library
+$retirementLibrary=Join-Path $PSScriptRoot 'K98-FailedReadiness.ps1'
+Assert-UpdaterCustody $retirementLibrary
+. $retirementLibrary
 $script:c=[pscustomobject]@{root=$root;sid=$identity.User.Value;git_path='C:\Program Files\Git\cmd\git.exe';git_sha256=''}
 $updates='C:\ProgramData\K98\S11\updates'
+Assert-RetirementUpdates
 if($Status) {
  if($PrepareOnly){throw 'Choose -Status or -PrepareOnly'}
  $active=Join-Path $updates 'active.json'
  if(-not(Test-Path -LiteralPath $active)){Write-Host 'No active update. Historical evidence is retained under the updates directory.';return}
  $saved=Read-Json $active
+ Assert-ReleaseNotRetired $saved.release_id
  if($saved.directory -cnotmatch '^C:\\ProgramData\\K98\\S11\\updates\\[0-9a-f-]{36}$'){throw 'Saved update path differs'}
  $prepared=Read-Json (Join-Path $saved.directory 'prepared.json')
  $manifest=Read-Json $prepared.manifest $prepared.manifest_sha256
@@ -85,6 +90,7 @@ $lock=[IO.File]::Open($lockPath,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[
 $transcript=Join-Path $updates ('update-'+[datetime]::UtcNow.ToString('yyyyMMddTHHmmssfff')+'.txt')
 $null=Start-Transcript -LiteralPath $transcript -NoClobber
 try {
+ Assert-RetirementUpdates
  $active=Join-Path $updates 'active.json'
  if($RepairPhase1Permissions) {
   if(Test-Path -LiteralPath (Join-Path $updates 'phase1-permission-repair-selection.json')){
@@ -96,6 +102,7 @@ try {
   $prepared=$null
  } elseif(Test-Path -LiteralPath $active) {
   $saved=Read-Json $active
+  Assert-ReleaseNotRetired $saved.release_id
   $work=$saved.directory
   if($work -cnotmatch '^C:\\ProgramData\\K98\\S11\\updates\\[0-9a-f-]{36}$'){throw 'Saved update path differs'}
   $prepared=Read-Json (Join-Path $work 'prepared.json')
@@ -171,6 +178,7 @@ try {
   Write-Host 'Checking private main and preparing this update automatically...'
   $null=Git ('-c credential.helper= -c credential.helper="'+$helper+'" fetch --no-tags --no-recurse-submodules origin +refs/heads/main:refs/remotes/origin/main')
   $target=Git 'rev-parse refs/remotes/origin/main'
+  Assert-RetirementUpdates $before $target
   if($before -ceq $target){Write-Host 'Already current. No restart required.';return}
   $null=Git ('merge-base --is-ancestor '+$before+' '+$target)
   $seed=Read-InstalledSeed $policy
@@ -215,7 +223,7 @@ try {
    # the live checkout. They can prepare the first release containing the tool.
    $toolManifest=Read-Json $toolManifestPath
    if($toolManifest.version -ne 1){throw 'Unsupported installed update tool'}
-   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','prepare_k98_release.py','verify_k98_update_pair.py','package_k98_update_tool.py','k98_update_transitions.json','p0a_release.py','p0a_release_spec.json','recovery_release_seed.py','contract_verifier.zip','EmptyGitConfig.txt')
+   $required=@('Update-K98.ps1','K98-SourceUpdate.ps1','K98-FailedReadiness.ps1','Deploy-K98Release.ps1','prepare_k98_update.py','prepare_k98_release.py','verify_k98_update_pair.py','package_k98_update_tool.py','k98_update_transitions.json','p0a_release.py','p0a_release_spec.json','recovery_release_seed.py','contract_verifier.zip','EmptyGitConfig.txt')
    if(@($toolManifest.files.PSObject.Properties).Count -ne $required.Count){throw 'Exact update tool inventory required'}
    foreach($name in $required){$null=Read-Bytes (Join-Path $PSScriptRoot $name) $toolManifest.files.$name 2MB}
   } else {

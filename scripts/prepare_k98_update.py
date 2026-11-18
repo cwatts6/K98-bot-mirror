@@ -70,6 +70,7 @@ TOOL_SOURCE_PATHS = frozenset(
     for name in (
         "Update-K98.ps1",
         "K98-SourceUpdate.ps1",
+        "K98-FailedReadiness.ps1",
         "Deploy-K98Release.ps1",
         "prepare_k98_update.py",
         "prepare_k98_release.py",

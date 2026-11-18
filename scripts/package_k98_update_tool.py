@@ -82,11 +82,79 @@ Write-Host 'Then run /ops graceful_restart once, only when prompted.'
 """
 
 
-def package(output, source=None, *, previous_manifest=None):
+def retirement_profile(raw):
+    """Validate the private, independently reviewed profile without host actions."""
+    if not raw or len(raw) > 65536:
+        raise ValueError("Bounded retirement profile required")
+    profile = json.loads(raw)
+    hashes = (
+        "active",
+        "bindings",
+        "drain",
+        "failure_evidence",
+        "journal",
+        "manifest",
+        "prepared",
+        "request",
+        "start",
+    )
+    fields = {
+        "version",
+        "kind",
+        "host",
+        "sid",
+        "release_id",
+        "work",
+        "approved_target",
+        "journal_name",
+        "receipts",
+        *(name + "_sha256" for name in hashes),
+    }
+    uuid = r"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"
+    if (
+        not isinstance(profile, dict)
+        or set(profile) != fields
+        or any(not isinstance(profile[key], str) for key in fields - {"version", "receipts"})
+        or type(profile["version"]) is not int
+        or profile["version"] != 1
+        or profile["kind"] != "failed_readiness_retirement"
+        or profile["host"] != "MINI_AMD"
+        or not re.fullmatch(r"S-1-5-21-(?:[0-9]+-){3}[0-9]+", profile["sid"])
+        or not re.fullmatch(uuid, profile["release_id"])
+        or not re.fullmatch(r"C:\\ProgramData\\K98\\S11\\updates\\" + uuid, profile["work"])
+        or not re.fullmatch(r"[a-f0-9]{40}", profile["approved_target"])
+        or not re.fullmatch(r"incarnation-[0-9]{20}-" + uuid + r"\.json", profile["journal_name"])
+        or any(not re.fullmatch(r"[a-f0-9]{64}", profile[name + "_sha256"]) for name in hashes)
+    ):
+        raise ValueError("Exact reviewed retirement profile required")
+    receipts = {
+        f"{step}.{state}.json"
+        for step in ("source", "seed", "start")
+        for state in ("intent", "complete")
+    }
+    if (
+        not isinstance(profile["receipts"], dict)
+        or set(profile["receipts"]) != receipts
+        or any(
+            not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value)
+            for value in profile["receipts"].values()
+        )
+    ):
+        raise ValueError("Only positively receipted source/seed/start can be retired")
+    return profile
+
+
+def package(output, source=None, *, previous_manifest=None, retirement=None):
+    retirement_raw = Path(retirement).read_bytes() if retirement is not None else None
+    if retirement_raw is not None:
+        retirement_profile(retirement_raw)
+        if previous_manifest is None:
+            raise ValueError("Retirement requires an exact used-updater upgrade")
     source = Path(source) if source else Path(__file__).parent
     names = (
         "Update-K98.ps1",
         "K98-SourceUpdate.ps1",
+        "K98-FailedReadiness.ps1",
         "Deploy-K98Release.ps1",
         "prepare_k98_update.py",
         "prepare_k98_release.py",
@@ -123,7 +191,10 @@ def package(output, source=None, *, previous_manifest=None):
     if previous_manifest is not None:
         previous_raw = Path(previous_manifest).read_bytes()
         previous = json.loads(previous_raw)
-        registry = set(names) - {
+        if not isinstance(previous, dict) or not isinstance(previous.get("files"), dict):
+            raise ValueError("Exact installed predecessor tool manifest required for upgrade.")
+        legacy_names = set(names) - {"K98-FailedReadiness.ps1"}
+        registry = legacy_names - {
             "p0a_release.py",
             "p0a_release_spec.json",
             "recovery_release_seed.py",
@@ -135,7 +206,8 @@ def package(output, source=None, *, previous_manifest=None):
             required,
             prior,
             registry,
-            set(names),
+            legacy_names,
+            legacy_names | {"contract_verifier.zip"},
             set(names) | {"contract_verifier.zip"},
         ):
             raise ValueError("Exact installed predecessor tool manifest required for upgrade.")
@@ -164,9 +236,18 @@ def package(output, source=None, *, previous_manifest=None):
             lambda match: replacements[match.group(0)],
             template,
         )
+        if template.count("__RETIREMENT_PROFILE_SHA256__") != 1:
+            raise ValueError("Retirement profile pin is missing or ambiguous")
+        template = template.replace(
+            "__RETIREMENT_PROFILE_SHA256__",
+            hashlib.sha256(retirement_raw).hexdigest() if retirement_raw is not None else "unbound",
+        )
         upgrade = output / "Upgrade-K98InstalledUpdater.ps1"
         with upgrade.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(template)
+        if retirement_raw is not None:
+            with (output / "Retire-FailedReadiness.json").open("xb") as stream:
+                stream.write(retirement_raw)
     return dict(
         installer=str(target.resolve()),
         sha256=hashlib.sha256(script).hexdigest(),
@@ -180,8 +261,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default=".codex_artifacts/k98-update-tool")
     parser.add_argument("--previous-manifest")
+    parser.add_argument("--retirement-profile")
     args = parser.parse_args()
-    print(json.dumps(package(args.output, previous_manifest=args.previous_manifest)))
+    print(
+        json.dumps(
+            package(
+                args.output,
+                previous_manifest=args.previous_manifest,
+                retirement=args.retirement_profile,
+            )
+        )
+    )
 
 
 if __name__ == "__main__":
