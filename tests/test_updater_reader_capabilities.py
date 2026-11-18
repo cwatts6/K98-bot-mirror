@@ -108,6 +108,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     root = Path(update.__file__).resolve().parents[1]
     expected = {}
     from tests.updater_source_assertions import (
+        before_admission_hash,
         before_d5_qualification_hash,
         before_p013_hash,
         before_p014_hash,
@@ -118,6 +119,13 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     )
 
     for transition in update.reviewed_transitions():
+        if transition["id"] == update.P02_ADMISSION_TRANSITION:
+            assert {m["path"] for m in transition["members"]} == update.P02_ADMISSION_PATHS
+            for member in transition["members"]:
+                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
+                assert update.sha256(raw) == member["after_sha256"]
+                assert before_admission_hash(root, member["path"]) == member["before_sha256"]
+            continue
         if transition["id"] == update.P02_QUALIFIED_TRANSITION:
             # This is a complete direct jump from the deployed D6 image, not
             # the next link in the older linear histories checked below.
@@ -128,9 +136,11 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             assert {m["path"] for m in transition["members"]} == (
                 update.P02_QUALIFIED_COMPATIBILITY_PATHS
             )
-            assert update.matches_protocol_transition(
-                transition, lambda *key: data.get(key), "old", "new"
-            )
+            for member in transition["members"]:
+                raw = data.get(("old", member["path"]))
+                old_hash = update.sha256(raw.replace(b"\r\n", b"\n")) if raw is not None else None
+                assert old_hash == member["before_sha256"]
+                assert before_admission_hash(root, member["path"]) == member["after_sha256"]
             continue
         if transition["id"] == update.D4_CONTRACT_TRANSITION:
             # The combined installed-to-D4 jump spans the historical chains below.
@@ -244,9 +254,9 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             continue
         if transition["id"] == "p016_personal_stats_ownership_v1":
             for member in transition["members"]:
-                assert (
-                    before_p016_render_hash(root, member["path"]) == member["after_sha256"]
-                ), member["path"]
+                assert before_p016_render_hash(root, member["path"]) == member["after_sha256"], (
+                    member["path"]
+                )
             continue
         if transition["id"] == "p015_calendar_ownership_v1":
             for member in transition["members"]:
@@ -282,9 +292,9 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             from tests.updater_source_assertions import before_p012a_contract_hash
 
             for member in transition["members"]:
-                assert (
-                    before_p012a_contract_hash(root, member["path"]) == member["after_sha256"]
-                ), member["path"]
+                assert before_p012a_contract_hash(root, member["path"]) == member["after_sha256"], (
+                    member["path"]
+                )
             continue
         if transition["id"] == "p012a_evidence_bundle_v1":
             from tests.updater_source_assertions import before_p012a_correction_hash
@@ -326,9 +336,9 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             continue
         if transition["id"] == "checkpoint_observation_lifecycle_v1":
             for member in transition["members"]:
-                assert (
-                    before_settlement_hash(root, member["path"]) == member["after_sha256"]
-                ), member["path"]
+                assert before_settlement_hash(root, member["path"]) == member["after_sha256"], (
+                    member["path"]
+                )
             continue
         if transition["id"] == "coordination_lifecycle_v1":
             from tests.updater_source_assertions import before_health_activity_hash
@@ -360,9 +370,9 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             continue
         if transition["id"] == "p1_mge_a1b_v1":
             for member in transition["members"]:
-                assert (
-                    before_finalisation_hash(root, member["path"]) == member["after_sha256"]
-                ), member["path"]
+                assert before_finalisation_hash(root, member["path"]) == member["after_sha256"], (
+                    member["path"]
+                )
             continue
         if transition["id"] == "p1_mge_a1a_v1":
             for member in transition["members"]:
@@ -380,17 +390,17 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
             continue
         if transition["id"] == "p1_event_delivery_v1":
             for member in transition["members"]:
-                assert (
-                    before_monitoring_hash(root, member["path"]) == member["after_sha256"]
-                ), member["path"]
+                assert before_monitoring_hash(root, member["path"]) == member["after_sha256"], (
+                    member["path"]
+                )
             continue
         if transition["id"] == "startup_cache_foundations_v1":
             # This exact successor has its own complete-bundle admission tests.
             # Keep the historical predecessor chain below unchanged.
             for member in transition["members"]:
-                assert (
-                    before_event_delivery_hash(root, member["path"]) == member["after_sha256"]
-                ), member["path"]
+                assert before_event_delivery_hash(root, member["path"]) == member["after_sha256"], (
+                    member["path"]
+                )
             continue
         if transition["id"] in {
             "report_timeout_monitor_v1",

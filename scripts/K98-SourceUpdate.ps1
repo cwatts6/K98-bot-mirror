@@ -862,7 +862,9 @@ function Verify-Native([switch]$Preflight) {
  # Fail before drain on drift, including separately deployed companion SQL.
  $verifyArguments+='--sql-contracts'
  & $c.venv.path @verifyArguments | Out-Host
+ if(-not $Preflight -and $LASTEXITCODE -eq 11){return $false}
  if($LASTEXITCODE -ne 0){throw 'New native publication not verified'}
+ return $true
 }
 function New-Journal {
  $journals=@(Get-ChildItem -LiteralPath $c.new_state_directory -Filter 'incarnation-*.json' -File | Select-Object -First 2)
@@ -888,7 +890,6 @@ function Import-ExportStatus([string]$StartupText) {
 function Check-Readiness {
  Assert-Drained -SuccessorRunning;Assert-Source $c.new_pins $c.target
  if(-not(Seed-Complete)){throw 'Successor seed missing'}
- $journal=New-Journal;Verify-Native;Assert-NewSession $journal
  $start=Read-Json (Join-Path $PSScriptRoot 'start-requested.json')
  $log=Join-Path $c.root 'logs\log.txt'
  $stream=[IO.File]::Open($log,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
@@ -900,6 +901,8 @@ function Check-Readiness {
  if($text -notmatch '\[BOOT\] full_startup_sequence completed successfully' -or $text -notmatch 'Logged in as'){return $false}
  $health=Import-ExportStatus $text
  if($health.reason -ceq 'runtime_admission_unavailable'){throw 'Discord is online but protected runtime admission failed; deployment health is unconfirmed. Preserve state; do not restart or replay work.'}
+ if(-not(Verify-Native)){return $false}
+ $journal=New-Journal;Assert-NewSession $journal
  $status=@{release_id=$c.release_id;target=$c.target;discord_status='online';import_export=$health}|ConvertTo-Json -Depth 5 -Compress|ConvertFrom-Json
  $statusPath=Join-Path $PSScriptRoot 'readiness-status.json'
  if(Test-Path -LiteralPath $statusPath) {
@@ -1035,7 +1038,8 @@ try {
    if(-not(Seed-Complete)){throw 'Seed missing'}
    $journals=@(Get-ChildItem -LiteralPath $c.new_state_directory -Filter 'incarnation-*.json' -File | Select-Object -First 2)
    if(-not $journals.Count -and -not(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'start-requested.json'))){$null=Assert-Task $newGate $true;exit 10}
-   $j=New-Journal;Verify-Native;Assert-NewSession $j;exit 0
+   if(-not(Verify-Native)){exit 11}
+   $j=New-Journal;Assert-NewSession $j;exit 0
   }
   'ApplyStart' {
    Assert-Drained;Assert-Source $c.new_pins $c.target
@@ -1050,7 +1054,8 @@ try {
    do {
     Start-Sleep -Seconds 2
     $journals=@(Get-ChildItem -LiteralPath $c.new_state_directory -Filter 'incarnation-*.json' -File | Select-Object -First 2)
-    if($journals.Count -eq 1){try{$j=New-Journal;Verify-Native;Assert-NewSession $j;exit 0}catch{if($watch.Elapsed.TotalSeconds -ge 120){throw}}}
+    if($journals.Count -gt 1){throw 'Exactly one successor incarnation required; do not restart'}
+    if($journals.Count -eq 1 -and (Verify-Native)){$j=New-Journal;Assert-NewSession $j;exit 0}
    }while($watch.Elapsed.TotalSeconds -lt 120)
    throw 'One start requested but not confirmed; do not start again'
   }

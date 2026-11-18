@@ -48,9 +48,24 @@ _D4_CONTRACT_PAIRS = {
 }
 
 
+def before_admission_hash(root, path):
+    """Authenticate current admission bytes before exposing their historical hash."""
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path in prepare_k98_update.P02_ADMISSION_PATHS:
+        transition = next(
+            t
+            for t in prepare_k98_update.reviewed_transitions()
+            if t["id"] == prepare_k98_update.P02_ADMISSION_TRANSITION
+        )
+        member = next(m for m in transition["members"] if m["path"] == path)
+        assert actual == member["after_sha256"], path
+        actual = member["before_sha256"]
+    return actual
+
+
 def before_schema_transaction_fix_hash(root, path):
     """Test-only exact bridge; production successor registration is still required."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_admission_hash(root, path)
     if path == "services/application_maintenance_dal.py":
         assert actual == "1e87fba0ab8b6d35311799dd00b8ce66d9925a950cf3a516c526ee2770c99260", path
         return "d712f0436d3358662c73fadd2d431c5cee44755342bc6b0cf062894d24055264"

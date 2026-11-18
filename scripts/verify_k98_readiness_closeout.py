@@ -73,7 +73,6 @@ def verify_chain(config, profile, predecessor, journals, sessions):
 
 def verify(profile, config, verifier):
     policy = verifier["verify_live_source"](config)
-    verifier["verify_sql_contracts"](config, policy)
     from core.export_deployment_handoff import RecordedTermination, termination_path
     from core.export_process_identity import open_pinned_process
     from core.export_startup_windows import administrative_path, signalled
@@ -134,6 +133,11 @@ def verify(profile, config, verifier):
             handle = open_pinned_process(binding["pid"], binding)
             stack.callback(handle.Close)
             handles.append(handle)
+        # New admission protocol: a closeout must not bypass the initial failed
+        # attempt. Historical explicitly pinned closeouts retain their old scope.
+        if "services/runtime_admission_diagnostics.py" in policy["source_hashes"]:
+            verifier["verify_successor_admission"](config, current)
+        verifier["verify_sql_contracts"](config, policy)
         # The existing reviewed connection profile is selected by the installed policy.
         ref = seed["templates"]["bot"]
         bot = protected(ref["path"], ref["sha256"])
