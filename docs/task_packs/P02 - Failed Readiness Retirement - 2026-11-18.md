@@ -124,8 +124,11 @@ verified resolution and exactly one durable action and business transition, both
 with a normal acknowledgement and a lost acknowledgement. A later confirmation
 must remain resolved without another business transition. This fixes the erroneous
 test expectation without suppressing the test or weakening the runtime guard.
-Original failure evidence remains retained. CI execution is approved after this
-correction; failed production-release replay remains prohibited.
+Original failure evidence remains retained. The operator approved CI execution
+after this correction; this does not waive any merge gate. Completed hosted
+reviews, successful checks and disposition of all actionable findings remain
+required for mirror merge and then the identical private patch. Failed
+production-release replay remains prohibited.
 
 ## Release and verification sequence
 
