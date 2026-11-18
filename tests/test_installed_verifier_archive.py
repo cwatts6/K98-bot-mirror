@@ -458,6 +458,8 @@ foreach($file in Get-ChildItem -LiteralPath $Tools -File){if($file.Name -notin @
 $manifest.files.PSObject.Properties.Remove('contract_verifier.zip')
 $oldRaw=[Text.Encoding]::UTF8.GetBytes(($manifest|ConvertTo-Json -Depth 5 -Compress))
 [IO.File]::WriteAllBytes((Join-Path $old 'update-tool.json'),$oldRaw)
+# This mixed inventory still includes the retirement helper, which requires the archive.
+# Refuse it before removing that helper to construct the exact historical inventory.
 Must-Refuse { Assert-UpgradeTool $old (Upgrade-Hash $oldRaw) }
 $manifest.files.PSObject.Properties.Remove('K98-FailedReadiness.ps1')
 Remove-Item -LiteralPath (Join-Path $old 'K98-FailedReadiness.ps1')
