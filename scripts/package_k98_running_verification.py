@@ -120,7 +120,10 @@ def build(profile, root):
         ).encode()
     ).decode()
     # Keep the existing trusted-resolution/admin bootstrap, but none of its updater install actions.
-    prefix = INSTALLER.split("$encoded='__PAYLOAD__'", 1)[0]
+    prefix = INSTALLER.split("$encoded='__PAYLOAD__'", 1)[0].replace(
+        "Run this one-time installer on MINI_AMD in Windows PowerShell 5.1.",
+        "Run this verification-only packet on MINI_AMD in Windows PowerShell 5.1.",
+    )
     body = r"""
 $profileHash='__PROFILE_HASH__'
 $payload=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PAYLOAD__'))|ConvertFrom-Json
