@@ -143,7 +143,7 @@ function Assert-AmendmentSelection([string]$Path,$Current,[string]$Hash) {
 }
 
 function Assert-OriginalReleaseUnselected($Current,[string]$Stage) {
-    if(Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json')){throw 'Release was superseded by an amendment; use only the selected amendment launcher'}
+    if(Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json')){throw 'Release was superseded or retired; do not replay it. Use only the reviewed selected continuation.'}
 }
 
 function Enter-ReleaseExecution([string]$Path) {

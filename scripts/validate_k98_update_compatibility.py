@@ -58,7 +58,8 @@ def classify(
         blockers.append(str(exc))
     if installed_tool is not None:
         expected = {Path(path).name for path in TOOL_SOURCE_PATHS} | {"EmptyGitConfig.txt"}
-        registry = expected - {
+        predecessor = expected - {"K98-FailedReadiness.ps1"}
+        registry = predecessor - {
             "p0a_release.py",
             "p0a_release_spec.json",
             "recovery_release_seed.py",
@@ -72,7 +73,14 @@ def classify(
             or installed_tool["version"] != 1
             or not isinstance(installed_tool["files"], dict)
             or set(installed_tool["files"])
-            not in (expected | {CONTRACT_ARCHIVE}, expected, registry, prior, legacy)
+            not in (
+                expected | {CONTRACT_ARCHIVE},
+                predecessor | {CONTRACT_ARCHIVE},
+                predecessor,
+                registry,
+                prior,
+                legacy,
+            )
             or any(
                 not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
                 for value in installed_tool["files"].values()

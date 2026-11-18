@@ -2,7 +2,7 @@
 # Exact installed package, current startup state and operator lock are revalidated.
 # Close all other updater PowerShell windows before running this reviewed helper.
 [CmdletBinding()]
-param([switch]$Phase1PermissionRepair)
+param([switch]$Phase1PermissionRepair,[switch]$RetireFailedReadiness)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $env:PATH='C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0'
@@ -11,6 +11,9 @@ $env:PSModulePath='C:\Windows\System32\WindowsPowerShell\v1.0\Modules'
 Set-Variable -Name PreviousManifestSHA256 -Value 'cd112e1912ec04318a463a48d8df20e88d6dae4dd20c45368f517deadc318871' -Option Constant
 Set-Variable -Name InstallerSHA256 -Value 'ab69591f89a88628a729eb35a08eadda4ed0602d7512291075e5ab746017fd30' -Option Constant
 Set-Variable -Name TargetManifestSHA256 -Value '6562c4cf8970c8fe5c776d10275aab6f2211fc2e814a9d3a529a56a15c34c50b' -Option Constant
+Set-Variable -Name RetirementProfileSHA256 -Value '__RETIREMENT_PROFILE_SHA256__' -Option Constant
+if($Phase1PermissionRepair -and $RetireFailedReadiness){throw 'Choose one reviewed administrative transition'}
+if($RetireFailedReadiness -and $RetirementProfileSHA256 -cnotmatch '^[a-f0-9]{64}$'){throw 'This upgrade has no reviewed failed-readiness retirement profile'}
 if($env:COMPUTERNAME -cne 'MINI_AMD' -or $PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5){throw 'Use MINI_AMD Windows PowerShell 5.1'}
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 if($identity.Owner.Value -cne 'S-1-5-32-544'){throw 'Administrative default object owner required'}
@@ -42,6 +45,10 @@ function Assert-UpgradeTool([string]$Path,[string]$ManifestHash) {
   if($null -eq $manifest.files.PSObject.Properties['p0a_release.py']){throw 'Archived verifier requires the complete recovery tool inventory'}
   $names+=@('contract_verifier.zip')
  }
+ if($null -ne $manifest.files.PSObject.Properties['K98-FailedReadiness.ps1']){
+  if($null -eq $manifest.files.PSObject.Properties['contract_verifier.zip']){throw 'Retirement updater requires the complete archived-verifier tool inventory'}
+  $names+=@('K98-FailedReadiness.ps1')
+ }
  if($manifest.version -ne 1 -or @($manifest.files.PSObject.Properties).Count -ne $names.Count){throw 'Tool manifest shape differs'}
  foreach($name in $names){if($null -eq $manifest.files.PSObject.Properties[$name]){throw 'Tool member missing from manifest'}}
  $items=@(Get-ChildItem -LiteralPath $Path -Force)
@@ -65,7 +72,7 @@ function Assert-UpgradePartial([string]$Path,$Payload) {
 function Assert-NoUpgradeProcess {
  # Current entrypoint loads its library before taking operator.lock. Refuse any
  # other observed updater process; the operator must close other updater windows.
- $others=@(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='pwsh.exe' OR Name='python.exe'" | Where-Object {$_.ProcessId -ne $PID -and $_.CommandLine -match '(Update-K98\.ps1|Deploy-K98Release\.ps1|prepare_k98_update\.py|K98-SourceUpdate\.ps1)'})
+ $others=@(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='pwsh.exe' OR Name='python.exe'" | Where-Object {$_.ProcessId -ne $PID -and $_.CommandLine -match '(Update-K98\.ps1|Upgrade-K98InstalledUpdater\.ps1|Deploy-K98Release\.ps1|prepare_k98_update\.py|K98-SourceUpdate\.ps1|Release-Step\.ps1)'})
  if($others.Count){throw 'Other updater process present; close its window first'}
 }
 function Write-UpgradeMember([string]$Directory,[string]$Work,[string]$Name,[byte[]]$Bytes) {
@@ -93,6 +100,33 @@ if((Upgrade-Hash $installerBytes) -cne $InstallerSHA256){throw 'Reviewed install
 $installerText=[Text.Encoding]::UTF8.GetString($installerBytes)
 if($installerText -cnotmatch "\`$encoded='([A-Za-z0-9+/=]+)'"){throw 'Installer payload missing'}
 $newPayload=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Matches[1]))|ConvertFrom-Json
+if($RetireFailedReadiness -or (Test-Path -LiteralPath 'C:\ProgramData\K98\S11\updates\retirements')) {
+ if($RetireFailedReadiness) {
+ $profileFile=Join-Path $PSScriptRoot 'Retire-FailedReadiness.json'
+ if((Get-Item -LiteralPath $profileFile).Length -gt 65536){throw 'Retirement profile bound exceeded'}
+ $retirementBytes=[IO.File]::ReadAllBytes($profileFile)
+ if($retirementBytes.Length -gt 65536 -or (Upgrade-Hash $retirementBytes) -cne $RetirementProfileSHA256){throw 'Reviewed retirement profile checksum differs'}
+ $retirementProfile=[Text.Encoding]::UTF8.GetString($retirementBytes)|ConvertFrom-Json
+ }
+ # The pinned installer supplies both the new implementation and existing
+ # custody/atomic-write primitives. Import definitions only, never release actions.
+ $supportText=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($newPayload.'K98-SourceUpdate.ps1'))
+ $supportTokens=$null;$supportErrors=$null
+ $supportAst=[Management.Automation.Language.Parser]::ParseInput($supportText,[ref]$supportTokens,[ref]$supportErrors)
+ if(@($supportErrors).Count){throw 'Retirement support parse failure'}
+ foreach($name in @('Assert-Protected','Hash','Read-Bytes','Read-Json','New-Directory','Write-New','Open-SourceCustodyHandle')) {
+  $definitions=@($supportAst.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true))
+  if($definitions.Count -ne 1){throw 'Retirement primitive missing or ambiguous'}
+  . ([scriptblock]::Create($definitions[0].Extent.Text))
+ }
+ $retirementText=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($newPayload.'K98-FailedReadiness.ps1'))
+ . ([scriptblock]::Create($retirementText))
+ if($RetireFailedReadiness) {
+  Assert-RetirementProfile $retirementProfile
+  $script:retirementProfileHash=$RetirementProfileSHA256
+  if($retirementProfile.sid -cne $identity.User.Value){throw 'Retirement deployment account differs'}
+ }
+}
 if($Phase1PermissionRepair) {
  if($PreviousManifestSHA256 -cne '4230b7b0eb344d087d29c56935fa6565f5ba050570b042812df174c68f9ce3a4'){throw 'Phase 1 repair requires its exact inventoried updater predecessor'}
  $libraryText=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($newPayload.'K98-SourceUpdate.ps1'))
@@ -132,7 +166,9 @@ Assert-Custody $policy.state_directory
 $lockPath=Join-Path $updates 'operator.lock'
 Assert-Custody $lockPath
 $lock=[IO.File]::Open($lockPath,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+$retirementContext=$null;$retirementLock=$null;$retirementProcesses=$null
 function Assert-UpgradeReleaseState {
+ if(-not $RetireFailedReadiness -and (Test-Path -LiteralPath (Join-Path $updates 'retirements'))){Assert-RetirementUpdates}
  if($Phase1PermissionRepair) {
   $readRecord={param($path,$expected)
    Assert-Custody $path
@@ -150,10 +186,30 @@ function Assert-UpgradeReleaseState {
   }
   $repair=Assert-Phase1PermissionRepairState $readRecord $inventory
   if([IO.Path]::GetFullPath($policyPath) -cne (Join-Path $repair.seed 'AutomaticStartupPolicy.json')){throw 'Phase 1 repair task policy differs'}
+ } elseif($RetireFailedReadiness) {
+  Assert-RetirementEvidence $retirementContext -Archived:(Test-Path -LiteralPath (Join-Path $retirementContext.paths.directory 'active.json'))
+  $null=Get-RetirementRuntime $retirementContext
+  Assert-RetirementProcesses $retirementProcesses
  } elseif(Test-Path -LiteralPath (Join-Path $updates 'active.json')){throw 'Active release exists; tool replacement refused'}
  if(Test-Path -LiteralPath (Join-Path $policy.state_directory 'deployment-request.json')){throw 'Deployment request exists; tool replacement refused'}
 }
 try {
+ if($RetireFailedReadiness) {
+  $retirementContext=Get-RetirementContext $retirementProfile
+  $completed=Join-Path $retirementContext.paths.directory 'complete.json'
+  if(Test-Path -LiteralPath $completed) {
+   $record=Read-CompletedRetirement $retirementContext.paths.directory
+   if($record.intent.profile_sha256 -cne $RetirementProfileSHA256 -or $record.complete.tool_sha256 -cne $TargetManifestSHA256){throw 'Completed retirement belongs to another upgrade'}
+   Assert-UpgradeTool $archive $PreviousManifestSHA256
+   Assert-UpgradeTool $tool $TargetManifestSHA256
+   Write-Host 'RETIREMENT ALREADY COMPLETE: historical failed readiness retained; no release action performed.'
+   return
+  }
+  $retirementLock=Open-RetirementExecution $retirementContext
+  $runtime=Get-RetirementRuntime $retirementContext
+  $retirementProcesses=Open-RetirementProcesses $runtime.processes
+  Assert-RetirementSource $retirementContext $runtime.policy
+ }
  Assert-UpgradeReleaseState
  # Only the fully inventoried old package or exact completed new package is eligible.
  $oldHash=$PreviousManifestSHA256
@@ -163,6 +219,13 @@ try {
   Assert-UpgradeTool $archive $oldHash
   if(Test-Path -LiteralPath $tool) {
    Assert-UpgradeTool $tool $newHash
+   if($RetireFailedReadiness) {
+    Start-FailedReadinessRetirement $retirementContext $retirementBytes $newHash
+    Assert-UpgradeReleaseState
+    Complete-FailedReadinessRetirement $retirementContext $newHash
+    Write-Host 'RETIREMENT COMPLETE WITHOUT VERIFIED READINESS. Updater verified; old release, failure and active selection preserved.'
+    return
+   }
    Write-Host 'UPGRADE ALREADY COMPLETE. No changes made.'
    return
   }
@@ -178,6 +241,7 @@ try {
  # Recheck admission after staging; the exclusive operator lock stays held.
  Assert-UpgradeReleaseState
  Assert-NoUpgradeProcess
+ if($RetireFailedReadiness){Start-FailedReadinessRetirement $retirementContext $retirementBytes $newHash}
  if(-not(Test-Path -LiteralPath $archive)) {
   Assert-UpgradeTool $tool $oldHash
   # Directory moves are confined to literal direct children of the protected root.
@@ -189,6 +253,15 @@ try {
  Move-Item -LiteralPath $candidate -Destination $tool -ErrorAction Stop
  Assert-UpgradeTool $archive $oldHash
  Assert-UpgradeTool $tool $newHash
+ if($RetireFailedReadiness) {
+  Assert-UpgradeReleaseState
+  Complete-FailedReadinessRetirement $retirementContext $newHash
+  Write-Host 'RETIREMENT COMPLETE WITHOUT VERIFIED READINESS. Old release, failure and active selection preserved. No runtime action performed.'
+ }
  Write-Host 'UPGRADE COMPLETE. Old updater retained; bot source, task, startup policy and SQL unchanged.'
  Write-Host "Next, after reviewed production promotion: & 'C:\ProgramData\K98\S11\updater\Update-K98.ps1'"
-} finally {$lock.Dispose()}
+} finally {
+ if($null -ne $retirementProcesses){foreach($process in $retirementProcesses){$process.Dispose()}}
+ if($null -ne $retirementLock){$retirementLock.Dispose()}
+ $lock.Dispose()
+}

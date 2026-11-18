@@ -110,9 +110,9 @@ function Assert-Phase1PermissionRepairState([scriptblock]$ReadRecord,[scriptbloc
  return [pscustomobject]@{release_id=$release;work=$work;stage=$stage;state=$state;seed=$seed;active_sha256=$activeHash;target=$bindings.target}
 }
 function Get-CompletedUpdateReadiness($Prepared,$Manifest,[string]$Stage) {
+ if(Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json')){throw 'Release selection was retired or superseded; no successful closeout may be inferred'}
  if(-not(Test-Path -LiteralPath $Stage)){return $null}
  $null=Read-Bytes (Join-Path $Stage '.release.json') $Prepared.manifest_sha256 65536
- if(Test-Path -LiteralPath (Join-Path $Stage '.amendment-selected.json')){throw 'A selected historical amendment requires its own finalization evidence'}
  foreach($step in $Manifest.steps) {
   $path=Join-Path (Join-Path $Stage '.receipts') ($step.id+'.complete.json')
   if(-not(Test-Path -LiteralPath $path)){return $null}
@@ -916,6 +916,7 @@ function Check-Readiness {
 
 if($Action -ceq 'Library'){return}
 try {
+ if(Test-Path -LiteralPath (Join-Path $PSScriptRoot '.amendment-selected.json')){throw 'Release retired or superseded; no status probe or stage may be replayed'}
  if($ExpectedBindingsSHA256 -cnotmatch '^[a-f0-9]{64}$'){throw 'Exact bindings hash required'}
  Assert-Protected $PSScriptRoot
  $c=Read-Json (Join-Path $PSScriptRoot 'ReleaseBindings.json') $ExpectedBindingsSHA256

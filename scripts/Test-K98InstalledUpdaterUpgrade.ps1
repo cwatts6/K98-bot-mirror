@@ -9,7 +9,7 @@ foreach($f in $ast.FindAll({param($n) $n -is [Management.Automation.Language.Fun
 $passed=0
 function Check($v,$m){if(-not $v){throw $m};$script:passed++}
 function Reject($call,$pattern){try{& $call;throw 'DID_NOT_REJECT'}catch{if($_.Exception.Message -notlike $pattern){throw};$script:passed++}}
-foreach($pin in @('PreviousManifestSHA256','InstallerSHA256','TargetManifestSHA256')) {
+foreach($pin in @('PreviousManifestSHA256','InstallerSHA256','TargetManifestSHA256','RetirementProfileSHA256')) {
  $override=@{};$override[$pin]='0'*64
  Reject {& $path @override} ('*parameter*'+$pin+'*')
 }
@@ -61,6 +61,8 @@ Check (Test-Path -LiteralPath (Join-Path $work 'pending-fixture')) 'partial stag
 $body=$ast.EndBlock.Statements[-1].Extent.Text
 # AST extraction omits the script parameter block; retain its normal default.
 $Phase1PermissionRepair=$false
+$RetireFailedReadiness=$false
+$retirementContext=$null;$retirementLock=$null;$retirementProcesses=$null
 $PreviousManifestSHA256='a'*64;$TargetManifestSHA256='b'*64
 $root='C:\ProgramData\K98\S11';$tool=Join-Path $root 'updater';$archive=Join-Path $root ('updater-before-'+$PreviousManifestSHA256);$updates=Join-Path $root 'updates'
 $work=Join-Path $root ('updater-upgrade-'+$TargetManifestSHA256);$candidate=Join-Path $work 'tool'
@@ -106,4 +108,47 @@ Reject {& ([scriptblock]::Create($body))} '*injected swap failure*'
 Check ($archive -cin $existing -and $tool -cnotin $existing -and $candidate -cin $existing -and $disposed) 'interrupted swap lost original or candidate'
 $script:failSwap=$false;$script:moves=@();& ([scriptblock]::Create($body))
 Check ($moves.Count -eq 1 -and $tool -cin $existing -and $archive -cin $existing) 'interrupted swap did not resume'
+
+# The actual used-upgrade orchestration must retire before the first tool move,
+# retain a barrier through interruption, and never call an operational adapter.
+$RetireFailedReadiness=$true
+$retirementProfile=[pscustomobject]@{}
+$retirementBytes=[byte[]]@(1)
+$RetirementProfileSHA256='d'*64
+$script:events=@();$script:retirementDone=$false;$script:barrier=$false
+$retirementFixture=[pscustomobject]@{paths=[pscustomobject]@{directory='C:\fixture-retirement'};lock='fixture-lock'}
+$fixtureProcess=[pscustomobject]@{};$fixtureProcess|Add-Member ScriptMethod Dispose {$script:events+='process-disposed'}
+$fixtureLock=[pscustomobject]@{};$fixtureLock|Add-Member ScriptMethod Dispose {$script:events+='release-lock-disposed'}
+function Get-RetirementContext($Profile){$script:events+='context';return $retirementFixture}
+function Open-RetirementExecution($Context){$script:events+='release-lock';return $fixtureLock}
+function Get-RetirementRuntime($Context){$script:events+='runtime';return [pscustomobject]@{policy=@{};processes=@()}}
+function Open-RetirementProcesses($Bindings){$script:events+='native-handles';return @($fixtureProcess)}
+function Assert-RetirementSource($Context,$Policy){$script:events+='source'}
+function Assert-RetirementProcesses($Processes){$script:events+='native-check'}
+function Assert-RetirementEvidence($Context,[switch]$Archived){$script:events+='evidence'}
+function Start-FailedReadinessRetirement($Context,[byte[]]$Bytes,[string]$Hash){$script:barrier=$true;$script:events+='barrier-and-intent'}
+function Complete-FailedReadinessRetirement($Context,[string]$Hash){
+ if(-not $script:barrier -or $tool -cnotin $existing -or $archive -cnotin $existing){throw 'retirement completed before verified tool swap'}
+ $script:retirementDone=$true;$script:events+='retired-without-readiness'
+}
+function Move-Item([string]$LiteralPath,[string]$Destination,[string]$ErrorAction){
+ if(-not $script:barrier){throw 'tool moved before legacy barrier'}
+ $script:events+='tool-move'
+ if($script:failSwap -and $LiteralPath -ceq $candidate){throw 'injected swap failure'}
+ $script:moves+=($LiteralPath+'->'+$Destination)
+ $script:existing=@($script:existing|Where-Object {$_ -cne $LiteralPath})+@($Destination)
+}
+Reset-Case;$script:existing+=(Join-Path $updates 'active.json');$script:events=@();$script:barrier=$false;$script:failSwap=$true
+Reject {& ([scriptblock]::Create($body))} '*injected swap failure*'
+Check ($barrier -and -not $retirementDone -and $archive -cin $existing -and $tool -cnotin $existing) 'failed swap lost safe barrier'
+Check ($events -contains 'release-lock-disposed' -and $events -contains 'process-disposed' -and $disposed) 'retirement failure leaked handles'
+$script:failSwap=$false;$script:moves=@();$script:events=@()
+& ([scriptblock]::Create($body))
+Check ($retirementDone -and $moves.Count -eq 1) 'retirement swap continuation failed'
+Check ([array]::IndexOf($events,'barrier-and-intent') -lt [array]::IndexOf($events,'tool-move')) 'barrier ordering differs'
+# Interruption after both tool moves but before pointer retirement finishes only
+# metadata on rerun; it never enters any release source/seed/start/readiness code.
+$script:retirementDone=$false;$script:moves=@();$script:events=@()
+& ([scriptblock]::Create($body))
+Check ($retirementDone -and $moves.Count -eq 0 -and $events -contains 'retired-without-readiness') 'completed tool swap was replayed'
 [pscustomobject]@{Status='PASS';Cases=$passed;ProductionTouched=$false;Qualification='Ordinary fixture ACLs and simulated task/control guards; exact manifest checks, native atomic member writes and orchestration exercised.'}|ConvertTo-Json -Compress
