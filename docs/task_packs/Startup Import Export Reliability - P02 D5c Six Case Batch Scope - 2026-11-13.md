@@ -1,0 +1,119 @@
+# P02 D5c six-case inspector batch scope
+
+The operator approved the exact bounded batch limits on 2026-11-13, including
+the source-size exceptions below. This plan replaces six preparation/review/handoff cycles
+with one reviewed batch. It does not execute a test or mark remaining cases passed.
+
+## Current accepted position
+
+The legacy reader-first/global-owner receipt
+`d5c-unreceipted-reader-first-global-result-66359ec306bf461c849d12cddcaeda79.json`
+has verified SHA256 `e806fc7393033d75874bb1c4695f5e85145b52e6f8801b4475942cfb10a3ac0f`.
+Refusal, reader-before-holder order, cleanup and preservation passed. Host time
+2.1126942 seconds consumes three, leaving 1,316 native seconds including the
+protected 1,000-second later-slice reserve. D5c has 316 seconds available.
+The inspector countdown is 19/25 accepted, six remaining. D5c overall remains
+seven of twelve families closed; this batch cannot close the other four partial
+families. Original receipts, failures and completed cases remain immutable.
+
+## Six fixed cases, one handoff
+
+| Case | Planned reserved operations |
+|---|---:|
+| Legacy reader before account owner | 48 |
+| Configuration publication fresh inspection | 42 |
+| Configuration global owner before reader | 47 |
+| Configuration account owner before reader | 48 |
+| Configuration reader before global owner | 47 |
+| Configuration reader before account owner | 48 |
+| Total baseline | 280 |
+
+Each case remains separately identified, uses its own owned connections/process,
+produces an immutable receipt, and must pass exact preservation and physical
+cleanup adjudication before the next case starts. Execution is sequential.
+The batch stops at the first error, incomplete result, identity mismatch, unknown
+cleanup or resource/time floor. There is no automatic retry or evidence deletion.
+Final assistant review still precedes acceptance and dependent later work.
+The batch ends with one summary for the operator to paste into chat.
+
+## Approved bounded changes for this batch only
+
+- One aggregate ceiling of 288 operations; every stage stays at or below 48.
+- One 180-second aggregate deadline including verification and cleanup; each
+  stage stays within 60 seconds. Do not admit another stage with fewer than
+  60 seconds remaining. An early budget stop leaves unstarted cases unconsumed.
+- Keep the 2,048-row aggregate ceiling and 1 MiB combined receipt ceiling.
+- Permit up to 256 KiB per stage manifest, 128 KiB per staged source bundle and
+  512 KiB expanded source, compared with 128/64/320 KiB previously.
+
+The measured configuration bundle contains 32 complete source modules and needs
+462,841 expanded bytes and 91,787 encoded bytes. These small source-size increases
+avoid substituting or trimming actual configuration code. They are qualification
+artifact limits, not VM memory or disk allocation increases. The source-only
+measurement is recorded in `d5c-inspector-batch-feasibility-20261113.json`.
+
+No change to the 1,316-second remaining overall native allowance, the 1,000-second
+later reserve, 50-second Windows allocation, VM resources/isolation, disk reserves,
+permissions, original database protection, production code or consumed 21 inputs.
+No new fixture rows: eleven of sixty-four remain in use. No maintenance/writer/
+isolation retry, provider request, import, report production, recovery action or
+deployment is added. Only the named six previously unexecuted inspector cases.
+
+## Preparation and review gate
+
+Prepare all six stage packets, one bounded host batch runner and an exact saved-
+receipt verifier together. Retain complete actual configuration DAL source and
+dependencies. Prove bundle load order, full source pins, constructor/inspection
+paths, fresh decision, both lock orders and no effectful service entry.
+
+Offline tests must prove refusal on a failed/missing/forged receipt, changed files,
+ambiguous result files, cleanup uncertainty and exhausted budget; no later stage
+may start after any such condition. Test individual stages and exact aggregate
+operation/row/byte/time accounting. Review the frozen whole change once with
+Changes mode and Deep off before providing the new console step.
+
+The original 48-operation single-packet limit cannot accommodate two existing
+inspector cases: even shared metadata/control overhead plus two actors exceeds
+it. The batch retains individual bounds and makes the aggregate increase explicit.
+No existing case is rerun to fit the new grouping.
+
+Later C04/C05/C06/C09 cases should be grouped by shared fixture and source path
+after their finite case inventory is reconciled. This plan does not invent their
+counts or waive any acceptance evidence. D5d/D5e/D5f and D6 remain separate.
+
+## Concrete execution packet
+
+`scripts/run_p02_d5c_inspector_batch.ps1` is the sole operator handoff. Its pinned
+`d5c-inspector-batch-execution-packet.json` lists six distinct wrappers, actors
+and manifests generated by `build_d5c_inspector_batch.py`. The individual wrappers
+retain the accepted metadata queries, resource/identity predicates, source pins,
+actor watchdog, SQL closure observer and irreversible create-new attempt markers.
+No production file or SQL source is changed. All 32 configuration modules load
+whole, with a SQL allowlist blocking any effectful service call.
+
+The runner holds all six script and manifest files open read-only for the batch,
+checks saved receipt hashes, replays each exact pure actor-result validator and
+independently checks metadata/preservation/cleanup before admitting the next case.
+One intent prevents replay of the batch. Every stage still has its own intent.
+Successful cases remain saved if a later stage fails. The aggregate planned row
+reservation is 667, and operation reservation is 280. The automatic checks do not
+replace final assistant acceptance.
+
+Each stage receipt is tightened to 128 KiB and guest JSON to 120,000 bytes.
+The runner reserves two stage records for an incomplete wrapper plus 64 KiB for
+the final summary; no seven-record worst case exceeds the 1 MiB combined limit.
+Receipt bytes, operations and rows accumulate; no stage resets the aggregate.
+Stage manifests label 1,316 as the batch initial allowance, never an independent
+remaining allowance. Debit the complete operator stopwatch once, rounded up;
+stage timing is diagnostic only. There is no refund for failure.
+
+Security decision: Changes review of the frozen batch diff in the Bot repository,
+Deep off. SQL/files/process custody and automated continuation require review.
+No SQL repository change exists, so no separate SQL diff is introduced. The same
+21 metadata statements are compared to the already accepted source-validated
+packet. Offline tests exercise full real DAL paths with inert drivers, all six
+stage validators, aggregate limits and first-failure stop behavior. Production
+pytest and native integration fixtures are deliberately excluded: they can mutate
+test accounts and retained data outside this packet's scope. No PR or deployment
+is being made; whole-repository PR checks are not substitutes for this packet's
+focused executable validation.
