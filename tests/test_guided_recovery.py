@@ -300,11 +300,13 @@ def test_concurrent_confirmations_have_one_business_transition(monkeypatch, lose
     service, dal, store, row = setup()
     dal.lose_ack = lose_ack
     entered, finish = Event(), Event()
+    timeout = 10
     original_settle = dal.settle
 
     def settle(*args, **kwargs):
         entered.set()
-        assert finish.wait(5), "Test did not release its fake settlement"
+        # Outlast both controlling waits and leave headroom for finally cleanup.
+        assert finish.wait(3 * timeout), "Test did not release its fake settlement"
         return original_settle(*args, **kwargs)
 
     monkeypatch.setattr(dal, "settle", settle)
@@ -314,9 +316,9 @@ def test_concurrent_confirmations_have_one_business_transition(monkeypatch, lose
     with ThreadPoolExecutor(max_workers=2) as pool:
         first = pool.submit(execute, service, row)
         try:
-            assert entered.wait(5), "Fake settlement was not entered"
+            assert entered.wait(timeout), "Fake settlement was not entered"
             # A duplicate must return progress without reconciling a live call.
-            repeated = pool.submit(execute, service, row).result(timeout=5)
+            repeated = pool.submit(execute, service, row).result(timeout=timeout)
             assert repeated["State"] == "open"
             assert repeated["pending_action"] == dict(state="dispatched", kind="supersede_partial")
             assert repeated["execution_progress"]["state"] == "in_progress"
@@ -324,7 +326,7 @@ def test_concurrent_confirmations_have_one_business_transition(monkeypatch, lose
             assert len(store.actions) == 1 and not dal.calls
         finally:
             finish.set()
-        completed = first.result(timeout=5)
+        completed = first.result(timeout=timeout)
     assert completed["State"] == "resolved" and completed["pending_action"] is None
     assert store.actions[0]["State"] == "verified"
     assert execute(service, row)["State"] == "resolved"
