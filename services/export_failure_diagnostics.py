@@ -204,9 +204,7 @@ def replacement_decision_context(job, registration):
     comparison = (
         "matches current"
         if original and original == current_hash
-        else "differs from current"
-        if original and current_hash
-        else "comparison unavailable"
+        else "differs from current" if original and current_hash else "comparison unavailable"
     )
     context.update(
         original_created_utc=created,

@@ -1691,9 +1691,7 @@ def validate_application_installation_contract(approved):
         != (
             D4_SOURCE_SHA256
             if d4
-            else APPLICATION_SOURCE_SHA256
-            if phase1
-            else APPLICATION_SCHEMA_SOURCE_HASH
+            else APPLICATION_SOURCE_SHA256 if phase1 else APPLICATION_SCHEMA_SOURCE_HASH
         )
     ):
         raise SourceConflict("Complete independently reviewed application SQL contract required.")

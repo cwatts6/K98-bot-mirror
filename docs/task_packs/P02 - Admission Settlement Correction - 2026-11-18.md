@@ -219,3 +219,12 @@ whitespace checks passed. The repository's Black formatting was applied and
 checked through its formatter API after stalled CLI cache/process invocations
 were stopped; no application process was involved. Earlier 366-pass results and
 all unrelated full-suite SQL-byte failures remain historical evidence.
+
+## Private CI formatting follow-up
+
+Private PR746's first quality run stopped at Black: three correction files needed
+formatting. The mirror follow-up preserves their Python ASTs and updates only the
+two affected successor hashes in the new admission transition. All92 historical
+entries, predecessor hashes, four-member scope and registry byte bound remain
+unchanged. The failed CI receipt is retained; tests, review and final package
+identities must be refreshed before private merge. No installed source is changed.
