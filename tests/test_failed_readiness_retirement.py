@@ -1,6 +1,5 @@
 """Retirement never converts a failed release into readiness or replays effects."""
 
-from copy import deepcopy
 import hashlib
 import json
 import os
@@ -177,13 +176,6 @@ def test_windows_retirement_state_and_native_file_harness(tmp_path):
     assert report["Cases"] >= 35
 
 
-def test_profile_input_preserved():
-    value = profile()
-    before = deepcopy(value)
-    retirement_profile(json.dumps(value).encode())
-    assert value == before
-
-
 def test_generated_package_passes_actual_normal_updater_inventory(packaged, tmp_path):
     """Run the real consumer block without executing host/updater entrypoints."""
     import base64
@@ -206,6 +198,7 @@ $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $ToolDirector
 if($errors.Count){throw 'Library parse failed'}
 foreach($name in @('Hash','Read-Bytes','Read-Json')) {
  $definition=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true)
+ if($null -eq $definition){throw ('Required library function missing: '+$name)}
  . ([scriptblock]::Create($definition.Extent.Text))
 }
 function Assert-Protected([string]$Path) {

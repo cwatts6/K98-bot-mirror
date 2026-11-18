@@ -19,6 +19,7 @@ $ast=[Management.Automation.Language.Parser]::ParseFile($library,[ref]$tokens,[r
 if($errors.Count){throw 'Library parsing failed'}
 foreach($name in @('Hash','Read-Bytes','Write-New','New-Directory','Open-SourceCustodyHandle')) {
  $definition=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true)
+ if($null -eq $definition){throw ('Required library function missing: '+$name)}
  . ([scriptblock]::Create($definition.Extent.Text))
 }
 . (Join-Path $PSScriptRoot 'K98-FailedReadiness.ps1')
