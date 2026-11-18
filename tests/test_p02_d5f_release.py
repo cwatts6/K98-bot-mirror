@@ -59,7 +59,7 @@ def bound_pair(monkeypatch):
 
 def test_all_89_historical_entries_preserved_and_current_family_exact():
     entries = update.reviewed_transitions()
-    assert len(entries) == 93
+    assert len(entries) == 94
     assert hashlib.sha256(encode(dict(version=1, transitions=entries[:89]))).hexdigest() == (
         "2dc508adfe1410609124eedeec41fb9c21855ab62e8d53e99f128eca45c04135"
     )

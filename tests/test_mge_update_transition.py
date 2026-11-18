@@ -40,7 +40,7 @@ def test_complete_bundle_pins_current_source():
 
 def test_reviewed_history_and_mge_hashes_remain_exact():
     items = updater.reviewed_transitions()
-    assert len(items) == 93
+    assert len(items) == 94
     # Independent review pins: original 48 entries and exact 27-file addition.
     # These include predecessor hashes, including required absence for new files.
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()

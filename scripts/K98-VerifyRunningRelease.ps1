@@ -106,9 +106,11 @@ function Invoke-RunningReleaseVerification($Profile,[string]$ProfileHash,[string
    closeout_kind='running_release_verification_v1';profile_sha256=$ProfileHash;actor_sid=$Profile.sid;
    failure_evidence_sha256=$Profile.failure_evidence_sha256;attempt_sha256=(Hash (Read-RetirementBytes $attemptPath));
    current_successor=$proof;readiness=@{discord_status='operator_confirmed_online';import_export=@{status='degraded';provider_delivery_verified=$false};original_start='unconfirmed_preserved';original_readiness='unstarted_preserved'}}
-  Write-RetirementBytes $complete (Retirement-Bytes $acceptance)
   Assert-RetirementProcesses $processes
   $null=Assert-RunningReleaseEvidence $Profile
+  # Publish only after every fallible verification check has passed. This is
+  # point-in-time acceptance, not a promise that the processes cannot exit later.
+  Write-RetirementBytes $complete (Retirement-Bytes $acceptance)
   Write-Host 'VERIFICATION RECORDED. Original start/readiness receipts and both failure histories are preserved. Runtime unchanged; no restart or replay. Run only -Status next and obtain review before clearing the active pointer.'
  } finally {
   if($null -ne $processes){foreach($process in $processes){$process.Dispose()}}

@@ -41,7 +41,7 @@ def test_complete_bundle_pins_current_source():
 
 def test_reviewed_history_and_mge_hashes_remain_exact():
     items = updater.reviewed_transitions()
-    assert len(items) == 93
+    assert len(items) == 94
     # All fifty historical entries are immutable; this is one fixed successor.
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     assert (

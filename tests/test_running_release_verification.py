@@ -630,7 +630,7 @@ def test_native_readiness_distinguishes_observer_contention(tmp_path, warning, e
 @pytest.mark.skipif(os.name != "nt", reason="Actual PowerShell verification-only orchestration")
 @pytest.mark.parametrize(
     "outcome,answer,drift",
-    [(0, True, False), (12, True, False), (1, True, False), (0, False, False), (0, True, True)],
+    [(0, True, 0), (12, True, 0), (1, True, 0), (0, False, 0), (0, True, 3), (0, True, 4)],
 )
 def test_native_orchestration_cannot_restart_replay_or_accept_failed_verification(
     tmp_path, outcome, answer, drift
@@ -654,7 +654,7 @@ def test_native_orchestration_cannot_restart_replay_or_accept_failed_verificatio
     fixture = tmp_path / "harness.ps1"
     fixture.write_text(
         r"""
-param($Root,$Fixture,$Python,[bool]$Drift,[string]$Answer)
+param($Root,$Fixture,$Python,[int]$Drift,[string]$Answer)
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 . (Join-Path $Root 'scripts/K98-SourceUpdate.ps1') -Action Library
 . (Join-Path $Root 'scripts/K98-FailedReadiness.ps1')
@@ -665,7 +665,7 @@ $profile=[pscustomobject]@{stage=(Join-Path $Fixture 'release');release_id='r';t
 $script:checks=0
 function Assert-RunningReleaseEvidence {
  $script:checks++
- if($Drift -and $script:checks -eq 3){throw 'identity changed'}
+ if($Drift -and $script:checks -eq $Drift){throw 'identity changed'}
  $script:c=[pscustomobject]@{venv=[pscustomobject]@{path=$Python;sha256='fixture'}}
  return [pscustomobject]@{processes=@();journal=[pscustomobject]@{sequence=107}}
 }
@@ -682,11 +682,11 @@ function Assert-Drained {throw 'FORBIDDEN'}
 Invoke-RunningReleaseVerification $profile 'profile' $Fixture
 """
     )
-    # PowerShell command-line boolean binding is awkward; drive a literal call through a wrapper.
+    # Drive the parameterized fixture through a literal, quoted wrapper.
     driver = tmp_path / "driver.ps1"
     q = lambda s: "'" + str(s).replace("'", "''") + "'"
     driver.write_text(
-        f"& {q(fixture)} -Root {q(ROOT)} -Fixture {q(tmp_path)} -Python {q(sys.executable)} -Drift ${str(drift).lower()} -Answer {q('CONFIRM ONLINE' if answer else '')}\n"
+        f"& {q(fixture)} -Root {q(ROOT)} -Fixture {q(tmp_path)} -Python {q(sys.executable)} -Drift {drift} -Answer {q('CONFIRM ONLINE' if answer else '')}\n"
     )
     result = subprocess.run(
         [PS, "-NoProfile", "-NonInteractive", "-File", str(driver)],
