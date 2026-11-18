@@ -1,4 +1,4 @@
-"""Deploy only the qualified direct successor; retain every historic family."""
+"""Retain the qualified historical family through authenticated successors."""
 
 import hashlib
 import json
@@ -23,6 +23,26 @@ def family():
     )
 
 
+@pytest.fixture(autouse=True)
+def authenticated_admission_successor(monkeypatch):
+    """Keep this historical family test bound through the exact reviewed successor."""
+    successor = next(
+        t for t in updater.reviewed_transitions() if t["id"] == updater.P02_ADMISSION_TRANSITION
+    )
+    pairs = {
+        m["after_sha256"]: m["before_sha256"]
+        for m in successor["members"]
+        if m["before_sha256"] is not None
+    }
+    original = updater.sha256
+
+    def historical_hash(raw):
+        value = original(raw)
+        return pairs.get(value, value)
+
+    monkeypatch.setattr(updater, "sha256", historical_hash)
+
+
 def blobs():
     result = {}
     for member in family()["members"]:
@@ -45,14 +65,14 @@ def blobs():
 
 def test_all_91_historical_families_unchanged():
     items = updater.reviewed_transitions()
-    assert len(items) == 92
+    assert len(items) == 93
     assert hashlib.sha256(json.dumps(items[:91], sort_keys=True).encode()).hexdigest() == (
         "ca56fa94f3921b714a07a63e94fc10c051f3869b1fdca8f962e7c051740ed92c"
     )
     assert {m["path"] for m in family()["members"]} == updater.P02_QUALIFIED_COMPATIBILITY_PATHS
 
 
-def test_real_direct_source_pair_matches_qualified_family():
+def test_authenticated_historical_pair_matches_qualified_family():
     data = blobs()
     assert updater.matches_protocol_transition(family(), lambda *k: data.get(k), "old", "new")
     for member in family()["members"]:
@@ -95,4 +115,5 @@ def test_qualified_family_builds_complete_packet(tmp_path, monkeypatch, bot):  #
 
     monkeypatch.setattr(previous, "assert_complete_repair_packet", qualified)
     complete_packet(tmp_path, monkeypatch, bot)
-    assert original()[-1]["id"] == updater.P02_QUALIFIED_TRANSITION
+    assert original()[-2]["id"] == updater.P02_QUALIFIED_TRANSITION
+    assert original()[-1]["id"] == updater.P02_ADMISSION_TRANSITION

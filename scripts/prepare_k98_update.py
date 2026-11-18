@@ -1306,6 +1306,13 @@ P02_QUALIFIED_COMPATIBILITY_PATHS = P02_MAINTENANCE_COMPATIBILITY_PATHS | {
     "prekvk/dal/import_history_dal.py",
 }
 P02_QUALIFIED_TRANSITION = "p02_maintenance_qualified_v1"
+P02_ADMISSION_TRANSITION = "p02_admission_settlement_v1"
+P02_ADMISSION_PATHS = {
+    "bot_instance.py",
+    "services/export_runtime_composition.py",
+    "services/export_failure_diagnostics.py",
+    "services/runtime_admission_diagnostics.py",
+}
 
 
 def reviewed_transitions():
@@ -1323,7 +1330,14 @@ def reviewed_transitions():
         raise ValueError("Unsupported installed transition registry.")
     if (
         not isinstance(value["transitions"], list)
-        or len(value["transitions"]) > 92
+        or len(value["transitions"]) > 93
+        or (
+            len(value["transitions"]) == 93
+            and not any(
+                isinstance(t, dict) and t.get("id") == P02_ADMISSION_TRANSITION
+                for t in value["transitions"]
+            )
+        )
         or (
             len(value["transitions"]) == 92
             and not any(
@@ -1380,6 +1394,9 @@ def reviewed_transitions():
             if set(member) != {"path", "before_sha256", "after_sha256"}:
                 raise ValueError("Exact transition member required.")
             path = ordinary_path(member["path"])
+            fixed_p02_admission = (
+                item["id"] == P02_ADMISSION_TRANSITION and path in P02_ADMISSION_PATHS
+            )
             fixed_closeout = (
                 item["id"] == "failed_export_closeout_v1" and path in FAILED_EXPORT_TRANSITION_PATHS
             )
@@ -1636,6 +1653,7 @@ def reviewed_transitions():
             if (
                 not (
                     path.startswith("services/export_")
+                    or fixed_p02_admission
                     or fixed_settlement
                     or fixed_closeout
                     or fixed_cache
@@ -1739,6 +1757,8 @@ def reviewed_transitions():
                     continue
                 if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
                     raise ValueError("Exact reviewed protocol hashes required.")
+        if item["id"] == P02_ADMISSION_TRANSITION and paths != P02_ADMISSION_PATHS:
+            raise ValueError("Complete fixed admission settlement transition required.")
         if item["id"] == P02_QUALIFIED_TRANSITION and paths != P02_QUALIFIED_COMPATIBILITY_PATHS:
             raise ValueError("Complete fixed qualified maintenance transition required.")
         if (

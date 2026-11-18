@@ -5,6 +5,9 @@ import re
 from uuid import uuid4
 
 _CODE_FILES = {
+    "runtime_admission_diagnostics.py",
+    "application_maintenance_dal.py",
+    "application_maintenance_contract.py",
     "recovery_service.py",
     "stats_report_continuation_dal.py",
     "import_capture_recovery_dal.py",
@@ -201,7 +204,9 @@ def replacement_decision_context(job, registration):
     comparison = (
         "matches current"
         if original and original == current_hash
-        else "differs from current" if original and current_hash else "comparison unavailable"
+        else "differs from current"
+        if original and current_hash
+        else "comparison unavailable"
     )
     context.update(
         original_created_utc=created,

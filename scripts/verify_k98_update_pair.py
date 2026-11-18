@@ -7,7 +7,7 @@ read-only SQL observations are checked by the complete existing startup comparat
 
 import argparse
 from copy import deepcopy
-from datetime import UTC
+from datetime import UTC, datetime
 import hashlib
 import io
 import json
@@ -331,6 +331,92 @@ def verify_live_source(config, *, predecessor=False):
     return policy
 
 
+def startup_admission_result(config, journal, start):
+    """Read bounded existing startup evidence before any successor SQL observer.
+
+    This orders observation only. Exact source/native/SQL checks still establish
+    readiness; log text never authorizes a start, retry, recovery or business work.
+    """
+    if (
+        set(start) != {"release_id", "requested_utc", "log_offset"}
+        or start["release_id"] != config["release_id"]
+        or type(start["log_offset"]) is not int
+        or start["log_offset"] < 0
+    ):
+        raise ValueError("Exact start request required for admission observation")
+    requested = datetime.fromisoformat(start["requested_utc"].replace("Z", "+00:00"))
+    if requested.tzinfo is None:
+        raise ValueError("UTC start request required")
+    binding = journal["bindings"]["bot"]
+    expected = journal["publication"]["manifests"]["bot"]
+    try:
+        with (Path(config["root"]) / "logs" / "log.txt").open("rb") as stream:
+            length = stream.seek(0, 2)
+            if not 0 <= length - start["log_offset"] <= 8 * 1024 * 1024:
+                raise ValueError("Startup log rotated/exceeded bound; admission unresolved")
+            stream.seek(start["log_offset"])
+            raw = stream.read(8 * 1024 * 1024 + 1)
+    except FileNotFoundError as exc:
+        raise PairPublicationPending("Awaiting successor admission evidence") from exc
+    if len(raw) > 8 * 1024 * 1024:
+        raise ValueError("Startup log exceeds admission observation bound")
+    results = []
+    marker = b"K98_STARTUP_ADMISSION_RESULT "
+    # An in-flight final line is not settled evidence. JSON prose/tracebacks are
+    # never evaluated; only the exact code-owned result and identity are used.
+    for line in raw.splitlines(keepends=True):
+        if marker not in line or not line.endswith(b"\n"):
+            continue
+        payload = line.split(marker, 1)[1]
+        if len(payload) > 32768:
+            raise ValueError("Admission result exceeds bound")
+        record = json.loads(payload)
+        if not isinstance(record, dict):
+            raise ValueError("Malformed admission result")
+        if (
+            record.get("manifest_sha256") != expected
+            or record.get("pid") != binding["pid"]
+            or record.get("created_filetime") != binding["created_filetime"]
+        ):
+            continue
+        observed = datetime.fromisoformat(record["observed_utc"])
+        if (
+            type(record.get("version")) is not int
+            or record["version"] != 1
+            or type(record.get("pid")) is not int
+            or type(record.get("created_filetime")) is not int
+            or observed.tzinfo is None
+            or not requested <= observed <= datetime.now(UTC)
+            or record.get("outcome") not in {"installed", "failed", "disabled"}
+        ):
+            raise ValueError("Stale or invalid successor admission result")
+        results.append(record)
+    if not results:
+        raise PairPublicationPending(
+            "Awaiting exact successor admission settlement; no SQL queried"
+        )
+    if any(r["outcome"] == "failed" for r in results):
+        raise ValueError(
+            "Successor admission failed; preserve its first diagnostic; do not restart"
+        )
+    if len(results) != 1 or results[0]["outcome"] != "installed":
+        raise ValueError("One successful initial admission required; readiness unconfirmed")
+    return results[0]
+
+
+def verify_successor_admission(config, journal):
+    from core.export_startup_windows import administrative_path
+
+    path = administrative_path(Path(__file__).parent / "start-requested.json", private=True)
+    return startup_admission_result(config, journal, json.loads(read(path)))
+
+
+def verify_successor_contracts(config, policy, journal, *, sql_contracts=True):
+    verify_successor_admission(config, journal)
+    if sql_contracts:
+        verify_sql_contracts(config, policy)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bindings", required=True)
@@ -345,9 +431,9 @@ def main():
     activate_release_archive(config, Path(__file__).parent)
     if "application_contract_repair" in config and not args.sql_contracts:
         raise ValueError("P016 application repair requires complete SQL contract verification")
-    if args.sql_contracts:
-        verify_sql_contracts(config, policy, preflight=args.preflight)
     if args.preflight:
+        if args.sql_contracts:
+            verify_sql_contracts(config, policy, preflight=True)
         print(
             json.dumps(
                 dict(stage="PREDECESSOR_LIVE_SOURCE_VERIFIED", sql_connected=args.sql_contracts)
@@ -424,6 +510,7 @@ def main():
     try:
         for binding in bindings:
             handles.append(open_pinned_process(binding["pid"], binding))
+        verify_successor_contracts(config, policy, journal, sql_contracts=args.sql_contracts)
         print(
             json.dumps(
                 dict(
@@ -574,7 +661,7 @@ if __name__ == "__main__":
             ),
             flush=True,
         )
-        raise SystemExit(1)
+        raise SystemExit(11)
     except Exception as exc:
         print(
             json.dumps(

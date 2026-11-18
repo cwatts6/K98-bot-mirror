@@ -321,7 +321,7 @@ function Assert-Drained {}
 function Assert-Source {}
 function Seed-Complete {return $true}
 function New-Journal {return @{}}
-function Verify-Native {}
+function Verify-Native {return $true}
 function Assert-NewSession {}
 function Read-Json {return @{log_offset=0}}
 function Write-Record {$script:written=$true}

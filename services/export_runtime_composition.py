@@ -842,6 +842,7 @@ class ExportRuntime(RuntimeLifetime):
 
 def install_configured_runtime():
     import bot_config
+    from services.runtime_admission_diagnostics import stage
 
     if not bot_config.EXPORT_COORDINATION_ENABLED:
         return None
@@ -865,9 +866,11 @@ def install_configured_runtime():
                 raise SourceConflict("Shutdown closed admission during runtime readiness.")
             _recovery_bundle = bundle
         if isinstance(bundle, ExportRuntime):
+            stage("replacement_registration")
             with bundle.reconfigure():
                 bundle.refresh_replacement_registration()
                 bundle.legacy.recovery_only = False
+        stage("runtime_publish")
         with _installation_lock:
             if _runtime_stopped:
                 bundle.stop()
@@ -901,7 +904,9 @@ def _prepare_configured_runtime():
     )
     from services.export_execution_protocol import decode
     from services.export_snapshot_store import ExportSnapshotStore
+    from services.runtime_admission_diagnostics import stage
 
+    stage("manifest")
     path = os.environ.get("K98_EXPORT_RUNTIME_MANIFEST")
     if not path:
         raise SourceConflict("Protected S11 runtime manifest is required before admission.")
@@ -963,6 +968,7 @@ def _prepare_configured_runtime():
         raise SourceConflict(
             "All readiness contracts must target the same restricted Bot principal."
         )
+    stage("source_inventory")
     root = Path(__file__).resolve().parents[1]
     hashes = config["source_hashes"]
     if not isinstance(hashes, dict) or set(hashes) != code_files(root):
@@ -992,6 +998,7 @@ def _prepare_configured_runtime():
     connection_factory = partial(
         configured_connection, sql_profile=config["sql_contract"]["profile"]
     )
+    stage("fixed_sql_contract")
     verify_installation_contract(
         ExportExecutionDAL(connection_factory).installation_snapshot(
             **(
@@ -1002,6 +1009,7 @@ def _prepare_configured_runtime():
         ),
         config["sql_contract"],
     )
+    stage("legacy_sql_contract")
     connection = connection_factory()
     try:
         connection.autocommit = True
@@ -1012,12 +1020,14 @@ def _prepare_configured_runtime():
                 config["legacy_sql_contract"],
                 profile=config["sql_contract"]["profile"],
             )
+            stage("application_sql_contract")
             verify_application_installation_contract(
                 application_snapshot_for_contract(cursor, config["application_sql_contract"]),
                 config["application_sql_contract"],
             )
             from core.recovery_sql_snapshot import require_recovery_snapshot_isolation
 
+            stage("recovery_isolation")
             require_recovery_snapshot_isolation(cursor)
         finally:
             from core.sql_connection_custody import connection_retained
@@ -1029,6 +1039,7 @@ def _prepare_configured_runtime():
 
         if not connection_retained(connection):
             connection.close()
+    stage("authority_ready")
     client = AuthorityClient(
         **{k: authority[k] for k in ("pipe_id", "authority_sid", "bot_sid", "deployment_hash")},
         **(
@@ -1044,6 +1055,7 @@ def _prepare_configured_runtime():
         expected_ready.update(sql_contract_hash=digest(config["sql_contract"]).hex())
     if client._invoke(dict(version=1, action="ready")) != expected_ready:
         raise SourceConflict("Protected authority registration/deployment differs.")
+    stage("runtime_construct")
     spool = assert_protected_path(config["spool_root"], private=True)
     store = ExportSnapshotStore(spool, registration.value()["storage_owner"])
     bundle = ExportRuntime(
@@ -1679,7 +1691,9 @@ def validate_application_installation_contract(approved):
         != (
             D4_SOURCE_SHA256
             if d4
-            else APPLICATION_SOURCE_SHA256 if phase1 else APPLICATION_SCHEMA_SOURCE_HASH
+            else APPLICATION_SOURCE_SHA256
+            if phase1
+            else APPLICATION_SCHEMA_SOURCE_HASH
         )
     ):
         raise SourceConflict("Complete independently reviewed application SQL contract required.")

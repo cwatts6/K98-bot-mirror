@@ -198,7 +198,7 @@ $script:statusRecord=$null
 function Assert-Drained {param([switch]$SuccessorRunning)}
 function Assert-Source($Pins,$Commit) {}
 function Seed-Complete {return $true}
-function Verify-Native {}
+function Verify-Native {return $true}
 function Read-Json([string]$Path,[string]$Expected='') {
  if($Path.EndsWith('start-requested.json')){return @{log_offset=$script:offset}}
  return $script:statusRecord
