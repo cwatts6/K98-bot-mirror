@@ -292,13 +292,42 @@ def test_partial_requires_its_specific_action():
     assert not dal.calls
 
 
-def test_concurrent_confirmations_have_one_business_transition():
+@pytest.mark.parametrize("lose_ack", [False, True])
+def test_concurrent_confirmations_have_one_business_transition(monkeypatch, lose_ack):
     from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
 
     service, dal, store, row = setup()
+    dal.lose_ack = lose_ack
+    entered, finish = Event(), Event()
+    original_settle = dal.settle
+
+    def settle(*args, **kwargs):
+        entered.set()
+        assert finish.wait(5), "Test did not release its fake settlement"
+        return original_settle(*args, **kwargs)
+
+    monkeypatch.setattr(dal, "settle", settle)
+    adapter = service.adapters["stats_import"]
+    reconcile = Mock(wraps=adapter.reconcile)
+    monkeypatch.setattr(adapter, "reconcile", reconcile)
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(lambda _: execute(service, row), range(2)))
-    assert all(r["State"] == "resolved" for r in results)
+        first = pool.submit(execute, service, row)
+        try:
+            assert entered.wait(5), "Fake settlement was not entered"
+            # A duplicate must return progress without reconciling a live call.
+            repeated = pool.submit(execute, service, row).result(timeout=5)
+            assert repeated["State"] == "open"
+            assert repeated["pending_action"] == dict(state="dispatched", kind="supersede_partial")
+            assert repeated["execution_progress"]["state"] == "in_progress"
+            reconcile.assert_not_called()
+            assert len(store.actions) == 1 and not dal.calls
+        finally:
+            finish.set()
+        completed = first.result(timeout=5)
+    assert completed["State"] == "resolved" and completed["pending_action"] is None
+    assert store.actions[0]["State"] == "verified"
+    assert execute(service, row)["State"] == "resolved"
     assert len(dal.calls) == 1
     assert len(store.actions) == 1
 

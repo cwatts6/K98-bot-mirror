@@ -108,6 +108,25 @@ the generated payload and rejects missing, substituted or changed helper bytes.
 The initial 526 passing tests did not cover this consumer; their result and the
 review discovery remain retained. Review of the corrected final head is required.
 
+## Concurrent-confirmation regression correction
+
+The guided-recovery concurrency test assumed both immediate confirmation responses
+were resolved, although the existing execution guard deliberately returns cached
+in-progress state to an overlapping caller. The existing publication/monitor race
+tests require that behavior: a live call must not be reconciled or dispatched again,
+and monitor work must not wait behind a long-running administrator operation.
+The guard, service and import adapter are unchanged by this correction.
+
+The regression now forces the overlap with events instead of depending on thread
+scheduling. It requires an open, dispatched, in-progress duplicate response and no
+reconciliation while the first fake settlement is held. After release, it requires
+verified resolution and exactly one durable action and business transition, both
+with a normal acknowledgement and a lost acknowledgement. A later confirmation
+must remain resolved without another business transition. This fixes the erroneous
+test expectation without suppressing the test or weakening the runtime guard.
+Original failure evidence remains retained. CI execution is approved after this
+correction; failed production-release replay remains prohibited.
+
 ## Release and verification sequence
 
 1. Finish local validation and the mirror's reviews/checks, then merge it. Apply
