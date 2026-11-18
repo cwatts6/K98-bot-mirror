@@ -182,6 +182,8 @@ async def test_actual_ready_callback_waits_for_observation_before_registering_wo
         "null_time",
         "numeric_time",
         "invalid_time",
+        "naive_time",
+        "offset_time",
     ],
 )
 def test_missing_failed_stale_or_ambiguous_evidence_never_reaches_sql(
@@ -210,6 +212,10 @@ def test_missing_failed_stale_or_ambiguous_evidence_never_reaches_sql(
         record["observed_utc"] = 123
     if damage == "invalid_time":
         record["observed_utc"] = "private-invalid-time"
+    if damage == "naive_time":
+        record["observed_utc"] = datetime.now(UTC).replace(tzinfo=None).isoformat()
+    if damage == "offset_time":
+        record["observed_utc"] = datetime.now(UTC).isoformat().replace("+00:00", "+01:00")
     raw = diagnostic.MARKER + json.dumps(record) + "\n"
     if damage == "missing":
         raw = "Logged in as bot\n[BOOT] full_startup_sequence completed successfully\n"
@@ -242,6 +248,39 @@ def test_missing_failed_stale_or_ambiguous_evidence_never_reaches_sql(
     if damage.endswith("_time"):
         assert str(caught.value) == "Malformed admission observation timestamp"
     sql.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "value", [None, 123, "private-start-time", "2026-11-18T11:00:00", "2026-11-18T11:00:00+01:00"]
+)
+def test_malformed_start_timestamps_are_sanitized_before_sql(monkeypatch, admission, value):
+    installed_result(monkeypatch, admission)
+    config, journal, start, _, _ = admission
+    start["requested_utc"] = value
+    sql = Mock()
+    monkeypatch.setattr(verifier, "verify_sql_contracts", sql)
+    monkeypatch.setattr(
+        verifier,
+        "verify_successor_admission",
+        lambda c, j: verifier.startup_admission_result(c, j, start),
+    )
+    with pytest.raises(ValueError, match=r"^Malformed admission start timestamp$"):
+        verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
+    sql.assert_not_called()
+
+
+@pytest.mark.parametrize("payload", [b"{private-prose", b"\xff", b"[" * 1500 + b"]" * 1500])
+def test_malformed_log_json_has_only_code_owned_failure(admission, payload):
+    config, journal, start, log, _ = admission
+    log.write_bytes(diagnostic.MARKER.encode() + payload + b"\n")
+    with pytest.raises(ValueError, match=r"^Malformed admission result$"):
+        verifier.startup_admission_result(config, journal, start)
+
+
+@pytest.mark.parametrize("suffix", ["Z", "+00:00"])
+def test_utc_timestamp_spellings_remain_supported(suffix):
+    value = verifier._admission_utc("2026-11-18T11:00:00" + suffix, "invalid")
+    assert value == datetime(2026, 11, 18, 11, tzinfo=UTC)
 
 
 @pytest.mark.parametrize("sql_contracts", [False, True])

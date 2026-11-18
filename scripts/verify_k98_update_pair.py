@@ -7,7 +7,7 @@ read-only SQL observations are checked by the complete existing startup comparat
 
 import argparse
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import hashlib
 import io
 import json
@@ -331,6 +331,18 @@ def verify_live_source(config, *, predecessor=False):
     return policy
 
 
+def _admission_utc(value, failure):
+    if not isinstance(value, str):
+        raise ValueError(failure)
+    try:
+        timestamp = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError(failure) from None
+    if timestamp.tzinfo is None or timestamp.utcoffset() != timedelta(0):
+        raise ValueError(failure)
+    return timestamp
+
+
 def startup_admission_result(config, journal, start):
     """Read bounded existing startup evidence before any successor SQL observer.
 
@@ -344,9 +356,7 @@ def startup_admission_result(config, journal, start):
         or start["log_offset"] < 0
     ):
         raise ValueError("Exact start request required for admission observation")
-    requested = datetime.fromisoformat(start["requested_utc"].replace("Z", "+00:00"))
-    if requested.tzinfo is None:
-        raise ValueError("UTC start request required")
+    requested = _admission_utc(start["requested_utc"], "Malformed admission start timestamp")
     binding = journal["bindings"]["bot"]
     expected = journal["publication"]["manifests"]["bot"]
     try:
@@ -370,7 +380,10 @@ def startup_admission_result(config, journal, start):
         payload = line.split(marker, 1)[1]
         if len(payload) > 32768:
             raise ValueError("Admission result exceeds bound")
-        record = json.loads(payload)
+        try:
+            record = json.loads(payload)
+        except (ValueError, UnicodeError, RecursionError):
+            raise ValueError("Malformed admission result") from None
         if not isinstance(record, dict):
             raise ValueError("Malformed admission result")
         if (
@@ -379,19 +392,14 @@ def startup_admission_result(config, journal, start):
             or record.get("created_filetime") != binding["created_filetime"]
         ):
             continue
-        timestamp = record.get("observed_utc")
-        if not isinstance(timestamp, str):
-            raise ValueError("Malformed admission observation timestamp")
-        try:
-            observed = datetime.fromisoformat(timestamp)
-        except ValueError:
-            raise ValueError("Malformed admission observation timestamp") from None
+        observed = _admission_utc(
+            record.get("observed_utc"), "Malformed admission observation timestamp"
+        )
         if (
             type(record.get("version")) is not int
             or record["version"] != 1
             or type(record.get("pid")) is not int
             or type(record.get("created_filetime")) is not int
-            or observed.tzinfo is None
             or not requested <= observed <= datetime.now(UTC)
             or record.get("outcome") not in {"installed", "failed", "disabled"}
         ):

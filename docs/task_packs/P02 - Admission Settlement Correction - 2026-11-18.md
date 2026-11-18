@@ -188,3 +188,12 @@ now explicitly skip on non-Windows hosts while all Python/package tests remain
 enabled. All 354 affected admission/closeout/verifier/package tests passed on
 Windows with operational logs unchanged. The earlier two comments and test results
 remain preserved; updater artifacts must reflect this final parser correction.
+
+The follow-up review also requested literal UTC format and stable parser failures.
+Timezone-aware comparisons already preserve absolute time; no correlation bypass
+was demonstrated. The parser now explicitly accepts UTC Z/+00:00 only and rejects
+malformed start/observation timestamps, invalid JSON/UTF-8 and excessive JSON
+nesting with code-owned messages. Twelve additional cases pass. Final affected
+admission/closeout/verifier/package validation:366 passed, logs unchanged. Two
+new test-regex literals initially needed raw-string markers for Ruff; corrected
+without changing their values or test behavior. All previous failures are retained.
