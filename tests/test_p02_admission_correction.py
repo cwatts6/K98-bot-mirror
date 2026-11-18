@@ -28,6 +28,8 @@ from services import (
 from services.application_maintenance_contract import RESOURCE
 from services.application_maintenance_dal import schema_observation
 
+ADMISSION_POLICY = {"source_hashes": {"services/runtime_admission_diagnostics.py": "a" * 64}}
+
 
 @pytest.fixture
 def admission(tmp_path, monkeypatch, caplog):
@@ -224,7 +226,45 @@ def test_missing_failed_stale_or_ambiguous_evidence_never_reaches_sql(
     sql = Mock()
     monkeypatch.setattr(verifier, "verify_sql_contracts", sql)
     with pytest.raises(verifier.PairPublicationPending if pending else ValueError):
-        verifier.verify_successor_contracts(config, {}, journal)
+        verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
+    sql.assert_not_called()
+
+
+@pytest.mark.parametrize("sql_contracts", [False, True])
+@pytest.mark.parametrize("sql_refused", [False, True])
+def test_historical_successor_keeps_sql_checks_without_new_protocol(
+    monkeypatch, sql_contracts, sql_refused
+):
+    policy = {"source_hashes": {"bot_instance.py": "b" * 64}}
+    config, journal = {}, {}
+    admission_check = Mock(side_effect=AssertionError("Legacy successor emits no marker"))
+    error = SourceConflict("schema observation refused")
+    sql = Mock(side_effect=error if sql_refused else None)
+    monkeypatch.setattr(verifier, "verify_successor_admission", admission_check)
+    monkeypatch.setattr(verifier, "verify_sql_contracts", sql)
+    if sql_contracts and sql_refused:
+        with pytest.raises(SourceConflict) as caught:
+            verifier.verify_successor_contracts(config, policy, journal)
+        assert caught.value is error
+    else:
+        verifier.verify_successor_contracts(config, policy, journal, sql_contracts=sql_contracts)
+    admission_check.assert_not_called()
+    if sql_contracts:
+        sql.assert_called_once_with(config, policy)
+    else:
+        sql.assert_not_called()
+
+
+def test_new_protocol_requires_settlement_even_without_sql_flag(monkeypatch):
+    pending = verifier.PairPublicationPending("Admission has not settled")
+    admission_check = Mock(side_effect=pending)
+    sql = Mock()
+    monkeypatch.setattr(verifier, "verify_successor_admission", admission_check)
+    monkeypatch.setattr(verifier, "verify_sql_contracts", sql)
+    with pytest.raises(verifier.PairPublicationPending) as caught:
+        verifier.verify_successor_contracts({}, ADMISSION_POLICY, {}, sql_contracts=False)
+    assert caught.value is pending
+    admission_check.assert_called_once()
     sql.assert_not_called()
 
 
@@ -345,19 +385,19 @@ def test_actual_observer_both_arrival_orders_are_sequenced(monkeypatch, admissio
     monkeypatch.setattr(verifier, "verify_sql_contracts", verify_sql)
     if first == "updater":
         with pytest.raises(verifier.PairPublicationPending):
-            verifier.verify_successor_contracts(config, {}, journal)
+            verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
     with ThreadPoolExecutor(max_workers=1) as pool:
         task = pool.submit(diagnostic.install_startup_runtime)
         assert entered.wait(5)
         try:
             with pytest.raises(verifier.PairPublicationPending):
-                verifier.verify_successor_contracts(config, {}, journal)
+                verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
             assert updater.acquisitions == 0 and model.owner is bot
         finally:
             release.set()
         task.result(timeout=5)
     publish()
-    verifier.verify_successor_contracts(config, {}, journal)
+    verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
     assert model.owner is None
     assert bot.acquisitions == bot.releases == updater.acquisitions == updater.releases == 1
 
@@ -380,7 +420,7 @@ def test_post_admission_worker_contention_is_one_failure_no_retry(monkeypatch, a
     monkeypatch.setattr(verifier, "verify_sql_contracts", verify_sql)
     with schema_observation(worker):
         with pytest.raises(SourceConflict, match="busy or refused"):
-            verifier.verify_successor_contracts(config, {}, journal)
+            verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
         assert updater.acquisitions == 1 and updater.releases == 0 and model.owner is worker
     assert model.owner is None
 

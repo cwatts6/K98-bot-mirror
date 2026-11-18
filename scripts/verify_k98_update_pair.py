@@ -412,7 +412,10 @@ def verify_successor_admission(config, journal):
 
 
 def verify_successor_contracts(config, policy, journal, *, sql_contracts=True):
-    verify_successor_admission(config, journal)
+    # The installed verifier also serves authenticated historical successors.
+    # Only source policies with the new protocol can emit its settlement marker.
+    if "services/runtime_admission_diagnostics.py" in policy["source_hashes"]:
+        verify_successor_admission(config, journal)
     if sql_contracts:
         verify_sql_contracts(config, policy)
 

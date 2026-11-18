@@ -164,3 +164,19 @@ P02 D7, actual P03 blockers, essential P04 corrections, P05 combined acceptance 
 earlier natural observations remain open. A future normal end-to-end acceptance
 uses a newly generated user stats file through Discord and standard destinations;
 do not generate that file or start provider work for this correction.
+
+## Mirror PR review follow-up
+
+PR541 identified that the installed pair verifier also serves historical and
+ordinary source-only successors that predate the admission marker. Its settlement
+check now follows the authenticated successor policy's source inventory, matching
+the closeout verifier. New-protocol successors still require settlement even when
+SQL verification is not requested; historical successors retain requested SQL
+checks and propagate refusal without retry. Five new regressions cover those
+branches. Admission/qualified/reader/closeout tests passed 113 cases; direct
+verifier/archive/package/transition regressions passed 237. Both runs left
+production operational logs unchanged. Earlier results remain preserved.
+
+This updates updater package bytes, so the earlier rehearsal installer and tool
+hashes are historical. Rebuild from the final reviewed commit before release;
+current host/custody and private-main binding requirements remain unchanged.
