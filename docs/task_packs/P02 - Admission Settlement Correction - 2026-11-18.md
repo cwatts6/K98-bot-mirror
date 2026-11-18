@@ -180,3 +180,11 @@ production operational logs unchanged. Earlier results remain preserved.
 This updates updater package bytes, so the earlier rehearsal installer and tool
 hashes are historical. Rebuild from the final reviewed commit before release;
 current host/custody and private-main binding requirements remain unchanged.
+
+Copilot follow-up: malformed/missing/non-string admission timestamps now produce
+one sanitized validation error (the existing outer handler already failed closed).
+Four new cases confirm SQL remains uncalled. The seven PowerShell action cases
+now explicitly skip on non-Windows hosts while all Python/package tests remain
+enabled. All 354 affected admission/closeout/verifier/package tests passed on
+Windows with operational logs unchanged. The earlier two comments and test results
+remain preserved; updater artifacts must reflect this final parser correction.

@@ -379,7 +379,13 @@ def startup_admission_result(config, journal, start):
             or record.get("created_filetime") != binding["created_filetime"]
         ):
             continue
-        observed = datetime.fromisoformat(record["observed_utc"])
+        timestamp = record.get("observed_utc")
+        if not isinstance(timestamp, str):
+            raise ValueError("Malformed admission observation timestamp")
+        try:
+            observed = datetime.fromisoformat(timestamp)
+        except ValueError:
+            raise ValueError("Malformed admission observation timestamp") from None
         if (
             type(record.get("version")) is not int
             or record["version"] != 1

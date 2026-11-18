@@ -178,6 +178,10 @@ async def test_actual_ready_callback_waits_for_observation_before_registering_wo
         "rotated",
         "oversize",
         "malformed",
+        "missing_time",
+        "null_time",
+        "numeric_time",
+        "invalid_time",
     ],
 )
 def test_missing_failed_stale_or_ambiguous_evidence_never_reaches_sql(
@@ -198,6 +202,14 @@ def test_missing_failed_stale_or_ambiguous_evidence_never_reaches_sql(
         record["observed_utc"] = "2999-01-01T00:00:00+00:00"
     if damage in {"failed", "disabled"}:
         record["outcome"] = damage
+    if damage == "missing_time":
+        del record["observed_utc"]
+    if damage == "null_time":
+        record["observed_utc"] = None
+    if damage == "numeric_time":
+        record["observed_utc"] = 123
+    if damage == "invalid_time":
+        record["observed_utc"] = "private-invalid-time"
     raw = diagnostic.MARKER + json.dumps(record) + "\n"
     if damage == "missing":
         raw = "Logged in as bot\n[BOOT] full_startup_sequence completed successfully\n"
@@ -225,8 +237,10 @@ def test_missing_failed_stale_or_ambiguous_evidence_never_reaches_sql(
     )
     sql = Mock()
     monkeypatch.setattr(verifier, "verify_sql_contracts", sql)
-    with pytest.raises(verifier.PairPublicationPending if pending else ValueError):
+    with pytest.raises(verifier.PairPublicationPending if pending else ValueError) as caught:
         verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
+    if damage.endswith("_time"):
+        assert str(caught.value) == "Malformed admission observation timestamp"
     sql.assert_not_called()
 
 
@@ -442,6 +456,7 @@ def packaged_tools(tmp_path_factory):
     return tools
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows PowerShell 5.1 action harness")
 @pytest.mark.parametrize(
     "case,code,verifications,starts",
     [
