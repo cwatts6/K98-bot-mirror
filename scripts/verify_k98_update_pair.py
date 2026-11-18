@@ -372,20 +372,22 @@ def startup_admission_result(config, journal, start):
         raise ValueError("Startup log exceeds admission observation bound")
     results = []
     marker = b"K98_STARTUP_ADMISSION_RESULT "
-    # An in-flight final line is not settled evidence. JSON prose/tracebacks are
-    # never evaluated; only the exact code-owned result and identity are used.
+    # Ordinary log messages can contain the marker as user-controlled text.
+    # Undecodable/unbounded records cannot be attributed to this successor;
+    # ignore them and keep waiting for exact evidence within the caller's bound.
+    # An in-flight final line is likewise not settled evidence.
     for line in raw.splitlines(keepends=True):
         if marker not in line or not line.endswith(b"\n"):
             continue
         payload = line.split(marker, 1)[1]
         if len(payload) > 32768:
-            raise ValueError("Admission result exceeds bound")
+            continue
         try:
             record = json.loads(payload)
         except (ValueError, UnicodeError, RecursionError):
-            raise ValueError("Malformed admission result") from None
+            continue
         if not isinstance(record, dict):
-            raise ValueError("Malformed admission result")
+            continue
         if (
             record.get("manifest_sha256") != expected
             or record.get("pid") != binding["pid"]

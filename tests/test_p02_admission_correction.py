@@ -191,7 +191,7 @@ def test_missing_failed_stale_or_ambiguous_evidence_never_reaches_sql(
 ):
     record = installed_result(monkeypatch, admission)
     config, journal, start, log, _ = admission
-    pending = damage in {"missing", "partial", "pid", "creation", "manifest"}
+    pending = damage in {"missing", "partial", "pid", "creation", "manifest", "malformed"}
     if damage == "pid":
         record["pid"] += 1
     if damage == "creation":
@@ -270,11 +270,79 @@ def test_malformed_start_timestamps_are_sanitized_before_sql(monkeypatch, admiss
 
 
 @pytest.mark.parametrize("payload", [b"{private-prose", b"\xff", b"[" * 1500 + b"]" * 1500])
-def test_malformed_log_json_has_only_code_owned_failure(admission, payload):
+def test_malformed_log_json_cannot_establish_admission(admission, payload):
     config, journal, start, log, _ = admission
     log.write_bytes(diagnostic.MARKER.encode() + payload + b"\n")
-    with pytest.raises(ValueError, match=r"^Malformed admission result$"):
+    with pytest.raises(verifier.PairPublicationPending, match="Awaiting exact successor"):
         verifier.startup_admission_result(config, journal, start)
+
+
+@pytest.mark.parametrize(
+    "noise",
+    [
+        b"{private-prose",
+        b"\xff",
+        b"[" * 1500 + b"]" * 1500,
+        b"x" * 32769,
+        b"null",
+        b"[]",
+        b'"installed"',
+        b'{"pid":999,"outcome":"failed","observed_utc":"invalid"}',
+    ],
+    ids=["json", "utf8", "depth", "size", "null", "list", "string", "other_identity"],
+)
+@pytest.mark.parametrize("position", ["alone", "before", "after"])
+def test_uncorrelated_log_content_does_not_control_admission(
+    monkeypatch, admission, noise, position
+):
+    installed_result(monkeypatch, admission)
+    config, journal, start, log, _ = admission
+    genuine = log.read_bytes()
+    unrelated = diagnostic.MARKER.encode() + noise + b"\n"
+    log.write_bytes(
+        unrelated
+        if position == "alone"
+        else unrelated + genuine if position == "before" else genuine + unrelated
+    )
+    sql = Mock()
+    monkeypatch.setattr(verifier, "verify_sql_contracts", sql)
+    monkeypatch.setattr(
+        verifier,
+        "verify_successor_admission",
+        lambda c, j: verifier.startup_admission_result(c, j, start),
+    )
+    if position == "alone":
+        with pytest.raises(verifier.PairPublicationPending):
+            verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
+        sql.assert_not_called()
+    else:
+        verifier.verify_successor_contracts(config, ADMISSION_POLICY, journal)
+        sql.assert_called_once_with(config, ADMISSION_POLICY)
+
+
+@pytest.mark.parametrize("outcome", ["installed", "failed", "disabled"])
+def test_ordinary_logged_fields_cannot_override_exact_admission(monkeypatch, admission, outcome):
+    record = installed_result(monkeypatch, admission)
+    config, journal, start, log, _ = admission
+    # Render a real logging record whose ordinary field happens to contain the
+    # marker. It is not a startup observation, regardless of message placement.
+    ordinary = logging.LogRecord(
+        "upload_routes.kvk_all_route",
+        logging.INFO,
+        __file__,
+        1,
+        "[KVK] msg=%s attachments=%s",
+        (7, [diagnostic.MARKER + "invalid.txt"]),
+        None,
+    ).getMessage()
+    record["outcome"] = outcome
+    genuine = diagnostic.MARKER + json.dumps(record)
+    log.write_text(ordinary + "\n" + genuine + "\n" + ordinary + "\n", encoding="utf-8")
+    if outcome == "installed":
+        assert verifier.startup_admission_result(config, journal, start) == record
+    else:
+        with pytest.raises(ValueError):
+            verifier.startup_admission_result(config, journal, start)
 
 
 @pytest.mark.parametrize("suffix", ["Z", "+00:00"])
@@ -595,9 +663,11 @@ def test_exact_source_transition_preserves_history_and_rejects_partial_or_unknow
         ),
     )
     before = {
-        member["path"]: marker + member["before_sha256"].encode()
-        if member["before_sha256"] is not None
-        else None
+        member["path"]: (
+            marker + member["before_sha256"].encode()
+            if member["before_sha256"] is not None
+            else None
+        )
         for member in transition["members"]
     }
     read = lambda rev, p: (before if rev == "before" else raw).get(p)

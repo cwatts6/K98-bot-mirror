@@ -197,3 +197,25 @@ nesting with code-owned messages. Twelve additional cases pass. Final affected
 admission/closeout/verifier/package validation:366 passed, logs unchanged. Two
 new test-regex literals initially needed raw-string markers for Ruff; corrected
 without changing their values or test behavior. All previous failures are retained.
+
+The subsequent formal Changes review started successfully after the scanner's
+trusted Git-path configuration was supplied. Its review required a further bounded
+log-attribution correction: undecodable, oversized or non-object marker text is
+not attributable to the successor and is ignored. Without an exact record the
+existing pending state and 120/180-second caller bounds remain; no SQL runs and
+no readiness is certified. Matching failed, disabled, duplicate, stale or invalid
+records remain hard failures. Ordinary log content cannot override a correlated
+result. Earlier parser behavior, review findings and test receipts remain retained
+in the additive handoff. The final diff requires refreshed tests and reviews;
+this update does not authorize deployment or revise historical qualification.
+The first added-input run passed 84 cases with six fixture setup errors: automatic
+test IDs expanded the large payload into a Windows environment variable beyond
+32,767 characters. A bounded reproduction retained seven passes/two setup errors.
+Explicit short test IDs correct the fixture; payload bounds and runtime code are
+unchanged by that fixture correction. The original failures remain retained.
+Final affected validation passed 393 tests with operational logs unchanged.
+Architecture, deferred-items, security-routing, explicit test selection, Ruff and
+whitespace checks passed. The repository's Black formatting was applied and
+checked through its formatter API after stalled CLI cache/process invocations
+were stopped; no application process was involved. Earlier 366-pass results and
+all unrelated full-suite SQL-byte failures remain historical evidence.
