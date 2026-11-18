@@ -94,6 +94,14 @@ and contained streams, transient versus terminal readiness, actual PowerShell
 orchestration and immutable acceptance. External effects use fixtures; this is
 not native SQL or production acceptance. Preserve intermediate test failures.
 
+The first private full-suite gate exposed a missed reader-registry test update:
+it compared the older admission endpoint directly with the new verification
+source bytes. The focused follow-up authenticates the new exact transition and
+bridges the older endpoint through its reviewed successor; historical hashes
+and all runtime/packet bytes remain unchanged. Test selection now includes the
+reader and transition-inventory checks whenever the registry, preparation code
+or shared historical assertion helper changes. Full private CI remains required.
+
 Security routing: **Changes**, Deep off, immutable final mirror base/head, then
 the equivalent private patch. All changed files and relevant custody/persistence
 callers require review. Final hosted reviews/checks and actionable-comment

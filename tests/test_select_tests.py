@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from scripts.select_tests import select_tests
 
 
@@ -46,3 +48,31 @@ def test_release_identity_regressions_are_always_selected() -> None:
     for paths in ([], ["docs/readme.md"], ["scripts/prepare_k98_update.py"]):
         commands = select_tests(paths)
         assert any("tests/test_release_identity_regressions.py" in c for c in commands)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "scripts/prepare_k98_update.py",
+        "scripts/k98_update_transitions.json",
+        r"tests\updater_source_assertions.py",
+    ],
+)
+def test_updater_registry_changes_select_reader_and_inventory_checks(path: str) -> None:
+    commands = select_tests([path])
+    assert any(
+        "tests/test_updater_reader_capabilities.py" in command
+        and "tests/test_updater_transition_inventory.py" in command
+        for command in commands
+    )
+
+
+def test_updater_registry_checks_are_focused_and_deduplicated() -> None:
+    commands = select_tests(
+        ["scripts/prepare_k98_update.py", "scripts/k98_update_transitions.json"]
+    )
+    assert sum("test_updater_reader_capabilities.py" in command for command in commands) == 1
+    assert not any(
+        "test_updater_reader_capabilities.py" in command
+        for command in select_tests(["scripts/smoke_imports.py"])
+    )

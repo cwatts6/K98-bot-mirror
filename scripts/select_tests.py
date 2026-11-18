@@ -9,6 +9,10 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+UPDATER_REGISTRY_TESTS = (
+    "python -m pytest -q tests/test_updater_reader_capabilities.py "
+    "tests/test_updater_transition_inventory.py"
+)
 ALWAYS_RUN = [
     "python scripts/smoke_imports.py",
     "python scripts/validate_command_registration.py",
@@ -17,6 +21,9 @@ ALWAYS_RUN = [
     "tests/test_p016_application_contract_repair.py",
 ]
 RULES = [
+    ("scripts/prepare_k98_update.py", [UPDATER_REGISTRY_TESTS]),
+    ("scripts/k98_update_transitions.json", [UPDATER_REGISTRY_TESTS]),
+    ("tests/updater_source_assertions.py", [UPDATER_REGISTRY_TESTS]),
     (
         "commands/stats",
         [
