@@ -1,0 +1,1065 @@
+{
+  "schema_version": 1,
+  "observed_date": "2026-09-25",
+  "purpose": "Immutable merged-delivery identities before the separate mirror repair and documentation update. No runtime attestation.",
+  "bot_production_merge": "ab8c8f43d28a6d27f615f672749ca37f334e6e55",
+  "bot_mirror_snapshot": "511c129602e144a198dc29e9c396196d90d30df9",
+  "sql_merge": "aa7b01381e2e451368c9b7118891a9b960bed9d9",
+  "repositories": {
+    "bot": {
+      "review_manifest": "bot-review2-publication-proof.json",
+      "review_manifest_sha256": "b2bdb628dab2ebd9626a42b5058567d0626540efb912a576f4f63c55f073bcfd",
+      "reviewed_head": "4b0de2f29bf731123ce5d893dd430afac66ef9fb",
+      "original_base": "721ad7e0cd6b160ddddad328c2338a98bdfb6e0a",
+      "merged_ref": "ab8c8f43d28a6d27f615f672749ca37f334e6e55",
+      "identities": [
+        {
+          "path": "README-DEV.md",
+          "blob": "3713d9a2d307470f564edcdfec8d9a808a347329",
+          "previous_filename": null,
+          "merged_blob": "3713d9a2d307470f564edcdfec8d9a808a347329",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "3713d9a2d307470f564edcdfec8d9a808a347329"
+        },
+        {
+          "path": "bot_instance.py",
+          "blob": "9ee0bc9a0f408659aef60071112c0a96a974a0a2",
+          "previous_filename": null,
+          "merged_blob": "9ee0bc9a0f408659aef60071112c0a96a974a0a2",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "9ee0bc9a0f408659aef60071112c0a96a974a0a2"
+        },
+        {
+          "path": "core/export_execution_host.py",
+          "blob": "99fb13e714739feb528dc7c7a0bde4437f453b43",
+          "previous_filename": null,
+          "merged_blob": "99fb13e714739feb528dc7c7a0bde4437f453b43",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "99fb13e714739feb528dc7c7a0bde4437f453b43"
+        },
+        {
+          "path": "docs/reference/ENV_REFERENCE.md",
+          "blob": "b6d0b4d2312d7b8ed6ebe840b4048691b54b0f78",
+          "previous_filename": null,
+          "merged_blob": "b6d0b4d2312d7b8ed6ebe840b4048691b54b0f78",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "b6d0b4d2312d7b8ed6ebe840b4048691b54b0f78"
+        },
+        {
+          "path": "docs/reference/README.md",
+          "blob": "b42cc72c9abfe747cf1a81ead6b374204a80a7b4",
+          "previous_filename": null,
+          "merged_blob": "b42cc72c9abfe747cf1a81ead6b374204a80a7b4",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "b42cc72c9abfe747cf1a81ead6b374204a80a7b4"
+        },
+        {
+          "path": "docs/reference/canonical_command_reference.md",
+          "blob": "f5e01712843b56d8d14fee67f64da9c712e02b34",
+          "previous_filename": null,
+          "merged_blob": "f5e01712843b56d8d14fee67f64da9c712e02b34",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "f5e01712843b56d8d14fee67f64da9c712e02b34"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/decision_and_evidence_register.md",
+          "blob": "89a6be0844a7d5ba8f8f58b9798ad33e6c198fb2",
+          "previous_filename": null,
+          "merged_blob": "89a6be0844a7d5ba8f8f58b9798ad33e6c198fb2",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "89a6be0844a7d5ba8f8f58b9798ad33e6c198fb2"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/integration_contract_and_consumer_matrix.md",
+          "blob": "5dc36cb6a3c1208540a6f2685cb003593c0d67cb",
+          "previous_filename": null,
+          "merged_blob": "5dc36cb6a3c1208540a6f2685cb003593c0d67cb",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "5dc36cb6a3c1208540a6f2685cb003593c0d67cb"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/integration_implementation_manifests.md",
+          "blob": "35f50d7edde4881107bff205d49ebe4d2cc993e5",
+          "previous_filename": null,
+          "merged_blob": "35f50d7edde4881107bff205d49ebe4d2cc993e5",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "35f50d7edde4881107bff205d49ebe4d2cc993e5"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/phase_2_acceptance_scenarios.md",
+          "blob": "7a2578eabca0121db39dc03c4d92cc07c3f31d3b",
+          "previous_filename": null,
+          "merged_blob": "7a2578eabca0121db39dc03c4d92cc07c3f31d3b",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "7a2578eabca0121db39dc03c4d92cc07c3f31d3b"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/phase_2_contract_and_architecture.md",
+          "blob": "8dbc52faf195b329bebd65dcae5f9285a762b412",
+          "previous_filename": null,
+          "merged_blob": "8dbc52faf195b329bebd65dcae5f9285a762b412",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "8dbc52faf195b329bebd65dcae5f9285a762b412"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/phase_2_evidence_and_validation_log.md",
+          "blob": "825eb6e0b079cd8d326a7a1aca67888764e77eed",
+          "previous_filename": null,
+          "merged_blob": "825eb6e0b079cd8d326a7a1aca67888764e77eed",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "825eb6e0b079cd8d326a7a1aca67888764e77eed"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/phase_2_implementation_plan.md",
+          "blob": "7bebe629f7f5a27adf469613987a4ca3ad73cb53",
+          "previous_filename": null,
+          "merged_blob": "7bebe629f7f5a27adf469613987a4ca3ad73cb53",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "7bebe629f7f5a27adf469613987a4ca3ad73cb53"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/phase_2b_evidence_and_validation_log.md",
+          "blob": "9dcd8307fafef665ca1f4781ca9562610eedf428",
+          "previous_filename": null,
+          "merged_blob": "9dcd8307fafef665ca1f4781ca9562610eedf428",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "9dcd8307fafef665ca1f4781ca9562610eedf428"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/post_s6_handoff_log.md",
+          "blob": "9a849a010fae8f186cd02257d0346deeed68a2b8",
+          "previous_filename": null,
+          "merged_blob": "9a849a010fae8f186cd02257d0346deeed68a2b8",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "9a849a010fae8f186cd02257d0346deeed68a2b8"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/post_s6_integration_requirements.md",
+          "blob": "eab8caa1127248a2814707efed4ee2e86e86078e",
+          "previous_filename": null,
+          "merged_blob": "eab8caa1127248a2814707efed4ee2e86e86078e",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "eab8caa1127248a2814707efed4ee2e86e86078e"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/release_evidence_log.md",
+          "blob": "7ec134d9d383787a910490bac0ff37808030803a",
+          "previous_filename": null,
+          "merged_blob": "7ec134d9d383787a910490bac0ff37808030803a",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "7ec134d9d383787a910490bac0ff37808030803a"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/release_readiness_and_rollback.md",
+          "blob": "c6ebfae899b1b857d4c439ca0ea179b982197931",
+          "previous_filename": null,
+          "merged_blob": "c6ebfae899b1b857d4c439ca0ea179b982197931",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "c6ebfae899b1b857d4c439ca0ea179b982197931"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s10a_implementation_and_s10b_handoff.md",
+          "blob": "745e70dd9d35a44fc83e21d23effe92cb14dee59",
+          "previous_filename": null,
+          "merged_blob": "745e70dd9d35a44fc83e21d23effe92cb14dee59",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "745e70dd9d35a44fc83e21d23effe92cb14dee59"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s10b_closeout_and_s10c_handoff.md",
+          "blob": "10e6f1cf187ae5b8918122103abeae7096d28e04",
+          "previous_filename": null,
+          "merged_blob": "10e6f1cf187ae5b8918122103abeae7096d28e04",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "10e6f1cf187ae5b8918122103abeae7096d28e04"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s10c_closeout_and_s10d_handoff.md",
+          "blob": "62658faaf19be20e3193320fcde78f9b1707d88c",
+          "previous_filename": null,
+          "merged_blob": "62658faaf19be20e3193320fcde78f9b1707d88c",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "62658faaf19be20e3193320fcde78f9b1707d88c"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s10d_closeout_and_s10e_handoff.md",
+          "blob": "c32c5f0f56963cd434445ee96d1671045b7c2e0c",
+          "previous_filename": null,
+          "merged_blob": "c32c5f0f56963cd434445ee96d1671045b7c2e0c",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "c32c5f0f56963cd434445ee96d1671045b7c2e0c"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s10e_closeout_and_s11_handoff.md",
+          "blob": "326e11a5e5cafbd26df9ac7c4f09e90b9558c552",
+          "previous_filename": null,
+          "merged_blob": "8efcf3f32d0e68661e7e5a17de23ac21adcfdcfb",
+          "proof": "exact_bytes_except_one_removed_trailing_blank_line",
+          "mirror_snapshot_blob": "8efcf3f32d0e68661e7e5a17de23ac21adcfdcfb"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s8a_closeout_and_s8b_handoff.md",
+          "blob": "db2e8526fa7c3d0504653e83a29b0cec719efded",
+          "previous_filename": null,
+          "merged_blob": "db2e8526fa7c3d0504653e83a29b0cec719efded",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "db2e8526fa7c3d0504653e83a29b0cec719efded"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s8b_closeout_and_s8c_handoff.md",
+          "blob": "e27fb666b04e8fb8f39d00c0246c0eb45fe91a09",
+          "previous_filename": null,
+          "merged_blob": "e27fb666b04e8fb8f39d00c0246c0eb45fe91a09",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "e27fb666b04e8fb8f39d00c0246c0eb45fe91a09"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s8c_closeout_and_s9a_handoff.md",
+          "blob": "6cea46d8bb0e961eb17d616cde215265a82951c7",
+          "previous_filename": null,
+          "merged_blob": "6cea46d8bb0e961eb17d616cde215265a82951c7",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "6cea46d8bb0e961eb17d616cde215265a82951c7"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s8c_folder_intake_smoke_evidence.md",
+          "blob": "2590dd0f69f40b5a5b9907e3ac64b378e7527207",
+          "previous_filename": null,
+          "merged_blob": "2590dd0f69f40b5a5b9907e3ac64b378e7527207",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "2590dd0f69f40b5a5b9907e3ac64b378e7527207"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s8c_operator_work_instruction.md",
+          "blob": "778332d61599c3dc420344d6d7429ab71f750816",
+          "previous_filename": null,
+          "merged_blob": "778332d61599c3dc420344d6d7429ab71f750816",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "778332d61599c3dc420344d6d7429ab71f750816"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s9a_closeout_and_s9b_handoff.md",
+          "blob": "f4cfbe51f0c143d7b62ed0142506534b165ee2c1",
+          "previous_filename": null,
+          "merged_blob": "f4cfbe51f0c143d7b62ed0142506534b165ee2c1",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "f4cfbe51f0c143d7b62ed0142506534b165ee2c1"
+        },
+        {
+          "path": "docs/reference/kvk_source_migration/s9b_closeout_and_s10a_handoff.md",
+          "blob": "5d0b7750134c0728547bb762a85be3d21f1fa632",
+          "previous_filename": null,
+          "merged_blob": "5d0b7750134c0728547bb762a85be3d21f1fa632",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "5d0b7750134c0728547bb762a85be3d21f1fa632"
+        },
+        {
+          "path": "docs/reference/local_sql_development.md",
+          "blob": "c5c6b3209f40c0a7b4eb3dfbd4d969246ebd02d7",
+          "previous_filename": null,
+          "merged_blob": "c5c6b3209f40c0a7b4eb3dfbd4d969246ebd02d7",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "c5c6b3209f40c0a7b4eb3dfbd4d969246ebd02d7"
+        },
+        {
+          "path": "docs/reference/runbook_diagnostics.md",
+          "blob": "743c6eb794e866b60a20628298c93115bb675afe",
+          "previous_filename": null,
+          "merged_blob": "743c6eb794e866b60a20628298c93115bb675afe",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "743c6eb794e866b60a20628298c93115bb675afe"
+        },
+        {
+          "path": "docs/reference/runbook_shutdown.md",
+          "blob": "88543c3280dd8562aa45d53c8a0ef73fe30af48b",
+          "previous_filename": null,
+          "merged_blob": "88543c3280dd8562aa45d53c8a0ef73fe30af48b",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "88543c3280dd8562aa45d53c8a0ef73fe30af48b"
+        },
+        {
+          "path": "docs/reference/runbook_startup.md",
+          "blob": "af6e447aba00b1c3e2333e5068c0b664c65f6316",
+          "previous_filename": null,
+          "merged_blob": "af6e447aba00b1c3e2333e5068c0b664c65f6316",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "af6e447aba00b1c3e2333e5068c0b664c65f6316"
+        },
+        {
+          "path": "docs/task_packs/Codex Chat Starter - KVK Source Migration S10E Export Operator UX and Rollover.md",
+          "absent": true,
+          "previous_filename_verified": true,
+          "merged_blob": null,
+          "proof": "absent_at_merge",
+          "original_base_blob": "4b4baa554264feb5328f8950872ff9ec76fc261c",
+          "mirror_snapshot_blob": null
+        },
+        {
+          "path": "docs/task_packs/Codex Chat Starter - KVK Source Migration S11 Controlled Release and Acceptance.md",
+          "blob": "9ba3a995294d844da4c6ac497f971ae6423cb0a8",
+          "previous_filename": null,
+          "merged_blob": "9ba3a995294d844da4c6ac497f971ae6423cb0a8",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "9ba3a995294d844da4c6ac497f971ae6423cb0a8"
+        },
+        {
+          "path": "docs/task_packs/Codex Task Pack - KVK Source Migration S10E Export Operator UX and Rollover.md",
+          "absent": true,
+          "previous_filename_verified": true,
+          "merged_blob": null,
+          "proof": "absent_at_merge",
+          "original_base_blob": "98d7b4c81605f50f507537c88418a833efee4989",
+          "mirror_snapshot_blob": null
+        },
+        {
+          "path": "docs/task_packs/Codex Task Pack - KVK Source Migration S11 Controlled Release and Acceptance.md",
+          "blob": "6c6c0600696fde0dc9f08c6ac67c953dc23b6e51",
+          "previous_filename": null,
+          "merged_blob": "6c6c0600696fde0dc9f08c6ac67c953dc23b6e51",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "6c6c0600696fde0dc9f08c6ac67c953dc23b6e51"
+        },
+        {
+          "path": "docs/task_packs/KVK Source Migration - Programme Pack.md",
+          "blob": "b9684f0a1f315f97f7b6007cb376d770fd37fb98",
+          "previous_filename": null,
+          "merged_blob": "b9684f0a1f315f97f7b6007cb376d770fd37fb98",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "b9684f0a1f315f97f7b6007cb376d770fd37fb98"
+        },
+        {
+          "path": "docs/task_packs/README.md",
+          "blob": "395e2fd4f9c4f52a1947ca0b4d99a6ce0847b50c",
+          "previous_filename": null,
+          "merged_blob": "395e2fd4f9c4f52a1947ca0b4d99a6ce0847b50c",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "395e2fd4f9c4f52a1947ca0b4d99a6ce0847b50c"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S10A Shared Export Coordination SQL Foundation.md",
+          "blob": "42ce8c6549e86a0d7dfcd4356765d9c56d6b6bf0",
+          "previous_filename": null,
+          "merged_blob": "42ce8c6549e86a0d7dfcd4356765d9c56d6b6bf0",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "42ce8c6549e86a0d7dfcd4356765d9c56d6b6bf0"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S10B Shared Export Coordination Worker and Durable Budget.md",
+          "blob": "405c4afa018c2f6ff683f28bc7cbfba9353eff62",
+          "previous_filename": null,
+          "merged_blob": "405c4afa018c2f6ff683f28bc7cbfba9353eff62",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "405c4afa018c2f6ff683f28bc7cbfba9353eff62"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S10C Legacy and Scan Export Adapters.md",
+          "blob": "505c33d98e51b8e47d890e8e9c00cc2660e67217",
+          "previous_filename": null,
+          "merged_blob": "505c33d98e51b8e47d890e8e9c00cc2660e67217",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "505c33d98e51b8e47d890e8e9c00cc2660e67217"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S10D Output Pool and Rollover SQL Foundation.md",
+          "blob": "25d166869d4892176f98fa2021f77a788d1237d5",
+          "previous_filename": null,
+          "merged_blob": "25d166869d4892176f98fa2021f77a788d1237d5",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "25d166869d4892176f98fa2021f77a788d1237d5"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S10E Export Operator UX and Rollover.md",
+          "blob": "1166324b1329dddf71ea0dd8d36f2ffb94f79870",
+          "previous_filename": "docs/task_packs/Codex Chat Starter - KVK Source Migration S10E Export Operator UX and Rollover.md",
+          "merged_blob": "1166324b1329dddf71ea0dd8d36f2ffb94f79870",
+          "proof": "exact_reviewed_blob",
+          "archive_proof": {
+            "previous_filename": "docs/task_packs/Codex Chat Starter - KVK Source Migration S10E Export Operator UX and Rollover.md",
+            "source_at_merge": null,
+            "source_at_original_base": "4b4baa554264feb5328f8950872ff9ec76fc261c",
+            "destination_at_original_base": null,
+            "destination_at_merge": "1166324b1329dddf71ea0dd8d36f2ffb94f79870",
+            "remote_status": "renamed",
+            "remote_previous_filename_verified": true,
+            "note": "Reviewed rename includes authored closeout edits; original-base source and reviewed destination need not have identical blobs."
+          },
+          "mirror_snapshot_blob": "1166324b1329dddf71ea0dd8d36f2ffb94f79870"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S7 Integration Contract and Implementation Planning.md",
+          "blob": "6b667fca319a523f6b5148a0260d496939ec81a4",
+          "previous_filename": null,
+          "merged_blob": "6b667fca319a523f6b5148a0260d496939ec81a4",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "6b667fca319a523f6b5148a0260d496939ec81a4"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S8A SQL Foundation.md",
+          "blob": "eb93e74959d08abed6339eba5eef1ee9e846c82c",
+          "previous_filename": null,
+          "merged_blob": "eb93e74959d08abed6339eba5eef1ee9e846c82c",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "eb93e74959d08abed6339eba5eef1ee9e846c82c"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S9A Public Routing and Availability.md",
+          "blob": "032f8fa20979a1ffef83809aa44d2cf73877f271",
+          "previous_filename": null,
+          "merged_blob": "032f8fa20979a1ffef83809aa44d2cf73877f271",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "032f8fa20979a1ffef83809aa44d2cf73877f271"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Chat Starter - KVK Source Migration S9B Stats Target Card Context and Admin Dispatch.md",
+          "blob": "889eeeb8b9e359794749e3c705909f993b4ede31",
+          "previous_filename": null,
+          "merged_blob": "889eeeb8b9e359794749e3c705909f993b4ede31",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "889eeeb8b9e359794749e3c705909f993b4ede31"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S10A Shared Export Coordination SQL Foundation.md",
+          "blob": "05d41b62e680dba51c808ad4c94b03d8c1662001",
+          "previous_filename": null,
+          "merged_blob": "05d41b62e680dba51c808ad4c94b03d8c1662001",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "05d41b62e680dba51c808ad4c94b03d8c1662001"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S10B Shared Export Coordination Worker and Durable Budget.md",
+          "blob": "e607560872e11e83bd3ac4968e3bb2704cb39922",
+          "previous_filename": null,
+          "merged_blob": "e607560872e11e83bd3ac4968e3bb2704cb39922",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "e607560872e11e83bd3ac4968e3bb2704cb39922"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S10C Legacy and Scan Export Adapters.md",
+          "blob": "50b078b20831a9ca0bfa47958857d405bc8bf829",
+          "previous_filename": null,
+          "merged_blob": "50b078b20831a9ca0bfa47958857d405bc8bf829",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "50b078b20831a9ca0bfa47958857d405bc8bf829"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S10D Output Pool and Rollover SQL Foundation.md",
+          "blob": "a1a2a7d2f056f778f1c13a7c79bc0eb6ed45c7b2",
+          "previous_filename": null,
+          "merged_blob": "a1a2a7d2f056f778f1c13a7c79bc0eb6ed45c7b2",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "a1a2a7d2f056f778f1c13a7c79bc0eb6ed45c7b2"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S10E Export Operator UX and Rollover.md",
+          "blob": "8164fd5b44ca433c3fe351222bcf60f97c6f2a33",
+          "previous_filename": "docs/task_packs/Codex Task Pack - KVK Source Migration S10E Export Operator UX and Rollover.md",
+          "merged_blob": "8164fd5b44ca433c3fe351222bcf60f97c6f2a33",
+          "proof": "exact_reviewed_blob",
+          "archive_proof": {
+            "previous_filename": "docs/task_packs/Codex Task Pack - KVK Source Migration S10E Export Operator UX and Rollover.md",
+            "source_at_merge": null,
+            "source_at_original_base": "98d7b4c81605f50f507537c88418a833efee4989",
+            "destination_at_original_base": null,
+            "destination_at_merge": "8164fd5b44ca433c3fe351222bcf60f97c6f2a33",
+            "remote_status": "renamed",
+            "remote_previous_filename_verified": true,
+            "note": "Reviewed rename includes authored closeout edits; original-base source and reviewed destination need not have identical blobs."
+          },
+          "mirror_snapshot_blob": "8164fd5b44ca433c3fe351222bcf60f97c6f2a33"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S7 Integration Contract and Implementation Planning.md",
+          "blob": "2bf05b3f1c73ff694946f1dae03cca0b8d6db72c",
+          "previous_filename": null,
+          "merged_blob": "2bf05b3f1c73ff694946f1dae03cca0b8d6db72c",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "2bf05b3f1c73ff694946f1dae03cca0b8d6db72c"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S8A SQL Foundation.md",
+          "blob": "c69f176abfa30cfa19da394c55cb2f0617363be2",
+          "previous_filename": null,
+          "merged_blob": "c69f176abfa30cfa19da394c55cb2f0617363be2",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "c69f176abfa30cfa19da394c55cb2f0617363be2"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S9A Public Routing and Availability.md",
+          "blob": "968ccdc9e69d9b3de55243e7d7f4be918d6338ef",
+          "previous_filename": null,
+          "merged_blob": "968ccdc9e69d9b3de55243e7d7f4be918d6338ef",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "968ccdc9e69d9b3de55243e7d7f4be918d6338ef"
+        },
+        {
+          "path": "docs/task_packs/archive/Codex Task Pack - KVK Source Migration S9B Stats Target Card Context and Admin Dispatch.md",
+          "blob": "9bab5580a317f8eb1787a3e431c26d26aff1d40a",
+          "previous_filename": null,
+          "merged_blob": "9bab5580a317f8eb1787a3e431c26d26aff1d40a",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "9bab5580a317f8eb1787a3e431c26d26aff1d40a"
+        },
+        {
+          "path": "docs/task_packs/archive/README.md",
+          "blob": "e9e02e299e0b1f79401c7356714e0c8396a1657f",
+          "previous_filename": null,
+          "merged_blob": "e9e02e299e0b1f79401c7356714e0c8396a1657f",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "e9e02e299e0b1f79401c7356714e0c8396a1657f"
+        },
+        {
+          "path": "gsheet_module.py",
+          "blob": "35493c4dc73f5402dac7e6b866a8e155dd9e4520",
+          "previous_filename": null,
+          "merged_blob": "35493c4dc73f5402dac7e6b866a8e155dd9e4520",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "35493c4dc73f5402dac7e6b866a8e155dd9e4520"
+        },
+        {
+          "path": "kvk/dal/kvk_admin_dal.py",
+          "blob": "0209477f25da60092eca2af891dcb4c0464c7aed",
+          "previous_filename": null,
+          "merged_blob": "0209477f25da60092eca2af891dcb4c0464c7aed",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "0209477f25da60092eca2af891dcb4c0464c7aed"
+        },
+        {
+          "path": "kvk/dal/kvk_all_import_dal.py",
+          "blob": "b795225ad86521e0d2c31c37e2fabcf40dc501d9",
+          "previous_filename": null,
+          "merged_blob": "b795225ad86521e0d2c31c37e2fabcf40dc501d9",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "b795225ad86521e0d2c31c37e2fabcf40dc501d9"
+        },
+        {
+          "path": "kvk/dal/source_output_pool_dal.py",
+          "blob": "037d49a5f0f1beb232677d4d3dc209d95f3ca3bb",
+          "previous_filename": null,
+          "merged_blob": "037d49a5f0f1beb232677d4d3dc209d95f3ca3bb",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "037d49a5f0f1beb232677d4d3dc209d95f3ca3bb"
+        },
+        {
+          "path": "kvk/services/kvk_admin_service.py",
+          "blob": "7b3238febe0ecef8abf9e99136db64d93894707d",
+          "previous_filename": null,
+          "merged_blob": "7b3238febe0ecef8abf9e99136db64d93894707d",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "7b3238febe0ecef8abf9e99136db64d93894707d"
+        },
+        {
+          "path": "kvk/services/new_source_delivery_service.py",
+          "blob": "c77f4b67a5ecd831c1ee02b4bfebb7cea6b2374a",
+          "previous_filename": null,
+          "merged_blob": "c77f4b67a5ecd831c1ee02b4bfebb7cea6b2374a",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "c77f4b67a5ecd831c1ee02b4bfebb7cea6b2374a"
+        },
+        {
+          "path": "kvk/services/new_source_export_service.py",
+          "blob": "82104756c69c223a801601e0944f47f8100e21c2",
+          "previous_filename": null,
+          "merged_blob": "82104756c69c223a801601e0944f47f8100e21c2",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "82104756c69c223a801601e0944f47f8100e21c2"
+        },
+        {
+          "path": "kvk/services/source_export_operator_service.py",
+          "blob": "fefd6f4cadb5a88fafb2322269802e329fec1964",
+          "previous_filename": null,
+          "merged_blob": "fefd6f4cadb5a88fafb2322269802e329fec1964",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "fefd6f4cadb5a88fafb2322269802e329fec1964"
+        },
+        {
+          "path": "kvk/services/source_output_pool_service.py",
+          "blob": "fdb2c3590d567b77f5c627b2c87a23ce5f111f9c",
+          "previous_filename": null,
+          "merged_blob": "fdb2c3590d567b77f5c627b2c87a23ce5f111f9c",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "fdb2c3590d567b77f5c627b2c87a23ce5f111f9c"
+        },
+        {
+          "path": "kvk_all_importer.py",
+          "blob": "6fe5dc01b24694c9fba52284f6ec8f726f29a93d",
+          "previous_filename": null,
+          "merged_blob": "6fe5dc01b24694c9fba52284f6ec8f726f29a93d",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "6fe5dc01b24694c9fba52284f6ec8f726f29a93d"
+        },
+        {
+          "path": "player_stats_cache.py",
+          "blob": "aa4fc0a1f86a6a32037685fc74bb72bc7474e9e4",
+          "previous_filename": null,
+          "merged_blob": "aa4fc0a1f86a6a32037685fc74bb72bc7474e9e4",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "aa4fc0a1f86a6a32037685fc74bb72bc7474e9e4"
+        },
+        {
+          "path": "proc_config_import.py",
+          "blob": "fa100c319c8f127063321d9d90c8f09bdc4f1dfb",
+          "previous_filename": null,
+          "merged_blob": "fa100c319c8f127063321d9d90c8f09bdc4f1dfb",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "fa100c319c8f127063321d9d90c8f09bdc4f1dfb"
+        },
+        {
+          "path": "processing_pipeline.py",
+          "blob": "dd1e80f5c63b95d05d1954d608856e0187a93d1e",
+          "previous_filename": null,
+          "merged_blob": "dd1e80f5c63b95d05d1954d608856e0187a93d1e",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "dd1e80f5c63b95d05d1954d608856e0187a93d1e"
+        },
+        {
+          "path": "scripts/enroll_export_output_pool.py",
+          "blob": "ab7f3e41a525c586c31fed67a4110e8e9999dce5",
+          "previous_filename": null,
+          "merged_blob": "ab7f3e41a525c586c31fed67a4110e8e9999dce5",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "ab7f3e41a525c586c31fed67a4110e8e9999dce5"
+        },
+        {
+          "path": "scripts/run_export_authority.py",
+          "blob": "e2041dd47ab42d0f6349413914b2bf43f6c55aa9",
+          "previous_filename": null,
+          "merged_blob": "e2041dd47ab42d0f6349413914b2bf43f6c55aa9",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": null,
+          "repair": "restored_exact_production_bytes_locally"
+        },
+        {
+          "path": "scripts/run_export_provider_child.py",
+          "blob": "ee68814be0770db7422baeb0dec930958ca65f63",
+          "previous_filename": null,
+          "merged_blob": "ee68814be0770db7422baeb0dec930958ca65f63",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "ee68814be0770db7422baeb0dec930958ca65f63"
+        },
+        {
+          "path": "services/export_coordination_dal.py",
+          "blob": "b1f77e6aeb7d4654b24a2aef2e120937451e35c5",
+          "previous_filename": null,
+          "merged_blob": "b1f77e6aeb7d4654b24a2aef2e120937451e35c5",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "b1f77e6aeb7d4654b24a2aef2e120937451e35c5"
+        },
+        {
+          "path": "services/export_coordination_service.py",
+          "blob": "f18eb508ba2244d2c00178427030b6d0e455e111",
+          "previous_filename": null,
+          "merged_blob": "f18eb508ba2244d2c00178427030b6d0e455e111",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "f18eb508ba2244d2c00178427030b6d0e455e111"
+        },
+        {
+          "path": "services/export_enrollment_service.py",
+          "blob": "65cfd54bc7c4f76d05d17d27776dc2d43c292c52",
+          "previous_filename": null,
+          "merged_blob": "65cfd54bc7c4f76d05d17d27776dc2d43c292c52",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "65cfd54bc7c4f76d05d17d27776dc2d43c292c52"
+        },
+        {
+          "path": "services/export_execution_authority.py",
+          "blob": "9b95e69ef2b0f86cdfca5e0e987a6fc75d54a2a0",
+          "previous_filename": null,
+          "merged_blob": "9b95e69ef2b0f86cdfca5e0e987a6fc75d54a2a0",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": null,
+          "repair": "restored_exact_production_bytes_locally"
+        },
+        {
+          "path": "services/export_execution_dal.py",
+          "blob": "46f01754827c02b754a4c5ee39698a10af1933ac",
+          "previous_filename": null,
+          "merged_blob": "46f01754827c02b754a4c5ee39698a10af1933ac",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "46f01754827c02b754a4c5ee39698a10af1933ac"
+        },
+        {
+          "path": "services/export_execution_protocol.py",
+          "blob": "0499f0cada4c824b55b4a85aa2a9196bef00db62",
+          "previous_filename": null,
+          "merged_blob": "0499f0cada4c824b55b4a85aa2a9196bef00db62",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "0499f0cada4c824b55b4a85aa2a9196bef00db62"
+        },
+        {
+          "path": "services/export_provider_adapter.py",
+          "blob": "14e9c2fced76b680ef1805de33e666a510bb0945",
+          "previous_filename": null,
+          "merged_blob": "14e9c2fced76b680ef1805de33e666a510bb0945",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "14e9c2fced76b680ef1805de33e666a510bb0945"
+        },
+        {
+          "path": "services/export_reconciliation_service.py",
+          "blob": "4d9977c185e3707f5e9d1e25d0615d2d2458fd5f",
+          "previous_filename": null,
+          "merged_blob": "4d9977c185e3707f5e9d1e25d0615d2d2458fd5f",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "4d9977c185e3707f5e9d1e25d0615d2d2458fd5f"
+        },
+        {
+          "path": "services/export_retirement_evidence.py",
+          "blob": "2a5102b1f8edd95682e36a60f90e1a81e0c33e31",
+          "previous_filename": null,
+          "merged_blob": "2a5102b1f8edd95682e36a60f90e1a81e0c33e31",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "2a5102b1f8edd95682e36a60f90e1a81e0c33e31"
+        },
+        {
+          "path": "services/export_retirement_recovery_evidence.py",
+          "blob": "9511f29cc9cbe6da9f2ec5b2d11b8cec63ed9738",
+          "previous_filename": null,
+          "merged_blob": "9511f29cc9cbe6da9f2ec5b2d11b8cec63ed9738",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "9511f29cc9cbe6da9f2ec5b2d11b8cec63ed9738"
+        },
+        {
+          "path": "services/export_rollover_evidence.py",
+          "blob": "95e14049d9df480f3729fc53ad2bfd4b177836cd",
+          "previous_filename": null,
+          "merged_blob": "95e14049d9df480f3729fc53ad2bfd4b177836cd",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "95e14049d9df480f3729fc53ad2bfd4b177836cd"
+        },
+        {
+          "path": "services/export_runtime_composition.py",
+          "blob": "0e17fcad28ab581f3c30fa6b5cb85bb9a8f1549a",
+          "previous_filename": null,
+          "merged_blob": "0e17fcad28ab581f3c30fa6b5cb85bb9a8f1549a",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "0e17fcad28ab581f3c30fa6b5cb85bb9a8f1549a"
+        },
+        {
+          "path": "services/legacy_export_snapshot_dal.py",
+          "blob": "5bca9c24c43a2def9c5ed9b4b9708846b2baa7ab",
+          "previous_filename": null,
+          "merged_blob": "5bca9c24c43a2def9c5ed9b4b9708846b2baa7ab",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "5bca9c24c43a2def9c5ed9b4b9708846b2baa7ab"
+        },
+        {
+          "path": "services/legacy_export_snapshot_service.py",
+          "blob": "8ec6f42c6458dd0733fe97d2e5ffde841442ef3d",
+          "previous_filename": null,
+          "merged_blob": "8ec6f42c6458dd0733fe97d2e5ffde841442ef3d",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "8ec6f42c6458dd0733fe97d2e5ffde841442ef3d"
+        },
+        {
+          "path": "stats_module.py",
+          "blob": "2025f45e16f9cd22d5bab42a4cee1eb3041e0661",
+          "previous_filename": null,
+          "merged_blob": "2025f45e16f9cd22d5bab42a4cee1eb3041e0661",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "2025f45e16f9cd22d5bab42a4cee1eb3041e0661"
+        },
+        {
+          "path": "tests/test_export_authority_boundaries.py",
+          "blob": "6de87f9b75b59744eb6a9fef76ef51f45b9c86e5",
+          "previous_filename": null,
+          "merged_blob": "6de87f9b75b59744eb6a9fef76ef51f45b9c86e5",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": null,
+          "repair": "restored_exact_production_bytes_locally"
+        },
+        {
+          "path": "tests/test_export_authority_launcher.py",
+          "blob": "ed43c4155b3334d37d491576f8e83aee6c22e15b",
+          "previous_filename": null,
+          "merged_blob": "ed43c4155b3334d37d491576f8e83aee6c22e15b",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": null,
+          "repair": "restored_exact_production_bytes_locally"
+        },
+        {
+          "path": "tests/test_export_enrollment_service.py",
+          "blob": "542a1a00c1dbfe1c3442b9dae8c65d35a5baf277",
+          "previous_filename": null,
+          "merged_blob": "542a1a00c1dbfe1c3442b9dae8c65d35a5baf277",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "542a1a00c1dbfe1c3442b9dae8c65d35a5baf277"
+        },
+        {
+          "path": "tests/test_export_execution_authority.py",
+          "blob": "5230e8bc2ab7031ae1a4708eae396bef3cec2837",
+          "previous_filename": null,
+          "merged_blob": "5230e8bc2ab7031ae1a4708eae396bef3cec2837",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": null,
+          "repair": "restored_exact_production_bytes_locally"
+        },
+        {
+          "path": "tests/test_export_execution_host.py",
+          "blob": "c24311d1973f6e4af41ec7fefe47027c36310f0c",
+          "previous_filename": null,
+          "merged_blob": "c24311d1973f6e4af41ec7fefe47027c36310f0c",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "c24311d1973f6e4af41ec7fefe47027c36310f0c"
+        },
+        {
+          "path": "tests/test_export_execution_protocol.py",
+          "blob": "fdc1b6c4645d4208e7c124b1444b16be67b1d2f6",
+          "previous_filename": null,
+          "merged_blob": "fdc1b6c4645d4208e7c124b1444b16be67b1d2f6",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "fdc1b6c4645d4208e7c124b1444b16be67b1d2f6"
+        },
+        {
+          "path": "tests/test_export_execution_sql_integration.py",
+          "blob": "15e2f44bfb1c1839512d8e32e743d2e8e24c3cd9",
+          "previous_filename": null,
+          "merged_blob": "15e2f44bfb1c1839512d8e32e743d2e8e24c3cd9",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "15e2f44bfb1c1839512d8e32e743d2e8e24c3cd9"
+        },
+        {
+          "path": "tests/test_export_provider_adapter.py",
+          "blob": "df61c825a24804af2b762f08f019cd15b9cac359",
+          "previous_filename": null,
+          "merged_blob": "df61c825a24804af2b762f08f019cd15b9cac359",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "df61c825a24804af2b762f08f019cd15b9cac359"
+        },
+        {
+          "path": "tests/test_export_reconciliation_service.py",
+          "blob": "5ac42b1d7ac8c53311b222312f99f8b267339477",
+          "previous_filename": null,
+          "merged_blob": "5ac42b1d7ac8c53311b222312f99f8b267339477",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "5ac42b1d7ac8c53311b222312f99f8b267339477"
+        },
+        {
+          "path": "tests/test_export_retirement_evidence.py",
+          "blob": "8b045ea0590260650d5084a911e33d28c1c0d003",
+          "previous_filename": null,
+          "merged_blob": "8b045ea0590260650d5084a911e33d28c1c0d003",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "8b045ea0590260650d5084a911e33d28c1c0d003"
+        },
+        {
+          "path": "tests/test_export_retirement_recovery_evidence.py",
+          "blob": "6628688030e330dfdbd79af0de9a349537d41359",
+          "previous_filename": null,
+          "merged_blob": "6628688030e330dfdbd79af0de9a349537d41359",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "6628688030e330dfdbd79af0de9a349537d41359"
+        },
+        {
+          "path": "tests/test_export_rollover_evidence.py",
+          "blob": "9f8119fdefe99f0b0f703407305ee78a825fe2c9",
+          "previous_filename": null,
+          "merged_blob": "9f8119fdefe99f0b0f703407305ee78a825fe2c9",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "9f8119fdefe99f0b0f703407305ee78a825fe2c9"
+        },
+        {
+          "path": "tests/test_export_runtime_composition.py",
+          "blob": "74a8bbdf0d012d4f28d2a75503eff8f9bb4cefbd",
+          "previous_filename": null,
+          "merged_blob": "74a8bbdf0d012d4f28d2a75503eff8f9bb4cefbd",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "74a8bbdf0d012d4f28d2a75503eff8f9bb4cefbd"
+        },
+        {
+          "path": "tests/test_gsheet_module.py",
+          "blob": "679e26f389310397277cef94ed5f6be4e57665d9",
+          "previous_filename": null,
+          "merged_blob": "679e26f389310397277cef94ed5f6be4e57665d9",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "679e26f389310397277cef94ed5f6be4e57665d9"
+        },
+        {
+          "path": "tests/test_kvk_output_rollover.py",
+          "blob": "b65982d7960877544b4caa3505320453bc49576b",
+          "previous_filename": null,
+          "merged_blob": "b65982d7960877544b4caa3505320453bc49576b",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "b65982d7960877544b4caa3505320453bc49576b"
+        },
+        {
+          "path": "tests/test_legacy_export_snapshot.py",
+          "blob": "2301f994dfbb539a66cd5eb4bed0a890ddfbe5ae",
+          "previous_filename": null,
+          "merged_blob": "2301f994dfbb539a66cd5eb4bed0a890ddfbe5ae",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "2301f994dfbb539a66cd5eb4bed0a890ddfbe5ae"
+        },
+        {
+          "path": "tests/test_proc_config_import.py",
+          "blob": "a23389789997d6f192c6de80f3d7841b22179af1",
+          "previous_filename": null,
+          "merged_blob": "a23389789997d6f192c6de80f3d7841b22179af1",
+          "proof": "exact_reviewed_blob",
+          "mirror_snapshot_blob": "a23389789997d6f192c6de80f3d7841b22179af1"
+        }
+      ]
+    },
+    "sql": {
+      "review_manifest": "sql-review2-publication-proof.json",
+      "review_manifest_sha256": "fc6847b3d1a6f125c461587c308bcd77420702a205ae819756d662825d49ccf3",
+      "reviewed_head": "0aab5d74e116291bde9b027e44ca819fa35db03c",
+      "original_base": "2352a898881d4b74d6eec153bb3cb381d6162041",
+      "merged_ref": "aa7b01381e2e451368c9b7118891a9b960bed9d9",
+      "identities": [
+        {
+          "path": ".gitattributes",
+          "blob": "3259c4551a7e42830f4a3bf9289363be9799fd28",
+          "previous_filename": null,
+          "merged_blob": "3259c4551a7e42830f4a3bf9289363be9799fd28",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "deploy/Test-ExportExecutionEvidenceContracts.ps1",
+          "blob": "c7999bde01523e7e46fb7ba3d7829d1aac95b2aa",
+          "previous_filename": null,
+          "merged_blob": "c7999bde01523e7e46fb7ba3d7829d1aac95b2aa",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "deploy/Test-ExportLegacyModulePermissionContracts.ps1",
+          "blob": "2cf37b0c0f5e76ea03712f000bea9f3f90077c28",
+          "previous_filename": null,
+          "merged_blob": "2cf37b0c0f5e76ea03712f000bea9f3f90077c28",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "deploy/export_legacy_module_permission_manifest.json",
+          "blob": "145b31cd959429b33c7d3cdd4d013e089496056a",
+          "previous_filename": null,
+          "merged_blob": "145b31cd959429b33c7d3cdd4d013e089496056a",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "docs/SQL_DELIVERY_LOG.md",
+          "blob": "0e13473ce972d56921317beeddfa84432793979b",
+          "previous_filename": null,
+          "merged_blob": "0e13473ce972d56921317beeddfa84432793979b",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "migrations/20260924_001_export_execution_evidence.sql",
+          "blob": "1a395bdcd47785bd22b28cb6332b7d2d1cc44f46",
+          "previous_filename": null,
+          "merged_blob": "1a395bdcd47785bd22b28cb6332b7d2d1cc44f46",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "migrations/20260924_002_export_legacy_module_permissions.sql",
+          "blob": "497321ae40e5f61a74111305bb6c9f3c76079b0a",
+          "previous_filename": null,
+          "merged_blob": "497321ae40e5f61a74111305bb6c9f3c76079b0a",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "migrations/README.md",
+          "blob": "89e9290c8c2cbb440ba51dbd919309d28f5a9833",
+          "previous_filename": null,
+          "merged_blob": "89e9290c8c2cbb440ba51dbd919309d28f5a9833",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "migrations/rollback/20260924_002_export_legacy_module_permissions_rollback.sql",
+          "blob": "75cfbd1e78dd9b26496961212a8bd8e3171fe4ee",
+          "previous_filename": null,
+          "merged_blob": "75cfbd1e78dd9b26496961212a8bd8e3171fe4ee",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.ExportExecutionSession.Table.sql",
+          "blob": "dd2de80dc1a8a930686c41e357720d6fa578fe57",
+          "previous_filename": null,
+          "merged_blob": "dd2de80dc1a8a930686c41e357720d6fa578fe57",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.ExportExecutionStream.Table.sql",
+          "blob": "38bd01024008f4f232fc4665dc487fa5df383a99",
+          "previous_filename": null,
+          "merged_blob": "38bd01024008f4f232fc4665dc487fa5df383a99",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.ExportManagedFileOrigin.Table.sql",
+          "blob": "6a9f51259e123db8af7a6a2ee8ce90ef1d75dff4",
+          "previous_filename": null,
+          "merged_blob": "6a9f51259e123db8af7a6a2ee8ce90ef1d75dff4",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.ExportProviderRequest.Table.sql",
+          "blob": "a8031660437a035aa4828ba3b8972dc1f1850afd",
+          "previous_filename": null,
+          "merged_blob": "a8031660437a035aa4828ba3b8972dc1f1850afd",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.ExportProviderRequestEvent.Table.sql",
+          "blob": "cc1ac48d8fc06e12f7eb099fd1d0de6e3ec71607",
+          "previous_filename": null,
+          "merged_blob": "cc1ac48d8fc06e12f7eb099fd1d0de6e3ec71607",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.ExportReconciliationProof.Table.sql",
+          "blob": "5a57fa90598642f44eef9855519b74c174721bb1",
+          "previous_filename": null,
+          "merged_blob": "5a57fa90598642f44eef9855519b74c174721bb1",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.usp_ExportExecutionSessionTransition.StoredProcedure.sql",
+          "blob": "4129c160c7fc0f1eac3c9077f49f5d9bf8bbbba8",
+          "previous_filename": null,
+          "merged_blob": "4129c160c7fc0f1eac3c9077f49f5d9bf8bbbba8",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.usp_ExportExecutionStreamTransition.StoredProcedure.sql",
+          "blob": "b46b7b29a823bafc72d379279680baebb8918c26",
+          "previous_filename": null,
+          "merged_blob": "b46b7b29a823bafc72d379279680baebb8918c26",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.usp_ExportOutputEnrollmentTransition.StoredProcedure.sql",
+          "blob": "ce8ef3e679b6a2f2009dabd63f0bfdc17e720d25",
+          "previous_filename": null,
+          "merged_blob": "ce8ef3e679b6a2f2009dabd63f0bfdc17e720d25",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.usp_ExportProviderRequestEventAppend.StoredProcedure.sql",
+          "blob": "72a454c44a1cdc1d43a2083aa38d7d49b4d5b76b",
+          "previous_filename": null,
+          "merged_blob": "72a454c44a1cdc1d43a2083aa38d7d49b4d5b76b",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "sql_schema/dbo.usp_ExportReconciliationProofIssue.StoredProcedure.sql",
+          "blob": "d6d95c21806591811d79fc0d14e6614ae21b5228",
+          "previous_filename": null,
+          "merged_blob": "d6d95c21806591811d79fc0d14e6614ae21b5228",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "validation/kvk_source/s11_export_execution_evidence.sql",
+          "blob": "bdf4676a84016ca1f740a1c4dbd5a7ab74f1aee0",
+          "previous_filename": null,
+          "merged_blob": "bdf4676a84016ca1f740a1c4dbd5a7ab74f1aee0",
+          "proof": "exact_reviewed_blob"
+        },
+        {
+          "path": "validation/kvk_source/s11_export_legacy_module_permissions.sql",
+          "blob": "ba402abd82617d71218546fea3a508751aaae3d5",
+          "previous_filename": null,
+          "merged_blob": "ba402abd82617d71218546fea3a508751aaae3d5",
+          "proof": "exact_reviewed_blob"
+        }
+      ]
+    }
+  }
+}
