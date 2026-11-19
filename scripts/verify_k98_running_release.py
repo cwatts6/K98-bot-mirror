@@ -263,7 +263,7 @@ def verify_retained_work(cursor, config, session_id):
             raise ValueError("Stream belongs to an unexpected session")
 
 
-def verify(profile, config, pair, policy=None):
+def verify(profile, config, pair, policy=None, *, startup_reader):
     policy = policy or pair["verify_live_source"](config)
     from core.export_deployment_handoff import RecordedTermination, termination_path
     from core.export_process_identity import open_pinned_process
@@ -319,7 +319,10 @@ def verify(profile, config, pair, policy=None):
         handles = [
             stack.enter_context(native_handle(open_pinned_process(b["pid"], b))) for b in bindings
         ]
-        admission = pair["startup_admission_result"](config, journal, start)
+        startup_before = startup_reader(config, start, profile)
+        admission = pair["startup_admission_result"](
+            config, journal, start, raw=startup_before["raw"]
+        )
         bot = pair["bot_from_policy"](policy)
         if bot["sql_contract"]["profile"] != "application":
             raise ValueError("Dedicated single-attempt application connection required")
@@ -345,6 +348,12 @@ def verify(profile, config, pair, policy=None):
             raise ValueError("Native identity or incarnation changed during verification")
         # Bind final files again after the SQL observation, retaining process handles.
         protected(paths[0], profile["journal_sha256"])
+        startup_after = startup_reader(config, start, profile)
+        if (
+            pair["startup_admission_result"](config, journal, start, raw=startup_after["raw"])
+            != admission
+        ):
+            raise ValueError("Initial admission history changed during verification")
         from services.export_execution_protocol import encode
 
         return dict(
@@ -355,6 +364,8 @@ def verify(profile, config, pair, policy=None):
             session_id=session_id,
             sequence=journal["sequence"],
             admission=admission,
+            startup_evidence_before=startup_before["evidence"],
+            startup_evidence_after=startup_after["evidence"],
             sql_observation_sha256=hashlib.sha256(encode(contracts)).hexdigest(),
             original_start="unconfirmed_preserved",
             original_readiness="unstarted_preserved",
@@ -389,7 +400,18 @@ def main():
     if not 0 < len(raw) <= 65536 or hashlib.sha256(raw).hexdigest() != args.sha256:
         raise ValueError("Verification profile differs")
     profile = json.loads(raw)
+    if profile.get("version") != 2:
+        raise ValueError("Reviewed rotation-aware profile required")
     directory = Path(args.profile).parent
+    reader_path = directory / "Read-StartupEvidence.py"
+    with reader_path.open("rb") as stream:
+        reader_raw = stream.read(1024 * 1024 + 1)
+    if (
+        len(reader_raw) > 1024 * 1024
+        or hashlib.sha256(reader_raw).hexdigest() != profile["members"][reader_path.name]
+    ):
+        raise ValueError("Sealed startup reader differs")
+    startup_reader = runpy.run_path(str(reader_path))["observe"]
     pair_path = directory / "Verify-NewPair.py"
     pair_raw = pair_path.read_bytes()
     if (
@@ -417,7 +439,7 @@ def main():
     # This isolated verifier owns every connection; close must not return a
     # session to a process-local pool with potentially retained SQL state.
     pyodbc.pooling = False
-    print(json.dumps(verify(profile, config, pair, policy)))
+    print(json.dumps(verify(profile, config, pair, policy, startup_reader=startup_reader)))
 
 
 def failure_result(error):

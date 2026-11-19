@@ -343,7 +343,7 @@ def _admission_utc(value, failure):
     return timestamp
 
 
-def startup_admission_result(config, journal, start):
+def startup_admission_result(config, journal, start, *, raw=None):
     """Read bounded existing startup evidence before any successor SQL observer.
 
     This orders observation only. Exact source/native/SQL checks still establish
@@ -359,16 +359,20 @@ def startup_admission_result(config, journal, start):
     requested = _admission_utc(start["requested_utc"], "Malformed admission start timestamp")
     binding = journal["bindings"]["bot"]
     expected = journal["publication"]["manifests"]["bot"]
-    try:
-        with (Path(config["root"]) / "logs" / "log.txt").open("rb") as stream:
-            length = stream.seek(0, 2)
-            if not 0 <= length - start["log_offset"] <= 8 * 1024 * 1024:
-                raise ValueError("Startup log rotated/exceeded bound; admission unresolved")
-            stream.seek(start["log_offset"])
-            raw = stream.read(8 * 1024 * 1024 + 1)
-    except FileNotFoundError as exc:
-        raise PairPublicationPending("Awaiting successor admission evidence") from exc
-    if len(raw) > 8 * 1024 * 1024:
+    if raw is None:
+        try:
+            with (Path(config["root"]) / "logs" / "log.txt").open("rb") as stream:
+                length = stream.seek(0, 2)
+                if not 0 <= length - start["log_offset"] <= 8 * 1024 * 1024:
+                    raise ValueError("Startup log rotated/exceeded bound; admission unresolved")
+                stream.seek(start["log_offset"])
+                raw = stream.read(8 * 1024 * 1024 + 1)
+        except FileNotFoundError as exc:
+            raise PairPublicationPending("Awaiting successor admission evidence") from exc
+    # Only the sealed running-release verifier supplies a separately captured
+    # interval. Its hash-pinned generation and original offset are checked there.
+    # The exact admission parser and ordinary updater behavior remain shared.
+    if not isinstance(raw, bytes) or len(raw) > 8 * 1024 * 1024:
         raise ValueError("Startup log exceeds admission observation bound")
     results = []
     marker = b"K98_STARTUP_ADMISSION_RESULT "

@@ -96,6 +96,8 @@ def test_cleanup_uncertainty_overrides_refusal_and_redacts_error_prose():
         "process_exit",
         "journal_changed",
         "admission_failed",
+        "history_failed_after_sql",
+        "admission_changed_after_sql",
         "stream_open",
     ],
 )
@@ -226,7 +228,7 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
             (state / "incarnation-extra.json").write_text("{}")
         return dict(actual="compared actual catalogue")
 
-    def admission(*args):
+    def admission(*args, **kwargs):
         if fault == "admission_failed":
             raise ValueError("initial admission failed")
         return dict(outcome="installed")
@@ -237,13 +239,24 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
         bot_from_policy=lambda p: dict(sql_contract=dict(profile="application")),
         verify_sql_contracts=sql,
     )
+    startup_reader = Mock(return_value=dict(raw=b"fixture startup", evidence=dict(fixture=True)))
+    if fault == "history_failed_after_sql":
+        startup_reader.side_effect = [startup_reader.return_value, ValueError("later log failure")]
+    if fault == "admission_changed_after_sql":
+        pair["startup_admission_result"] = Mock(side_effect=[dict(outcome="installed"), {}])
     if fault:
         with pytest.raises((SourceConflict, ValueError)):
-            verify(profile, config, pair, policy)
+            verify(profile, config, pair, policy, startup_reader=startup_reader)
     else:
-        result = verify(profile, config, pair, policy)
+        result = verify(profile, config, pair, policy, startup_reader=startup_reader)
         assert result["stage"] == "RUNNING_RELEASE_VERIFIED" and result["session_id"] == "new"
         assert result["provider_delivery_verified"] is False
+        assert startup_reader.call_count == 2
+        assert (
+            result["startup_evidence_before"]
+            == result["startup_evidence_after"]
+            == dict(fixture=True)
+        )
     assert len(acquisitions) == (0 if fault == "admission_failed" else 1)
     for connection in connections:
         connection.close.assert_called_once()
@@ -255,7 +268,7 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
 def profile():
     release = "10000000-0000-0000-0000-000000000001"
     value = dict(
-        version=1,
+        version=2,
         kind="running_release_verification_v1",
         host="MINI_AMD",
         sid="S-1-5-21-1-2-3-1001",
@@ -267,6 +280,7 @@ def profile():
         journal_name="incarnation-00000000000000000107-40000000-0000-0000-0000-000000000004.json",
         original_retirement_path=r"C:\ProgramData\K98\S11\updates\retirements\50000000-0000-0000-0000-000000000005\complete.json",
         receipts={name: "b" * 64 for name in RECEIPTS},
+        startup_log_anchor=dict(sha256="d" * 64, bytes=3000000, offset=2383156),
     )
     value.update(
         {
@@ -673,7 +687,7 @@ function Open-RetirementProcesses {return ,@()}
 function Assert-RetirementProcesses {}
 function Read-RetirementBytes($Path,$Expected='', $Limit=0){if(Test-Path -LiteralPath $Path){return ,([IO.File]::ReadAllBytes($Path))};return ,([byte[]]@(1))}
 function Read-RetirementJson {return [pscustomobject]@{log_offset=0}}
-function Read-StartupText {return "Logged in as fixture`n[BOOT] full_startup_sequence completed successfully`nExport coordinator unavailable error_type=ObservationBusy"}
+function Read-RunningStartupText {$script:runningStartupObservationHash='fixture';return "Logged in as fixture`n[BOOT] full_startup_sequence completed successfully`nExport coordinator unavailable error_type=ObservationBusy"}
 function Read-Host {return $Answer}
 function Write-RetirementBytes($Path,$Bytes){[IO.File]::WriteAllBytes($Path,$Bytes)}
 function ApplyStart {throw 'FORBIDDEN'}

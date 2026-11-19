@@ -47,6 +47,39 @@ function Assert-RunningReleaseEvidence($Profile) {
  return $runtime
 }
 
+function Read-RunningStartupText($Profile,[string]$ProfileHash,[string]$Directory,$Start) {
+ if($Profile.version -ne 2 -or $Start.release_id -cne $Profile.release_id -or
+    [long]$Start.log_offset -ne [long]$Profile.startup_log_anchor.offset){throw 'Original startup log anchor differs'}
+ $reader=Join-Path $Directory 'Read-StartupEvidence.py'
+ $null=Read-RetirementBytes $reader $Profile.members.'Read-StartupEvidence.py' 1MB
+ $profilePath=Join-Path $Directory 'profile.json'
+ $null=Read-RetirementBytes $profilePath $ProfileHash 65536
+ $null=Read-RetirementBytes $c.venv.path $c.venv.sha256 4MB
+ $output=@(& $c.venv.path -I -B $reader --profile $profilePath --sha256 $ProfileHash)
+ $code=$LASTEXITCODE
+ $record=$null
+ if($output.Count -eq 1){try{$record=$output[0]|ConvertFrom-Json}catch{$record=$null}}
+ $evidence=$null;$failure='invalid_response'
+ if($null -ne $record -and $null -ne $record.PSObject.Properties['evidence']){$evidence=$record.evidence}
+ if($null -ne $record -and $null -ne $record.PSObject.Properties['failure_type']){$failure=$record.failure_type}
+ $text=$null
+ try {
+  if($code -ne 0 -or $null -eq $record -or $record.stage -cne 'STARTUP_HISTORY_CAPTURED'){throw 'Capture refused'}
+  $bytes=[Convert]::FromBase64String($record.raw_base64)
+  if($bytes.Length -gt 8MB -or $bytes.Length -ne $evidence.interval_bytes -or (Hash $bytes) -cne $evidence.interval_sha256){throw 'Capture result differs'}
+  $text=[Text.UTF8Encoding]::new($false,$true).GetString($bytes)
+  $failure=$null
+ } catch {if($failure -ceq 'invalid_response'){$failure=$_.Exception.GetType().Name}}
+ $observation=[ordered]@{version=1;release_id=$Profile.release_id;profile_sha256=$ProfileHash;observed_utc=[datetime]::UtcNow.ToString('o');exit_code=$code;evidence=$evidence;failure_type=$failure}
+ $path=Join-Path $Directory ('startup-observation-'+[guid]::NewGuid().ToString()+'.json')
+ Write-RetirementBytes $path (Retirement-Bytes $observation)
+ if($null -ne $failure){
+  throw 'Startup history capture refused; preserve its observation and obtain review. No retry or acceptance.'
+ }
+ $script:runningStartupObservationHash=Hash (Read-RetirementBytes $path)
+ return $text
+}
+
 function Invoke-RunningReleaseVerification($Profile,[string]$ProfileHash,[string]$Directory) {
  $updates='C:\ProgramData\K98\S11\updates'
  $lockPath=Join-Path $updates 'operator.lock'
@@ -75,7 +108,7 @@ function Invoke-RunningReleaseVerification($Profile,[string]$ProfileHash,[string
   $null=Assert-RunningReleaseEvidence $Profile
   Assert-RetirementProcesses $processes
   $start=Read-RetirementJson (Join-Path $Profile.stage 'start-requested.json') $Profile.start_sha256
-  $startupText=Read-StartupText $start
+  $startupText=Read-RunningStartupText $Profile $ProfileHash $Directory $start
   $health=Import-ExportStatus $startupText
   if($startupText -notmatch '\[BOOT\] full_startup_sequence completed successfully' -or
      $startupText -notmatch 'Logged in as' -or $health.reason -ceq 'runtime_admission_unavailable') {
@@ -101,10 +134,11 @@ function Invoke-RunningReleaseVerification($Profile,[string]$ProfileHash,[string
      $proof.provider_delivery_verified -ne $false -or $proof.retry -ne $false){throw 'Verification proof differs'}
   $null=Assert-RunningReleaseEvidence $Profile
   Assert-RetirementProcesses $processes
-  if((Import-ExportStatus (Read-StartupText $start)).reason -ceq 'runtime_admission_unavailable'){throw 'Runtime admission failure appeared; no acceptance'}
+  if((Import-ExportStatus (Read-RunningStartupText $Profile $ProfileHash $Directory $start)).reason -ceq 'runtime_admission_unavailable'){throw 'Runtime admission failure appeared; no acceptance'}
   $acceptance=[ordered]@{version=1;release_id=$Profile.release_id;target=$Profile.target;verified_utc=[datetime]::UtcNow.ToString('o');
    closeout_kind='running_release_verification_v1';profile_sha256=$ProfileHash;actor_sid=$Profile.sid;
    failure_evidence_sha256=$Profile.failure_evidence_sha256;attempt_sha256=(Hash (Read-RetirementBytes $attemptPath));
+   final_startup_observation_sha256=$script:runningStartupObservationHash;
    current_successor=$proof;readiness=@{discord_status='operator_confirmed_online';import_export=@{status='degraded';provider_delivery_verified=$false};original_start='unconfirmed_preserved';original_readiness='unstarted_preserved'}}
   Assert-RetirementProcesses $processes
   $null=Assert-RunningReleaseEvidence $Profile

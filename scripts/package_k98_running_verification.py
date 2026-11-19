@@ -9,6 +9,7 @@ import re
 import zipfile
 
 from scripts.package_k98_update_tool import INSTALLER
+from scripts.read_k98_startup_evidence import validate_anchor
 from scripts.verify_k98_update_pair import build_contract_archive
 
 UUID = r"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"
@@ -43,13 +44,14 @@ def validate_profile(profile):
         "journal_name",
         "receipts",
         "original_retirement_path",
+        "startup_log_anchor",
         *(x + "_sha256" for x in hashes),
     }
     if (
         not isinstance(profile, dict)
         or set(profile) != fields
         or type(profile["version"]) is not int
-        or profile["version"] != 1
+        or profile["version"] != 2
         or profile["kind"] != "running_release_verification_v1"
         or profile["host"] != "MINI_AMD"
     ):
@@ -85,6 +87,7 @@ def validate_profile(profile):
         raise ValueError("Exactly verified source/seed and unconfirmed start required")
     if profile["release_id"] in profile["original_retirement_path"]:
         raise ValueError("Retired release cannot be verified")
+    validate_anchor(profile["startup_log_anchor"])
 
 
 def build(profile, root):
@@ -96,6 +99,7 @@ def build(profile, root):
         "Running-Library.ps1": "K98-VerifyRunningRelease.ps1",
         "Verify-NewPair.py": "verify_k98_update_pair.py",
         "Verify-RunningRelease.py": "verify_k98_running_release.py",
+        "Read-StartupEvidence.py": "read_k98_startup_evidence.py",
     }
     members = {
         name: (root / "scripts" / source).read_bytes().replace(b"\r\n", b"\n")
