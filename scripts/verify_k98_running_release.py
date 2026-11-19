@@ -351,7 +351,9 @@ def verify(profile, config, pair, policy=None, *, startup_reader):
             startup_reader["check_admission"](pair, config, journal, start, startup_after)
             != admission
         ):
-            raise ValueError("Initial admission history changed during verification")
+            raise startup_reader["StartupHistoryRefused"](
+                "admission_changed", startup_after["evidence"]
+            )
         from services.export_execution_protocol import encode
 
         return dict(

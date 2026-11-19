@@ -108,7 +108,11 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
     import core.export_process_identity as processes
     import core.export_startup_windows as windows
     import kvk.dal.new_source_admin_dal as admin
-    from scripts.read_k98_startup_evidence import check_admission
+    from scripts.read_k98_startup_evidence import (
+        StartupHistoryRefused,
+        check_admission,
+        failure_record,
+    )
     from scripts.verify_k98_running_release import verify
 
     rows, config, journal = session_fixture()
@@ -241,14 +245,26 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
         verify_sql_contracts=sql,
     )
     observe = Mock(return_value=dict(raw=b"fixture startup", evidence=dict(fixture=True)))
-    startup_reader = dict(observe=observe, check_admission=check_admission)
+    startup_reader = dict(
+        observe=observe,
+        check_admission=check_admission,
+        StartupHistoryRefused=StartupHistoryRefused,
+        failure_record=failure_record,
+    )
     if fault == "history_failed_after_sql":
         observe.side_effect = [observe.return_value, ValueError("later log failure")]
     if fault == "admission_changed_after_sql":
         pair["startup_admission_result"] = Mock(side_effect=[dict(outcome="installed"), {}])
     if fault:
-        with pytest.raises((SourceConflict, ValueError)):
+        with pytest.raises((SourceConflict, ValueError)) as caught:
             verify(profile, config, pair, policy, startup_reader=startup_reader)
+        if fault == "admission_changed_after_sql":
+            from scripts.verify_k98_running_release import failure_result
+
+            code, record = failure_result(caught.value, startup_reader=startup_reader)
+            assert code == 1 and record["verified"] is False and record["retry"] is False
+            assert record["startup_observation"]["failure_category"] == "admission_changed"
+            assert record["startup_observation"]["evidence"] == dict(fixture=True)
     else:
         result = verify(profile, config, pair, policy, startup_reader=startup_reader)
         assert result["stage"] == "RUNNING_RELEASE_VERIFIED" and result["session_id"] == "new"
