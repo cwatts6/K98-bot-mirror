@@ -1344,9 +1344,9 @@ def reviewed_transitions():
         or len(value["transitions"]) > 95
         or (
             len(value["transitions"]) == 95
-            and not any(
-                isinstance(t, dict) and t.get("id") == P02_CATALOG_TRANSITION
-                for t in value["transitions"]
+            and not all(
+                any(isinstance(t, dict) and t.get("id") == required for t in value["transitions"])
+                for required in (P02_VERIFICATION_TRANSITION, P02_CATALOG_TRANSITION)
             )
         )
         or (

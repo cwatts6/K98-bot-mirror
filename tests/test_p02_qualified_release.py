@@ -28,7 +28,11 @@ def authenticated_admission_successor(monkeypatch):
     """Keep this historical family test bound through the exact reviewed successor."""
     successors = [
         next(t for t in updater.reviewed_transitions() if t["id"] == identity)
-        for identity in (updater.P02_VERIFICATION_TRANSITION, updater.P02_ADMISSION_TRANSITION)
+        for identity in (
+            updater.P02_CATALOG_TRANSITION,
+            updater.P02_VERIFICATION_TRANSITION,
+            updater.P02_ADMISSION_TRANSITION,
+        )
     ]
     pairs = [
         {
@@ -121,6 +125,7 @@ def test_qualified_family_builds_complete_packet(tmp_path, monkeypatch, bot):  #
 
     monkeypatch.setattr(previous, "assert_complete_repair_packet", qualified)
     complete_packet(tmp_path, monkeypatch, bot)
-    assert original()[-3]["id"] == updater.P02_QUALIFIED_TRANSITION
-    assert original()[-2]["id"] == updater.P02_ADMISSION_TRANSITION
-    assert original()[-1]["id"] == updater.P02_VERIFICATION_TRANSITION
+    assert original()[-4]["id"] == updater.P02_QUALIFIED_TRANSITION
+    assert original()[-3]["id"] == updater.P02_ADMISSION_TRANSITION
+    assert original()[-2]["id"] == updater.P02_VERIFICATION_TRANSITION
+    assert original()[-1]["id"] == updater.P02_CATALOG_TRANSITION

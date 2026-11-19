@@ -27,6 +27,30 @@ ROOT = Path(__file__).resolve().parents[1]
 PS = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 
+@pytest.mark.parametrize(
+    "missing", ["p02_running_verification_v1", "p02_verification_catalog_cleanup_v1"]
+)
+def test_full_registry_requires_both_verification_families(monkeypatch, missing):
+    from scripts import prepare_k98_update as updater
+
+    transitions = deepcopy(updater.reviewed_transitions())
+    replacement = next(item for item in transitions if item["id"] == missing)
+    replacement.update(
+        id="fixture_replacement_v1",
+        members=[
+            dict(
+                path="services/export_execution_dal.py",
+                before_sha256="a" * 64,
+                after_sha256="b" * 64,
+            )
+        ],
+    )
+    edited = json.dumps(dict(version=1, transitions=transitions)).encode()
+    monkeypatch.setattr(updater.Path, "read_bytes", lambda self: edited)
+    with pytest.raises(ValueError, match="Bounded installed transitions required"):
+        updater.reviewed_transitions()
+
+
 def test_source_successor_is_exact_indivisible_and_preserves_historical_registry(monkeypatch):
     from scripts import prepare_k98_update as updater
 
