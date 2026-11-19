@@ -319,10 +319,8 @@ def verify(profile, config, pair, policy=None, *, startup_reader):
         handles = [
             stack.enter_context(native_handle(open_pinned_process(b["pid"], b))) for b in bindings
         ]
-        startup_before = startup_reader(config, start, profile)
-        admission = pair["startup_admission_result"](
-            config, journal, start, raw=startup_before["raw"]
-        )
+        startup_before = startup_reader["observe"](config, start, profile)
+        admission = startup_reader["check_admission"](pair, config, journal, start, startup_before)
         bot = pair["bot_from_policy"](policy)
         if bot["sql_contract"]["profile"] != "application":
             raise ValueError("Dedicated single-attempt application connection required")
@@ -348,9 +346,9 @@ def verify(profile, config, pair, policy=None, *, startup_reader):
             raise ValueError("Native identity or incarnation changed during verification")
         # Bind final files again after the SQL observation, retaining process handles.
         protected(paths[0], profile["journal_sha256"])
-        startup_after = startup_reader(config, start, profile)
+        startup_after = startup_reader["observe"](config, start, profile)
         if (
-            pair["startup_admission_result"](config, journal, start, raw=startup_after["raw"])
+            startup_reader["check_admission"](pair, config, journal, start, startup_after)
             != admission
         ):
             raise ValueError("Initial admission history changed during verification")
@@ -411,7 +409,7 @@ def main():
         or hashlib.sha256(reader_raw).hexdigest() != profile["members"][reader_path.name]
     ):
         raise ValueError("Sealed startup reader differs")
-    startup_reader = runpy.run_path(str(reader_path))["observe"]
+    startup_reader = runpy.run_path(str(reader_path))
     pair_path = directory / "Verify-NewPair.py"
     pair_raw = pair_path.read_bytes()
     if (
@@ -439,22 +437,31 @@ def main():
     # This isolated verifier owns every connection; close must not return a
     # session to a process-local pool with potentially retained SQL state.
     pyodbc.pooling = False
-    print(json.dumps(verify(profile, config, pair, policy, startup_reader=startup_reader)))
+    try:
+        result = verify(profile, config, pair, policy, startup_reader=startup_reader)
+    except Exception as error:
+        code, record = failure_result(error, startup_reader=startup_reader)
+        print(json.dumps(record))
+        raise SystemExit(code) from None
+    print(json.dumps(result))
 
 
-def failure_result(error):
+def failure_result(error, *, startup_reader=None):
     # Only an exact acknowledged timeout is pending; cancellation/deadlock,
     # unknown cleanup and all contract/identity drift remain hard failures.
     module = sys.modules.get("services.application_maintenance_dal")
     refused = getattr(module, "SchemaObservationRefused", ())
     pending = isinstance(error, refused) and error.result == -1
-    return (12 if pending else 1), dict(
+    record = dict(
         stage="VERIFICATION_PENDING" if pending else "VERIFICATION_REFUSED",
         failure_type=type(error).__name__,
         schema_lock_result=error.result if isinstance(error, refused) else None,
         verified=False,
         retry=False,
     )
+    if startup_reader and isinstance(error, startup_reader["StartupHistoryRefused"]):
+        record["startup_observation"] = startup_reader["failure_record"](error)
+    return (12 if pending else 1), record
 
 
 if __name__ == "__main__":

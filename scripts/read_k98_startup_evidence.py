@@ -21,6 +21,24 @@ READ_LIMIT = 8 * 1024 * 1024
 NAMES = ("log.txt", *(f"log.txt.{i}" for i in range(1, 6)))
 
 
+class StartupHistoryRefused(ValueError):
+    """Retain compact captured evidence, never the underlying log text."""
+
+    def __init__(self, category, evidence=None):
+        super().__init__("Startup history does not establish readiness or admission")
+        self.category = category
+        self.evidence = evidence
+
+
+def failure_record(error):
+    record = dict(failure_type=type(error).__name__, retry=False)
+    if isinstance(error, StartupHistoryRefused):
+        record.update(failure_category=error.category, evidence=error.evidence)
+    else:
+        record["failure_category"] = "capture_or_input_refused"
+    return record
+
+
 def validate_anchor(anchor):
     if (
         not isinstance(anchor, dict)
@@ -183,18 +201,21 @@ def capture(log_root, anchor):
 
 def require_startup_ready(raw):
     text = raw.decode("utf-8")
+    if "S11 export admission remains closed" in text:
+        raise StartupHistoryRefused("admission_closed")
+    if "Export admission disabled:" in text:
+        raise StartupHistoryRefused("admission_disabled")
+    if any(
+        "Export coordinator unavailable" in line
+        and not re.search(r"error_type=ObservationBusy(?:\s|$)", line)
+        for line in text.splitlines()
+    ):
+        raise StartupHistoryRefused("coordinator_unavailable")
     if (
         "[BOOT] full_startup_sequence completed successfully" not in text
         or "Logged in as" not in text
-        or "S11 export admission remains closed" in text
-        or "Export admission disabled:" in text
-        or any(
-            "Export coordinator unavailable" in line
-            and not re.search(r"error_type=ObservationBusy(?:\s|$)", line)
-            for line in text.splitlines()
-        )
     ):
-        raise ValueError("Startup history does not establish readiness")
+        raise StartupHistoryRefused("startup_markers_missing")
 
 
 def observe(config, start, profile):
@@ -203,8 +224,21 @@ def observe(config, start, profile):
     if start["release_id"] != profile["release_id"] or start["log_offset"] != anchor["offset"]:
         raise ValueError("Startup log anchor differs from original request")
     result = capture(Path(config["root"]) / "logs", anchor)
-    require_startup_ready(result["raw"])
+    try:
+        require_startup_ready(result["raw"])
+    except StartupHistoryRefused as error:
+        error.evidence = result["evidence"]
+        raise
     return result
+
+
+def check_admission(pair, config, journal, start, result):
+    try:
+        return pair["startup_admission_result"](config, journal, start, raw=result["raw"])
+    except ValueError as error:
+        raise StartupHistoryRefused("admission_refused", result["evidence"]) from error
+    except pair["PairPublicationPending"] as error:
+        raise StartupHistoryRefused("admission_pending", result["evidence"]) from error
 
 
 def pinned_bytes(path, digest, limit):
@@ -238,9 +272,7 @@ def capture_profile(profile, directory):
     pinned_bytes(pair_path, profile["pair_sha256"], 1024 * 1024)
     pair = runpy.run_path(str(pair_path))
     result = observe(config, start, profile)
-    result["evidence"]["admission"] = pair["startup_admission_result"](
-        config, journal, start, raw=result["raw"]
-    )
+    result["evidence"]["admission"] = check_admission(pair, config, journal, start, result)
     return result
 
 
@@ -275,11 +307,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as error:
-        print(
-            json.dumps(
-                dict(
-                    stage="STARTUP_HISTORY_REFUSED", failure_type=type(error).__name__, retry=False
-                )
-            )
-        )
+        print(json.dumps(dict(stage="STARTUP_HISTORY_REFUSED", **failure_record(error))))
         raise SystemExit(1) from None

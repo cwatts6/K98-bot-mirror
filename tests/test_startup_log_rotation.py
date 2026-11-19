@@ -117,8 +117,18 @@ def test_missing_ambiguous_or_incomplete_history_refuses(tmp_path, fault):
 def test_later_negative_evidence_is_not_hidden_by_historical_success(tmp_path, failure):
     root, profile, start, *_ = history(tmp_path)
     (root / "log.txt").write_bytes(failure)
-    with pytest.raises(ValueError, match="does not establish readiness"):
+    with pytest.raises(
+        reader.StartupHistoryRefused, match="does not establish readiness"
+    ) as caught:
         reader.observe(dict(root=str(tmp_path)), start, profile)
+    failure_record = reader.failure_record(caught.value)
+    assert failure_record["evidence"]["interval_bytes"] > 0
+    assert failure_record["failure_category"] in {
+        "admission_closed",
+        "admission_disabled",
+        "coordinator_unavailable",
+    }
+    assert failure.decode().strip() not in json.dumps(failure_record)
 
 
 def test_exact_observation_busy_is_degraded_but_not_terminal(tmp_path):
@@ -272,10 +282,25 @@ def test_anchor_is_closed_and_strict(tmp_path, damage):
         reader.validate_anchor(profile["startup_log_anchor"])
 
 
+def test_python_verification_failure_retains_redacted_captured_evidence(tmp_path):
+    from scripts.verify_k98_running_release import failure_result
+
+    root, profile, start, journal, *_ = history(tmp_path)
+    result = reader.observe(dict(root=str(tmp_path)), start, profile)
+    error = reader.StartupHistoryRefused("admission_refused", result["evidence"])
+    code, record = failure_result(error, startup_reader=vars(reader))
+    assert code == 1 and record["verified"] is False and record["retry"] is False
+    assert record["startup_observation"]["evidence"] == result["evidence"]
+    assert record["startup_observation"]["failure_category"] == "admission_refused"
+    assert "raw_base64" not in json.dumps(record) and "Logged in as" not in json.dumps(record)
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Isolated Windows sealed-reader entry point")
-@pytest.mark.parametrize("damage", [None, "pair", "journal", "offset", "late_failure"])
+@pytest.mark.parametrize("damage", [None, "pair", "journal", "offset", "late_failure", "admission"])
 def test_isolated_reader_uses_pinned_inputs_and_real_admission_parser(tmp_path, damage):
     root, profile, start, journal, record, startup = history(tmp_path)
+    if damage == "admission":
+        journal["bindings"]["bot"]["pid"] = 913
     config = dict(
         root=r"C:\discord_file_downloader", release_id="r", new_state_directory=str(tmp_path)
     )
@@ -302,14 +327,18 @@ def test_isolated_reader_uses_pinned_inputs_and_real_admission_parser(tmp_path, 
     # Redirect only the log filesystem effect into a fixture. All profile,
     # binding, journal and same-packet parser validation uses the actual code.
     harness = """
-import runpy,sys
+import json,runpy,sys
 from pathlib import Path
 scope=runpy.run_path(sys.argv[1])
 capture=scope['capture']
 fixture=Path(sys.argv[2])/'logs'
 scope['observe'].__globals__['capture']=lambda root,anchor:capture(fixture,anchor)
 sys.argv=['reader','--profile',str(Path(sys.argv[2])/'profile.json'),'--sha256',sys.argv[3]]
-scope['main']()
+try:
+    scope['main']()
+except Exception as error:
+    print(json.dumps(dict(stage='STARTUP_HISTORY_REFUSED',**scope['failure_record'](error))))
+    sys.exit(1)
 assert not any(name in sys.modules for name in ('pyodbc','bot_instance','services'))
 """
     result = subprocess.run(
@@ -333,6 +362,13 @@ assert not any(name in sys.modules for name in ('pyodbc','bot_instance','service
         assert observation["stage"] == "STARTUP_HISTORY_CAPTURED"
         assert observation["evidence"]["admission"] == record
         assert observation["evidence"]["interval_bytes"] == len(startup + b"later generation 0\n")
+    elif damage in {"late_failure", "admission"}:
+        failure_record = json.loads(result.stdout)
+        assert failure_record["evidence"]["anchor"] == profile["startup_log_anchor"]
+        assert failure_record["failure_category"] == (
+            "admission_closed" if damage == "late_failure" else "admission_pending"
+        )
+        assert "raw_base64" not in result.stdout and "Logged in as" not in result.stdout
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Actual PowerShell reader boundary and failed evidence")
@@ -347,7 +383,13 @@ def test_native_reader_boundary_retains_success_or_failure_without_log_contents(
         evidence=dict(interval_bytes=len(raw), interval_sha256=sha(raw)),
     )
     if damage == "refused":
-        response = dict(stage="STARTUP_HISTORY_REFUSED", failure_type="ValueError", retry=False)
+        response = dict(
+            stage="STARTUP_HISTORY_REFUSED",
+            failure_type="StartupHistoryRefused",
+            failure_category="admission_closed",
+            evidence=response["evidence"],
+            retry=False,
+        )
     elif damage == "hash":
         response["evidence"]["interval_sha256"] = "0" * 64
     elif damage == "base64":
@@ -393,6 +435,9 @@ if($text -cne "private fixture log`n" -or $script:runningStartupObservationHash.
     assert len(receipts) == 1
     receipt = json.loads(receipts[0].read_text(encoding="utf-8-sig"))
     assert (receipt["failure_type"] is None) == (damage is None)
+    if damage == "refused":
+        assert receipt["failure_category"] == "admission_closed"
+        assert receipt["evidence"] == response["evidence"]
     assert "private fixture" not in receipts[0].read_text()
     assert "raw_base64" not in receipts[0].read_text()
     assert not (tmp_path / "verified.json").exists()

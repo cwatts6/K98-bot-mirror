@@ -59,18 +59,19 @@ function Read-RunningStartupText($Profile,[string]$ProfileHash,[string]$Director
  $code=$LASTEXITCODE
  $record=$null
  if($output.Count -eq 1){try{$record=$output[0]|ConvertFrom-Json}catch{$record=$null}}
- $evidence=$null;$failure='invalid_response'
+ $evidence=$null;$failure='invalid_response';$category='invalid_response'
  if($null -ne $record -and $null -ne $record.PSObject.Properties['evidence']){$evidence=$record.evidence}
  if($null -ne $record -and $null -ne $record.PSObject.Properties['failure_type']){$failure=$record.failure_type}
+ if($null -ne $record -and $null -ne $record.PSObject.Properties['failure_category']){$category=$record.failure_category}
  $text=$null
  try {
   if($code -ne 0 -or $null -eq $record -or $record.stage -cne 'STARTUP_HISTORY_CAPTURED'){throw 'Capture refused'}
   $bytes=[Convert]::FromBase64String($record.raw_base64)
   if($bytes.Length -gt 8MB -or $bytes.Length -ne $evidence.interval_bytes -or (Hash $bytes) -cne $evidence.interval_sha256){throw 'Capture result differs'}
   $text=[Text.UTF8Encoding]::new($false,$true).GetString($bytes)
-  $failure=$null
+  $failure=$null;$category=$null
  } catch {if($failure -ceq 'invalid_response'){$failure=$_.Exception.GetType().Name}}
- $observation=[ordered]@{version=1;release_id=$Profile.release_id;profile_sha256=$ProfileHash;observed_utc=[datetime]::UtcNow.ToString('o');exit_code=$code;evidence=$evidence;failure_type=$failure}
+ $observation=[ordered]@{version=1;release_id=$Profile.release_id;profile_sha256=$ProfileHash;observed_utc=[datetime]::UtcNow.ToString('o');exit_code=$code;evidence=$evidence;failure_type=$failure;failure_category=$category}
  $path=Join-Path $Directory ('startup-observation-'+[guid]::NewGuid().ToString()+'.json')
  Write-RetirementBytes $path (Retirement-Bytes $observation)
  if($null -ne $failure){

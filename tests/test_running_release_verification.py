@@ -108,6 +108,7 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
     import core.export_process_identity as processes
     import core.export_startup_windows as windows
     import kvk.dal.new_source_admin_dal as admin
+    from scripts.read_k98_startup_evidence import check_admission
     from scripts.verify_k98_running_release import verify
 
     rows, config, journal = session_fixture()
@@ -239,9 +240,10 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
         bot_from_policy=lambda p: dict(sql_contract=dict(profile="application")),
         verify_sql_contracts=sql,
     )
-    startup_reader = Mock(return_value=dict(raw=b"fixture startup", evidence=dict(fixture=True)))
+    observe = Mock(return_value=dict(raw=b"fixture startup", evidence=dict(fixture=True)))
+    startup_reader = dict(observe=observe, check_admission=check_admission)
     if fault == "history_failed_after_sql":
-        startup_reader.side_effect = [startup_reader.return_value, ValueError("later log failure")]
+        observe.side_effect = [observe.return_value, ValueError("later log failure")]
     if fault == "admission_changed_after_sql":
         pair["startup_admission_result"] = Mock(side_effect=[dict(outcome="installed"), {}])
     if fault:
@@ -251,7 +253,7 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
         result = verify(profile, config, pair, policy, startup_reader=startup_reader)
         assert result["stage"] == "RUNNING_RELEASE_VERIFIED" and result["session_id"] == "new"
         assert result["provider_delivery_verified"] is False
-        assert startup_reader.call_count == 2
+        assert observe.call_count == 2
         assert (
             result["startup_evidence_before"]
             == result["startup_evidence_after"]
