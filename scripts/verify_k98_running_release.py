@@ -32,6 +32,9 @@ def sql_error_facts(error):
         codes = re.findall(r"\((-?\d{1,10})\)", args[1][:4096])
         if codes:
             facts["native_code"] = int(codes[-1])
+    module = sys.modules.get("services.application_maintenance_dal")
+    if isinstance(error, getattr(module, "SchemaObservationRefused", ())):
+        facts["schema_lock_result"] = error.result
     return facts
 
 
@@ -153,11 +156,17 @@ class Connection:
             raise RuntimeError("Prior connection close unconfirmed")
         # Mark before dispatch: a lost acknowledgement never triggers another close.
         self.close_failed = True
+        if (original := sys.exception()) is not None:
+            self.budget.record_failure(original, "before_connection_close")
         try:
             for cursor in self.cursors:
                 cursor.close()
         finally:
-            self.raw.close()
+            try:
+                self.raw.close()
+            except BaseException as error:
+                self.budget.record_failure(error, "connection_close")
+                raise
         self.closed = True
         self.close_failed = False
 
@@ -248,7 +257,7 @@ class Cursor:
     def nextset(self):
         return self._fetch("nextset")
 
-    def release_schema_observation(self, resource):
+    def release_schema_observation(self, resource, *, first_failure=None):
         """One fixed cleanup after acknowledged ownership, with the same 3s driver cap.
 
         This cannot admit arbitrary SQL or a new observation after budget expiry.
@@ -261,6 +270,8 @@ class Cursor:
             raise ValueError("Unowned or repeated schema cleanup refused")
         self.release_attempted = True
         budget = self.connection.budget
+        if first_failure is not None:
+            budget.record_failure(first_failure, "before_schema_release")
         self.statement = dict(
             ordinal=len(budget.observations) + 1,
             phase=budget.phase,
@@ -288,7 +299,13 @@ class Cursor:
         if self.close_failed:
             raise RuntimeError("Prior cursor close unconfirmed")
         self.close_failed = True
-        self.raw.close()
+        if (original := sys.exception()) is not None:
+            self.connection.budget.record_failure(original, "before_cursor_close")
+        try:
+            self.raw.close()
+        except BaseException as error:
+            self.connection.budget.record_failure(error, "cursor_close")
+            raise
         self.closed, self.close_failed = True, False
 
 
@@ -504,18 +521,25 @@ def verify(profile, config, pair, policy=None, *, startup_reader):
             session_id = verify_sessions(rows, config, journal)
             owner.observation_phase("retained_work")
             verify_retained_work(cursor, config, session_id)
-        if any(signalled(h) for h in handles) or list(state.glob("incarnation-*.json")) != paths:
-            raise ValueError("Native identity or incarnation changed during verification")
-        # Bind final files again after the SQL observation, retaining process handles.
-        protected(paths[0], profile["journal_sha256"])
-        startup_after = startup_reader["observe"](config, start, profile)
-        if (
-            startup_reader["check_admission"](pair, config, journal, start, startup_after)
-            != admission
-        ):
-            raise startup_reader["StartupHistoryRefused"](
-                "admission_changed", startup_after["evidence"]
-            )
+        try:
+            if (
+                any(signalled(h) for h in handles)
+                or list(state.glob("incarnation-*.json")) != paths
+            ):
+                raise ValueError("Native identity or incarnation changed during verification")
+            # Bind final files again after the SQL observation, retaining process handles.
+            protected(paths[0], profile["journal_sha256"])
+            startup_after = startup_reader["observe"](config, start, profile)
+            if (
+                startup_reader["check_admission"](pair, config, journal, start, startup_after)
+                != admission
+            ):
+                raise startup_reader["StartupHistoryRefused"](
+                    "admission_changed", startup_after["evidence"]
+                )
+        except BaseException as error:
+            error.sql_observation = owner.evidence()
+            raise
         from services.export_execution_protocol import encode
 
         return dict(

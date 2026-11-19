@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_all_90_previous_transitions_remain_immutable():
     transitions = updater.reviewed_transitions()
-    assert len(transitions) == 94
+    assert len(transitions) == 95
     assert transitions[90]["id"] == "p02_maintenance_compatibility_v1"
     assert hashlib.sha256(json.dumps(transitions[:90], sort_keys=True).encode()).hexdigest() == (
         "06255ea6b75c30801cc080b41c405d0489bd67bb6554b451f04b565158057ec7"

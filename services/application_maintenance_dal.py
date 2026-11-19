@@ -101,7 +101,7 @@ def schema_observation(cursor):
                     cursor.execute(SCHEMA_RELEASE_SQL, RESOURCE, RESOURCE)
                     result = cursor.fetchone()
                 else:
-                    result = release(cursor, RESOURCE)
+                    result = release(cursor, RESOURCE, first_failure=failed)
                 if result is None or result[0] != 0 or result[1] != "NoLock":
                     raise SqlCleanupUnknown(
                         "Application schema observation release is unconfirmed."

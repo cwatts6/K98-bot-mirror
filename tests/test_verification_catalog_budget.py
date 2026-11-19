@@ -107,7 +107,8 @@ class RawCursor:
         return (1,)
 
     def close(self):
-        pass
+        if self.state.get("close_after_refusal") and self.sql == SCHEMA_ACQUIRE_SQL:
+            raise DriverError("08S01", "secret close (10054)")
 
 
 def observation(**options):
@@ -185,6 +186,37 @@ def test_lost_acquisition_acknowledgement_never_guesses_cleanup():
             pytest.fail("Unknown acquisition cannot admit reads")
     assert connection_retained(connection) and raw.close.call_count == 0
     assert not any(c[0] == SCHEMA_RELEASE_SQL for c in state["calls"])
+
+
+def test_non_driver_first_failure_survives_lost_schema_release():
+    from kvk.dal.new_source_import_dal import SourceConflict
+
+    owner, _, raw = observation(release_execute_error=True)
+    with pytest.raises(SqlCleanupUnknown) as caught, owner:
+        connection = owner()
+        with schema_observation(connection.cursor()):
+            raise SourceConflict("private metadata mismatch")
+    _, record = failure_result(caught.value)
+    assert record["sql_observation"]["first_failure"]["error_type"] == "SourceConflict"
+    assert "private" not in json.dumps(record)
+    assert raw.close.call_count == 0
+
+
+def test_acknowledged_refusal_survives_cursor_close_failure_without_becoming_pending():
+    owner, _, raw = observation(acquire_result=-1, close_after_refusal=True)
+    with pytest.raises(SqlCleanupUnknown) as caught, owner:
+        connection = owner()
+        cursor = connection.cursor()
+        try:
+            with schema_observation(cursor):
+                pytest.fail("Refused acquisition cannot admit reads")
+        finally:
+            cursor.close()
+    code, record = failure_result(caught.value)
+    assert code == 1 and record["verified"] is False
+    first = record["sql_observation"]["first_failure"]
+    assert first["error_type"] == "SchemaObservationRefused" and first["schema_lock_result"] == -1
+    assert raw.close.call_count == 1
 
 
 def test_safe_diagnostics_record_exact_query_and_fetch_stage_without_values():

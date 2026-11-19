@@ -71,7 +71,7 @@ def blobs():
 
 def test_all_91_historical_families_unchanged():
     items = updater.reviewed_transitions()
-    assert len(items) == 94
+    assert len(items) == 95
     assert hashlib.sha256(json.dumps(items[:91], sort_keys=True).encode()).hexdigest() == (
         "ca56fa94f3921b714a07a63e94fc10c051f3869b1fdca8f962e7c051740ed92c"
     )

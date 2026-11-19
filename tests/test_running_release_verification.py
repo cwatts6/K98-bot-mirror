@@ -258,6 +258,12 @@ def test_complete_running_verifier_preserves_native_sql_and_admission_gates(
     if fault:
         with pytest.raises((SourceConflict, ValueError)) as caught:
             verify(profile, config, pair, policy, startup_reader=startup_reader)
+        if fault != "admission_failed":
+            from scripts.verify_k98_running_release import failure_result
+
+            _, evidence = failure_result(caught.value, startup_reader=startup_reader)
+            assert evidence["sql_observation"]["statements"]
+            assert all(c["closed"] for c in evidence["sql_observation"]["connections"])
         if fault == "admission_changed_after_sql":
             from scripts.verify_k98_running_release import failure_result
 

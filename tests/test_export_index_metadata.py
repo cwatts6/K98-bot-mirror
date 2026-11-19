@@ -64,7 +64,11 @@ def test_scoped_index_reads_bind_scope_and_preserve_rows(scope, metadata_format)
     result = dal.application_installation_snapshot(
         cursor, scope=scope, metadata_format=metadata_format
     )
-    materialized = [(sql, params) for sql, params in cursor.calls if "DECLARE @required" in sql]
+    materialized = [
+        (sql, params)
+        for sql, params in cursor.calls
+        if "DECLARE @required" in sql and "FROM sys.indexes" in sql
+    ]
     assert len(materialized) == (1 if metadata_format is None else 2)
     for sql, params in materialized:
         assert params == (json.dumps(scope),)

@@ -154,7 +154,7 @@ def test_candidate_source_drift_refuses(contract_pair, key):
 def test_registry_preserves_all_historical_entries_and_original_byte_bound():
     raw = (ROOT / "scripts/k98_update_transitions.json").read_bytes().replace(b"\r\n", b"\n")
     transitions = updater.reviewed_transitions()
-    assert len(transitions) == 94
+    assert len(transitions) == 95
     prior = dict(version=1, transitions=transitions[:88])
     # Exact canonical digest of the already merged 88-entry registry.
     assert (

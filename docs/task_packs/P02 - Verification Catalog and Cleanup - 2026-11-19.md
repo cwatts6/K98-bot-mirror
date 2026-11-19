@@ -78,7 +78,10 @@ archive, identity, retained-work, rotated-log and PowerShell 5.1 packet fixtures
 remain required. Include updater transition/inventory, architecture, deferred,
 security-routing, test selection, imports, SQL identifiers, registration, lint,
 formatting and log hygiene. Preserve failed local test results separately from
-corrected runs. Full hosted CI and reviews must complete on each final head.
+corrected runs. Run the full suite locally before mirror merge: the mirror has
+only a path-filtered command-governance workflow for this source snapshot.
+Require all configured hosted checks and hosted reviews on each final head,
+including the private repository's full Quality workflow before private merge.
 
 Security review: Changes, Deep off, immutable mirror and private ranges. The
 embedded SQL and file/receipt boundaries are in the Bot review. The authoritative
