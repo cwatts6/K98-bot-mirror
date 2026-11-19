@@ -1,0 +1,57 @@
+[
+  {
+    "path": "commands/mge_cmds.py",
+    "before": "3a5282f7899395511a0c3fe9c8bc380a4f6953ad700b5c4bc46ed02a01007109",
+    "after": "6c075e925609812736762c13fffa1b1aa67846c057927d2b05b4392fd9a8f1cb"
+  },
+  {
+    "path": "mge/dal/mge_completion_dal.py",
+    "before": "8c68219e8f9d25e2ce966030f5c4a48c5e1e9118bbe965a7c26426e036024062",
+    "after": "0e6194b3693a52c331f765b039d2bee87a7bc214b5efb3646b338cfac842407c"
+  },
+  {
+    "path": "mge/dal/mge_roster_dal.py",
+    "before": "c3a6b613a6e2852a8f5887aea80f045b8ef51f9383cd99a1f7c6bb5296e1fcd1",
+    "after": "bd106e672d195fb89522a215ad7a1bd9fd79476a677aa0ad909bfaaed8a363fa"
+  },
+  {
+    "path": "mge/dal/mge_rules_dal.py",
+    "before": "c5f423c34cb3f693820bd7525932f664618c23869c048c1920a728aec5751b4e",
+    "after": "215692da2657391464022c29d1da4578b92ede9c233e20a04dab317444fe0fab"
+  },
+  {
+    "path": "mge/dal/mge_signup_dal.py",
+    "before": "03d4faebfd64131aad36f3078bf78662662b1301b09aabd85eeadcbf88f88c51",
+    "after": "18cd1ac2ff5303a7a83fbdd6d9c072f4920f7878ad650c82cbfbb53b0479f639"
+  },
+  {
+    "path": "mge/mge_completion_service.py",
+    "before": "3e821eb20e04f4ecca05fe12e4dddd5a88526fd06a46d1fe1c12b3a0614b847a",
+    "after": "aaeb22c372dd69ece048970e37c648855595b877121b3fe5396e9d13607bda2a"
+  },
+  {
+    "path": "mge/mge_embed_manager.py",
+    "before": "794f163435fe9beb5fb5e4f965321ba0a0c7b009bb2a89734a0352697dc4fcf0",
+    "after": "f44b90b426854e3f9406e2f8d4cfc54524d6d62ddbf47713d2a6e5e5790ecd09"
+  },
+  {
+    "path": "mge/mge_publish_service.py",
+    "before": "7d7bb853e450a787adefd358ac30c1b5f3105caa23c67881e861adfaf60fb6d9",
+    "after": "cc005808efb2adbb7f636fae3f0b0be8f25509400b08262c0e982a6a1c55b24a"
+  },
+  {
+    "path": "mge/mge_recovery.py",
+    "before": "2f3dadb20d9ac0bbb27b76ecdd621a72858c731a9195f1a38368661734cab036",
+    "after": "7c5d1e2c93b127b18ed1e90787956edfb44ec626862961b16f533bf4a370ab63"
+  },
+  {
+    "path": "mge/mge_scheduler.py",
+    "before": "4229774fc67da8bfd3fb93537f8984d24456602c789d17107fbaba69b63506c5",
+    "after": "b765cc875c484897c1912b1d05433fcf5afcb85a5140f96fd6677198c2248cd5"
+  },
+  {
+    "path": "ui/views/mge_admin_completion_view.py",
+    "before": "20181429cd0e9521d4adf5123a16c91aea6b4a400f76e3d484c782b89ee38282",
+    "after": "67ebe250b566eda589a5d3ca7611c17daec5e86f5c329a4f609558bc72e169a2"
+  }
+]
