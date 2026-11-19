@@ -139,7 +139,12 @@ def capture(log_root, anchor):
             identity = file_identity(before)
             stream = stack.enter_context(open_log(path))
             opened = os.fstat(stream.fileno())
-            if file_identity(opened) != identity or opened.st_size != before.st_size:
+            # The logger may append between stat and open. Capture the current
+            # handle's boundary; archives still require an unchanged length.
+            length_changed = (
+                opened.st_size < before.st_size if index == 0 else opened.st_size != before.st_size
+            )
+            if file_identity(opened) != identity or length_changed:
                 raise ValueError("Startup log identity changed before capture")
             raw = read_exact(stream, opened.st_size)
             if raw and not raw.endswith(b"\n"):

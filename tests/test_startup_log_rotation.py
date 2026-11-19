@@ -216,6 +216,35 @@ def test_same_sized_active_rewrite_refuses(tmp_path, monkeypatch):
         reader.observe(dict(root=str(tmp_path)), start, profile)
 
 
+@pytest.mark.parametrize("change", ["current_append", "archive_append", "current_shrink"])
+def test_changes_between_path_stat_and_open_preserve_current_append_only(
+    tmp_path, monkeypatch, change
+):
+    root, profile, start, *_ = history(tmp_path)
+    original = reader.open_log
+    target = "log.txt.1" if change == "archive_append" else "log.txt"
+
+    def open_after_change(path):
+        if path.name == target:
+            if change == "current_shrink":
+                path.write_bytes(b"\n")
+            else:
+                with path.open("ab") as stream:
+                    stream.write(b"complete ordinary append\n")
+        return original(path)
+
+    monkeypatch.setattr(reader, "open_log", open_after_change)
+    if change == "current_append":
+        result = reader.observe(dict(root=str(tmp_path)), start, profile)
+        assert result["raw"].endswith(b"complete ordinary append\n")
+        assert result["evidence"]["generations"][-1]["sha256"] == sha(
+            (root / "log.txt").read_bytes()
+        )
+    else:
+        with pytest.raises(ValueError, match="identity changed before capture"):
+            reader.observe(dict(root=str(tmp_path)), start, profile)
+
+
 def test_archived_mutation_after_read_refuses(tmp_path, monkeypatch):
     root, profile, start, *_ = history(tmp_path)
 
