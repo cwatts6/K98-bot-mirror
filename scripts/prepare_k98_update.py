@@ -1309,6 +1309,11 @@ P02_QUALIFIED_COMPATIBILITY_PATHS = P02_MAINTENANCE_COMPATIBILITY_PATHS | {
 P02_QUALIFIED_TRANSITION = "p02_maintenance_qualified_v1"
 P02_ADMISSION_TRANSITION = "p02_admission_settlement_v1"
 P02_VERIFICATION_TRANSITION = "p02_running_verification_v1"
+P02_CATALOG_TRANSITION = "p02_verification_catalog_cleanup_v1"
+P02_CATALOG_PATHS = {
+    "services/application_maintenance_dal.py",
+    "services/export_execution_dal.py",
+}
 P02_VERIFICATION_PATHS = {
     "services/application_maintenance_dal.py",
     "services/runtime_admission_diagnostics.py",
@@ -1336,7 +1341,14 @@ def reviewed_transitions():
         raise ValueError("Unsupported installed transition registry.")
     if (
         not isinstance(value["transitions"], list)
-        or len(value["transitions"]) > 94
+        or len(value["transitions"]) > 95
+        or (
+            len(value["transitions"]) == 95
+            and not any(
+                isinstance(t, dict) and t.get("id") == P02_CATALOG_TRANSITION
+                for t in value["transitions"]
+            )
+        )
         or (
             len(value["transitions"]) == 94
             and not any(
@@ -1413,6 +1425,7 @@ def reviewed_transitions():
             fixed_p02_verification = (
                 item["id"] == P02_VERIFICATION_TRANSITION and path in P02_VERIFICATION_PATHS
             )
+            fixed_p02_catalog = item["id"] == P02_CATALOG_TRANSITION and path in P02_CATALOG_PATHS
             fixed_closeout = (
                 item["id"] == "failed_export_closeout_v1" and path in FAILED_EXPORT_TRANSITION_PATHS
             )
@@ -1671,6 +1684,7 @@ def reviewed_transitions():
                     path.startswith("services/export_")
                     or fixed_p02_admission
                     or fixed_p02_verification
+                    or fixed_p02_catalog
                     or fixed_settlement
                     or fixed_closeout
                     or fixed_cache
@@ -1778,6 +1792,8 @@ def reviewed_transitions():
             raise ValueError("Complete fixed admission settlement transition required.")
         if item["id"] == P02_VERIFICATION_TRANSITION and paths != P02_VERIFICATION_PATHS:
             raise ValueError("Complete fixed running verification transition required.")
+        if item["id"] == P02_CATALOG_TRANSITION and paths != P02_CATALOG_PATHS:
+            raise ValueError("Complete fixed verification catalog transition required.")
         if item["id"] == P02_QUALIFIED_TRANSITION and paths != P02_QUALIFIED_COMPATIBILITY_PATHS:
             raise ValueError("Complete fixed qualified maintenance transition required.")
         if (

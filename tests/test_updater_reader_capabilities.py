@@ -109,6 +109,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     expected = {}
     from tests.updater_source_assertions import (
         before_admission_hash,
+        before_catalog_cleanup_hash,
         before_d5_qualification_hash,
         before_p013_hash,
         before_p014_hash,
@@ -120,11 +121,17 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
     )
 
     for transition in update.reviewed_transitions():
-        if transition["id"] == update.P02_VERIFICATION_TRANSITION:
-            assert {m["path"] for m in transition["members"]} == update.P02_VERIFICATION_PATHS
+        if transition["id"] == update.P02_CATALOG_TRANSITION:
+            assert {m["path"] for m in transition["members"]} == update.P02_CATALOG_PATHS
             for member in transition["members"]:
                 raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
                 assert update.sha256(raw) == member["after_sha256"]
+                assert before_catalog_cleanup_hash(root, member["path"]) == member["before_sha256"]
+            continue
+        if transition["id"] == update.P02_VERIFICATION_TRANSITION:
+            assert {m["path"] for m in transition["members"]} == update.P02_VERIFICATION_PATHS
+            for member in transition["members"]:
+                assert before_catalog_cleanup_hash(root, member["path"]) == member["after_sha256"]
                 assert (
                     before_running_verification_hash(root, member["path"])
                     == member["before_sha256"]

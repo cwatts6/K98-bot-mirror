@@ -10,14 +10,29 @@ from datetime import UTC, datetime
 import hashlib
 import json
 from pathlib import Path
+import re
 import runpy
 import sys
 import time
+from typing import Any
 from uuid import UUID
 
 
 class VerificationBudgetExceeded(RuntimeError):
     pass
+
+
+def sql_error_facts(error):
+    """No driver prose, statement text, parameters or credentials in receipts."""
+    facts = {"error_type": type(error).__name__[:80]}
+    args = getattr(error, "args", ())
+    if args and isinstance(args[0], str) and re.fullmatch(r"[A-Z0-9]{5}", args[0]):
+        facts["sqlstate"] = args[0]
+    if len(args) > 1 and isinstance(args[1], str):
+        codes = re.findall(r"\((-?\d{1,10})\)", args[1][:4096])
+        if codes:
+            facts["native_code"] = int(codes[-1])
+    return facts
 
 
 class ObservationConnections:
@@ -33,9 +48,52 @@ class ObservationConnections:
         self.deadline = clock() + 45
         self.statements = 0
         self.connections = []
+        self.phase = "connection_setup"
+        self.observations = []
+        self.first_failure = None
 
-    def check(self):
-        if self.clock() >= self.deadline or self.statements >= 256:
+    def observation_phase(self, phase):
+        if phase not in {"export", "legacy", "application", "sessions", "retained_work"}:
+            raise ValueError("Unknown observation phase")
+        self.phase = phase
+
+    def record_failure(self, error, operation, statement=None):
+        facts = dict(phase=self.phase, operation=operation, **sql_error_facts(error))
+        if statement is not None:
+            facts.update(ordinal=statement["ordinal"], sql_sha256=statement["sql_sha256"])
+        if self.first_failure is None:
+            self.first_failure = facts
+        return facts
+
+    def evidence(self):
+        return dict(
+            first_failure=self.first_failure,
+            statements=self.observations,
+            connections=[
+                dict(closed=c.closed, close_failed=c.close_failed) for c in self.connections
+            ],
+            timing_scope="Client call wall time; not SQL Server CPU or a benchmark",
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, kind, error, traceback):
+        if error is not None:
+            self.record_failure(error, "contract_or_session_comparison")
+        try:
+            self.close()
+            if error is None:
+                self.check(dispatch=False)
+        except BaseException as cleanup:
+            facts = self.record_failure(cleanup, "observation_close")
+            cleanup.sql_observation = dict(self.evidence(), final_failure=facts)
+            raise
+        if error is not None:
+            error.sql_observation = self.evidence()
+
+    def check(self, *, dispatch=True):
+        if self.clock() >= self.deadline or (dispatch and self.statements >= 256):
             raise VerificationBudgetExceeded("Verification observation budget exhausted; no retry")
 
     def __call__(self):
@@ -108,15 +166,119 @@ class Cursor:
     def __init__(self, connection, raw):
         self.connection, self.raw = connection, raw
         self.closed = self.close_failed = False
+        self.statement: dict[str, Any] | None = None
+        self.acquire_pending = False
+        self.schema_owned = False
+        self.release_attempted = False
 
     def execute(self, *args):
-        self.connection.budget.check()
-        self.connection.budget.statements += 1
-        self.raw.execute(*args)
+        from services.application_maintenance_contract import RESOURCE
+        from services.application_maintenance_dal import SCHEMA_ACQUIRE_SQL
+
+        budget = self.connection.budget
+        try:
+            budget.check()
+        except BaseException as error:
+            budget.record_failure(error, "dispatch_budget")
+            raise
+        budget.statements += 1
+        self.acquire_pending = args == (SCHEMA_ACQUIRE_SQL, RESOURCE)
+        self.statement = dict(
+            ordinal=len(budget.observations) + 1,
+            phase=budget.phase,
+            sql_sha256=hashlib.sha256(args[0].encode()).hexdigest(),
+            execute_seconds=0.0,
+            fetch_seconds=0.0,
+            fetch_calls=0,
+            cleanup=False,
+        )
+        budget.observations.append(self.statement)
+        self._call("execute", self.raw.execute, *args)
         return self
 
+    def _call(self, operation, method, *args) -> Any:
+        budget = self.connection.budget
+        statement = self.statement
+        if statement is None:
+            raise ValueError("SQL observation requires an executed statement")
+        started = budget.clock()
+        try:
+            return method(*args)
+        except BaseException as error:
+            statement["failure"] = budget.record_failure(error, operation, statement)
+            raise
+        finally:
+            key = "execute_seconds" if operation == "execute" else "fetch_seconds"
+            statement[key] += round(budget.clock() - started, 6)
+            if operation != "execute":
+                statement["fetch_calls"] += 1
+
+    def _fetch(self, operation, *args) -> Any:
+        # Learn the acquisition acknowledgement even if its bounded call crossed
+        # the deadline. The guard must know whether it owns cleanup.
+        if not self.acquire_pending:
+            try:
+                self.connection.budget.check(dispatch=False)
+            except BaseException as error:
+                self.connection.budget.record_failure(error, "fetch_budget", self.statement)
+                raise
+        result = self._call(operation, getattr(self.raw, operation), *args)
+        if self.acquire_pending and operation == "fetchone":
+            self.acquire_pending = False
+            self.schema_owned = (
+                result is not None and type(result[0]) is int and result[0] in {0, 1}
+            )
+            return result
+        try:
+            self.connection.budget.check(dispatch=False)
+        except BaseException as error:
+            self.connection.budget.record_failure(error, "fetch_budget", self.statement)
+            raise
+        return result
+
+    def fetchone(self):
+        return self._fetch("fetchone")
+
+    def fetchmany(self, *args):
+        return self._fetch("fetchmany", *args)
+
+    def fetchall(self):
+        return self._fetch("fetchall")
+
+    def nextset(self):
+        return self._fetch("nextset")
+
+    def release_schema_observation(self, resource):
+        """One fixed cleanup after acknowledged ownership, with the same 3s driver cap.
+
+        This cannot admit arbitrary SQL or a new observation after budget expiry.
+        A lost acknowledgement consumes the attempt and retains uncertainty.
+        """
+        from services.application_maintenance_contract import RESOURCE
+        from services.application_maintenance_dal import SCHEMA_RELEASE_SQL
+
+        if resource != RESOURCE or not self.schema_owned or self.release_attempted:
+            raise ValueError("Unowned or repeated schema cleanup refused")
+        self.release_attempted = True
+        budget = self.connection.budget
+        self.statement = dict(
+            ordinal=len(budget.observations) + 1,
+            phase=budget.phase,
+            sql_sha256=hashlib.sha256(SCHEMA_RELEASE_SQL.encode()).hexdigest(),
+            execute_seconds=0.0,
+            fetch_seconds=0.0,
+            fetch_calls=0,
+            cleanup=True,
+        )
+        budget.observations.append(self.statement)
+        self._call("execute", self.raw.execute, SCHEMA_RELEASE_SQL, RESOURCE, RESOURCE)
+        result = self._call("fetchone", self.raw.fetchone)
+        if result is not None and result[0] == 0 and result[1] == "NoLock":
+            self.schema_owned = False
+        return result
+
     def __getattr__(self, name):
-        if name not in {"description", "fetchone", "fetchall", "fetchmany", "nextset"}:
+        if name != "description":
             raise AttributeError(name)
         return getattr(self.raw, name)
 
@@ -325,8 +487,9 @@ def verify(profile, config, pair, policy=None, *, startup_reader):
         if bot["sql_contract"]["profile"] != "application":
             raise ValueError("Dedicated single-attempt application connection required")
         owner = ObservationConnections(lambda: configured_connection(sql_profile="application"))
-        try:
+        with owner:
             contracts = pair["verify_sql_contracts"](config, policy, connection_factory=owner)
+            owner.observation_phase("sessions")
             connection = owner()
             cursor = connection.cursor()
             cursor.execute(
@@ -339,9 +502,8 @@ def verify(profile, config, pair, policy=None, *, startup_reader):
             columns = [c[0] for c in cursor.description]
             rows = [dict(zip(columns, row, strict=True)) for row in cursor.fetchmany(3)]
             session_id = verify_sessions(rows, config, journal)
+            owner.observation_phase("retained_work")
             verify_retained_work(cursor, config, session_id)
-        finally:
-            owner.close()
         if any(signalled(h) for h in handles) or list(state.glob("incarnation-*.json")) != paths:
             raise ValueError("Native identity or incarnation changed during verification")
         # Bind final files again after the SQL observation, retaining process handles.
@@ -372,6 +534,7 @@ def verify(profile, config, pair, policy=None, *, startup_reader):
             import_export="degraded",
             provider_delivery_verified=False,
             sql_statements=owner.statements,
+            sql_observation=owner.evidence(),
             retry=False,
         )
 
@@ -463,6 +626,8 @@ def failure_result(error, *, startup_reader=None):
     )
     if startup_reader and isinstance(error, startup_reader["StartupHistoryRefused"]):
         record["startup_observation"] = startup_reader["failure_record"](error)
+    if hasattr(error, "sql_observation"):
+        record["sql_observation"] = error.sql_observation
     return (12 if pending else 1), record
 
 

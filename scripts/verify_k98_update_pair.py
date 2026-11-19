@@ -637,6 +637,15 @@ def verify_bot_sql_contracts(bot, *, connection_factory=None):
 
     approved = bot["sql_contract"]
     factory = connection_factory or partial(configured_connection, sql_profile=approved["profile"])
+
+    def phase(name):
+        # Optional evidence hook on the standalone bounded owner, never a SQL
+        # probe or a new requirement on ordinary runtime connection factories.
+        observe = getattr(type(factory), "observation_phase", None)
+        if observe is not None:
+            observe(factory, name)
+
+    phase("export")
     installation = ExportExecutionDAL(factory).installation_snapshot(
         **({"migrations": installation_migrations(approved)} if approved["version"] == 4 else {})
     )
@@ -646,12 +655,14 @@ def verify_bot_sql_contracts(bot, *, connection_factory=None):
         connection.autocommit = True
         cursor = connection.cursor()
         try:
+            phase("legacy")
             legacy = legacy_installation_snapshot(cursor, bot["legacy_sql_contract"]["source"])
             verify_legacy_installation_contract(
                 legacy,
                 bot["legacy_sql_contract"],
                 profile=approved["profile"],
             )
+            phase("application")
             application = application_snapshot_for_contract(cursor, bot["application_sql_contract"])
             verify_application_installation_contract(application, bot["application_sql_contract"])
         finally:

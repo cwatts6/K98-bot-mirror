@@ -12,6 +12,15 @@ from core.sql_connection_custody import SqlCleanupUnknown, retain_connection
 from kvk.dal.new_source_import_dal import SourceConflict
 from services.application_maintenance_contract import POLICY, RESOURCE, policy_objects
 
+SCHEMA_ACQUIRE_SQL = (
+    "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
+    "@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; SELECT @r"
+)
+SCHEMA_RELEASE_SQL = (
+    "DECLARE @r int; EXEC @r=sys.sp_releaseapplock @Resource=?,"
+    "@LockOwner='Session'; SELECT @r,APPLOCK_MODE('public',?,'Session')"
+)
+
 
 class SchemaObservationRefused(SourceConflict):
     """An acknowledged refusal owns no schema lock and proves no schema drift.
@@ -62,11 +71,7 @@ def schema_observation(cursor):
     failed = None
     try:
         attempted = True
-        cursor.execute(
-            "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
-            "@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; SELECT @r",
-            RESOURCE,
-        )
+        cursor.execute(SCHEMA_ACQUIRE_SQL, RESOURCE)
         result = cursor.fetchone()
         if result is None or type(result[0]) is not int:
             raise SqlCleanupUnknown("Application schema observation acquisition is unconfirmed.")
@@ -88,13 +93,15 @@ def schema_observation(cursor):
                 # Do not guess whether release or connection close is safe.
                 if not acquired:
                     raise SqlCleanupUnknown("Application schema ownership was not acknowledged.")
-                cursor.execute(
-                    "DECLARE @r int; EXEC @r=sys.sp_releaseapplock @Resource=?,"
-                    "@LockOwner='Session'; SELECT @r,APPLOCK_MODE('public',?,'Session')",
-                    RESOURCE,
-                    RESOURCE,
-                )
-                result = cursor.fetchone()
+                # A bounded observer may have exhausted admission for new reads.
+                # Only its explicit, single-use cleanup operation bypasses that
+                # admission budget. Ordinary runtime cursors retain this SQL path.
+                release = getattr(type(cursor), "release_schema_observation", None)
+                if release is None:
+                    cursor.execute(SCHEMA_RELEASE_SQL, RESOURCE, RESOURCE)
+                    result = cursor.fetchone()
+                else:
+                    result = release(cursor, RESOURCE)
                 if result is None or result[0] != 0 or result[1] != "NoLock":
                     raise SqlCleanupUnknown(
                         "Application schema observation release is unconfirmed."

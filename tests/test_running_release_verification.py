@@ -32,12 +32,12 @@ def test_source_successor_is_exact_indivisible_and_preserves_historical_registry
 
     transitions = updater.reviewed_transitions()
     assert (
-        hashlib.sha256(json.dumps(transitions[:93], sort_keys=True).encode()).hexdigest()
-        == "5ac658cf371dd94d0cd940bccbb31c7cd82cc77cdf260f8483d7897e87ccf90f"
+        hashlib.sha256(json.dumps(transitions[:94], sort_keys=True).encode()).hexdigest()
+        == "e2a68465696d60ebb6207fcb4c627f4314be99294aa9b591f4624544b798733d"
     )
     family = transitions[-1]
-    assert family["id"] == updater.P02_VERIFICATION_TRANSITION
-    assert {m["path"] for m in family["members"]} == updater.P02_VERIFICATION_PATHS
+    assert family["id"] == updater.P02_CATALOG_TRANSITION
+    assert {m["path"] for m in family["members"]} == updater.P02_CATALOG_PATHS
     raw = {
         m["path"]: (ROOT / m["path"]).read_bytes().replace(b"\r\n", b"\n")
         for m in family["members"]

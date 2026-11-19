@@ -948,6 +948,32 @@ _APPLICATION_INDEX_METADATA = (
 )
 
 
+# The large pinned application scope needs materialized membership for these
+# catalog joins too. Keep the fixed export contract and unscoped reader intact.
+_APPLICATION_SCOPED_METADATA = {
+    "indexes": _APPLICATION_INDEX_METADATA,
+    "columns": _APPLICATION_INDEX_SCOPE
+    + _METADATA_QUERIES["columns"]
+    .replace("FROM required)", "FROM @required)")
+    .replace("OBJECT_SCHEMA_NAME(c.object_id)+'.'+OBJECT_NAME(c.object_id)", "s.name+'.'+o.name")
+    .replace("SCHEMA_NAME(t.schema_id)+'.'+t.name", "ts.name+'.'+t.name")
+    .replace(
+        "FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id",
+        "FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id\n"
+        "        JOIN sys.schemas s ON s.schema_id=o.schema_id\n"
+        "        JOIN sys.types t ON t.user_type_id=c.user_type_id\n"
+        "        JOIN sys.schemas ts ON ts.schema_id=t.schema_id",
+    )
+    .replace(
+        "OBJECT_SCHEMA_NAME(c.object_id) COLLATE Latin1_General_100_BIN2,"
+        "OBJECT_NAME(c.object_id) COLLATE Latin1_General_100_BIN2",
+        "s.name COLLATE Latin1_General_100_BIN2,o.name COLLATE Latin1_General_100_BIN2",
+    ),
+    "foreign_keys": _APPLICATION_INDEX_SCOPE
+    + _METADATA_QUERIES["foreign_keys"].replace("FROM required)", "FROM @required)"),
+}
+
+
 # Separate opt-in provenance reads; the legacy fixed-contract queries remain unchanged.
 _APPLICATION_IDENTITY_QUERIES = {
     "checks": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
@@ -996,12 +1022,11 @@ _APPLICATION_IDENTITY_QUERIES = {
     "object_name,stats_id,name,auto_created,user_created,has_filter,filter_definition "
     "FROM sys.stats WHERE has_filter=1 AND object_id IN (SELECT id FROM "
     "selected) ORDER BY object_name,stats_id",
-    "foreign_keys": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)) SELECT "
+    "foreign_keys": _APPLICATION_INDEX_SCOPE + "SELECT "
     "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
     "object_name,name,is_system_named,OBJECT_SCHEMA_NAME(referenced_object_id)+'.'+OBJECT_NAME(referenced_object_id) "
-    "AS referenced_object FROM sys.foreign_keys WHERE parent_object_id IN (SELECT id "
-    "FROM selected) ORDER BY object_name,name",
+    "AS referenced_object FROM sys.foreign_keys WHERE parent_object_id IN (SELECT object_id "
+    "FROM @required) ORDER BY object_name,name",
     "indexes": _APPLICATION_INDEX_SCOPE
     + """SELECT s.name+'.'+o.name AS object_name,i.index_id,i.name,i.type_desc,
         i.is_unique,i.is_primary_key,i.is_unique_constraint,i.is_disabled,i.has_filter,i.filter_definition
@@ -1009,11 +1034,10 @@ _APPLICATION_IDENTITY_QUERIES = {
         JOIN sys.schemas s ON s.schema_id=o.schema_id
         WHERE i.object_id IN (SELECT object_id FROM @required) ORDER BY object_name,i.index_id
     """,
-    "key_constraints": "WITH selected AS (SELECT value AS object_name,OBJECT_ID(value) AS id FROM "
-    "OPENJSON(@scope)) SELECT "
+    "key_constraints": _APPLICATION_INDEX_SCOPE + "SELECT "
     "OBJECT_SCHEMA_NAME(parent_object_id)+'.'+OBJECT_NAME(parent_object_id) AS "
     "object_name,name,type_desc,is_system_named,unique_index_id FROM "
-    "sys.key_constraints WHERE parent_object_id IN (SELECT id FROM selected) ORDER "
+    "sys.key_constraints WHERE parent_object_id IN (SELECT object_id FROM @required) ORDER "
     "BY object_name,name",
 }
 
@@ -1054,8 +1078,8 @@ def application_installation_snapshot(cursor, *, scope=None, metadata_format=Non
     if result["target"] is None or result["target"]["ViewDefinition"] != 1:
         raise SourceConflict("Whole application metadata must be visible.")
     for name, query in _METADATA_QUERIES.items():
-        if name == "indexes" and scope is not None:
-            cursor.execute(_APPLICATION_INDEX_METADATA.replace("@scope", "?"), *parameters)
+        if name in _APPLICATION_SCOPED_METADATA and scope is not None:
+            cursor.execute(_APPLICATION_SCOPED_METADATA[name].replace("@scope", "?"), *parameters)
         else:
             cursor.execute("WITH required AS (" + required + ") " + query, *parameters)
         result["metadata"][name] = rows(cursor)
