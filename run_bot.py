@@ -1,11 +1,22 @@
 # run_bot.py
+import sys
+
+# Check the offline guest before local imports can load dotenv, log, or take a lock.
+_previous_bytecode_setting = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
+try:
+    from dev_startup_hold import enforce_dev_startup_hold
+
+    enforce_dev_startup_hold()
+finally:
+    sys.dont_write_bytecode = _previous_bytecode_setting
+
 import json
 import logging
 import os
 import random
 import signal
 import subprocess
-import sys
 import threading
 import time
 import traceback

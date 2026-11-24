@@ -1,10 +1,21 @@
 # DL_bot.py
+import sys
+
+# Check the offline guest before local imports can load dotenv, log, or take a lock.
+_previous_bytecode_setting = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
+try:
+    from dev_startup_hold import enforce_dev_startup_hold
+
+    enforce_dev_startup_hold()
+finally:
+    sys.dont_write_bytecode = _previous_bytecode_setting
+
 # Note: minimal edit to use centralized logging_setup (UTC timestamps, rotation, console handling).
 from functools import partial
 import io
 import os
 from pathlib import Path
-import sys
 
 # Centralized logging setup
 from logging_setup import LOG_DIR, ORIG_STDOUT, clean_old_lock_files, flush_logs, setup_logging
