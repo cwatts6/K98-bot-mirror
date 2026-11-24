@@ -1,0 +1,15 @@
+# S00TX2 — isolate scalar transaction-state observation
+
+PREPARED, NOT APPROVED OR EXECUTED. Purpose: determine whether XACT_STATE() still returns 1 when read alone instead of alongside identity/system expressions. This tests an evaluation-context hypothesis; it does not assume a cause or clear any state.
+
+Exact query: `.codex_artifacts/s11-g4-capture-preparation-20260926/commands/S00TX2.sql.txt`; SHA256 `7ac3a5357f57c34ebb94cc62fd255e8108f4505bf7d3f5182276dbe307334261`.
+
+Three SELECTs without FROM: (1) standalone XACT_STATE; (2) @@TRANCOUNT and implicit-transactions bit; (3) server UTC/server/database/original login. Three one-row result sets, 1/2/4 columns. No table reads, transactions, session SET, COMMIT/ROLLBACK, connection reset, kill, application procedure or S11 object probe. Sequential samples are not atomic or runtime/native identity proof. Microsoft documents that [SELECTs without table reads do not start implicit transactions](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-implicit-transactions-transact-sql?view=sql-server-ver16).
+
+Chris Watts is operator/reviewer/abort owner in the same existing SSMS connection as S00TX: intended MINI_AMD / ROK_TRACKER, SQL original login MicrosoftAccount\cwattsconsulting@outlook.com, separately retained Windows/UI MINI_AMD\cwatt. H14 client SHA256 935b24379389e8260ac0d02d5e77402b005fce12c72b0ed2894a4138a6864fb7; operator-reported current-tab timeout ten seconds. No setting changes. Replace only supplied diagnostic text in existing unsaved editor; stop if other work/changed target is present. Do not save over a file or create a new query connection.
+
+One attempt, one batch, <=4 KiB output, three one-row sets, ten-second client timeout/fifteen-second operator cutoff. Start timing before Execute; Cancel at cutoff, preserve results/errors, no retry. Cancellation is not proof server work ended; report persistent running state without kill/reconnect. Stop on error, unexpected/truncated output, changed identity, timeout mismatch, disconnect/reconnect/auth/certificate prompt. No new connection requested; five-second connect timeout remains unestablished and invisible client reconnect cannot be excluded.
+
+Effects: scalar session-state query/audit/CPU, editor text and normal history/autorecovery only. No data/schema/permission changes, installs, imports/exports, provider/Discord, task/job control, backup/restore or Git operation. Even a zero result does not authorize rerunning S01; reconcile it first. Do not use results as permission to commit/roll back or modify implicit transaction settings.
+
+Approve S00TX2/hash for a fresh twenty-minute UTC window. Prior diagnostic approval does not carry over. Preserve all three rows/errors and operator timing if available as a new dated receipt; distinguish execution/receipt times and seal additively. Local static validation only, no SQL runtime test; documentation/inert-query security-routing skip with no application/configuration change or PR. All seven typed G4 proofs and actual restore remain incomplete; prior boundaries stay in force.

@@ -1,0 +1,359 @@
+{
+  "packet_version": 1,
+  "status": "PREPARATION_ONLY_NOT_EXECUTABLE",
+  "generated_utc": "2026-10-29T11:02:33.710288+00:00",
+  "execution_authorized": false,
+  "hash_semantics": "SHA256 of exact committed Git blob bytes; no newline normalization. Not installed postimage or updater normalized source hashes.",
+  "bot": {
+    "base": "139038e416c657cb589f24ca8a4ff61a913b7a3b",
+    "implementation_head": "a333656c1168c7da449cee30653140269ad8fdc4",
+    "branch": "codex/mge-board-finalisation",
+    "runtime_members": [
+      {
+        "path": "commands/mge_cmds.py",
+        "git_blob_sha256": "6413d20de593023f5d049f9d8449ed9bff9181a9f7fbca3bde25819131fdb6ce",
+        "bytes": 13883
+      },
+      {
+        "path": "core/board_lifecycle.py",
+        "git_blob_sha256": "b5e4f319cfc66d091d16e690aa1a6d02f91a6f644d4a3845c80bd3cb07358870",
+        "bytes": 1082
+      },
+      {
+        "path": "mge/dal/mge_completion_dal.py",
+        "git_blob_sha256": "0e6194b3693a52c331f765b039d2bee87a7bc214b5efb3646b338cfac842407c",
+        "bytes": 3884
+      },
+      {
+        "path": "mge/dal/mge_finalisation_dal.py",
+        "git_blob_sha256": "edd7811631f17c9dc503b9594e411b2fadc24f341b45f00d0a99c112b356ffe3",
+        "bytes": 3159
+      },
+      {
+        "path": "mge/dal/mge_roster_dal.py",
+        "git_blob_sha256": "bd106e672d195fb89522a215ad7a1bd9fd79476a677aa0ad909bfaaed8a363fa",
+        "bytes": 25419
+      },
+      {
+        "path": "mge/dal/mge_rules_dal.py",
+        "git_blob_sha256": "215692da2657391464022c29d1da4578b92ede9c233e20a04dab317444fe0fab",
+        "bytes": 4439
+      },
+      {
+        "path": "mge/dal/mge_signup_dal.py",
+        "git_blob_sha256": "18cd1ac2ff5303a7a83fbdd6d9c072f4920f7878ad650c82cbfbb53b0479f639",
+        "bytes": 13036
+      },
+      {
+        "path": "mge/mge_completion_service.py",
+        "git_blob_sha256": "aaeb22c372dd69ece048970e37c648855595b877121b3fe5396e9d13607bda2a",
+        "bytes": 2779
+      },
+      {
+        "path": "mge/mge_embed_manager.py",
+        "git_blob_sha256": "f44b90b426854e3f9406e2f8d4cfc54524d6d62ddbf47713d2a6e5e5790ecd09",
+        "bytes": 38388
+      },
+      {
+        "path": "mge/mge_finalisation.py",
+        "git_blob_sha256": "ad98169e3b89cd61ff0b22b95fc6226218ea84944563ef39713a5b6c7e9dd501",
+        "bytes": 10299
+      },
+      {
+        "path": "mge/mge_publish_service.py",
+        "git_blob_sha256": "410c4c0c8c64b15a55834eacfeebf9769816579cccbf511fb97959307a9c6449",
+        "bytes": 40955
+      },
+      {
+        "path": "mge/mge_recovery.py",
+        "git_blob_sha256": "7c5d1e2c93b127b18ed1e90787956edfb44ec626862961b16f533bf4a370ab63",
+        "bytes": 6234
+      },
+      {
+        "path": "mge/mge_scheduler.py",
+        "git_blob_sha256": "b765cc875c484897c1912b1d05433fcf5afcb85a5140f96fd6677198c2248cd5",
+        "bytes": 4718
+      },
+      {
+        "path": "ui/views/mge_admin_completion_view.py",
+        "git_blob_sha256": "67ebe250b566eda589a5d3ca7611c17daec5e86f5c329a4f609558bc72e169a2",
+        "bytes": 8376
+      }
+    ],
+    "changed_paths": [
+      "README-DEV.md",
+      "commands/mge_cmds.py",
+      "core/board_lifecycle.py",
+      "docs/reference/P0 delivery and P1 recovery status.md",
+      "docs/reference/Promotion Guide.md",
+      "docs/reference/README.md",
+      "docs/reference/canonical_command_reference.md",
+      "docs/reference/deferred_optimisations.md",
+      "docs/reference/events_and_dm_reminders.md",
+      "docs/reference/mge_reference_model.md",
+      "docs/reference/p1-operation-lifecycle.md",
+      "docs/reference/runbook_diagnostics.md",
+      "docs/reference/runbook_shutdown.md",
+      "docs/reference/runbook_startup.md",
+      "docs/task_packs/Bot Operational Reliability - Programme Pack.md",
+      "docs/task_packs/P1 Batch A Remaining Discord Domain - Chat Starter - 2026-10-28.md",
+      "docs/task_packs/P1 Batch A Remaining Discord Domain - Scope - 2026-10-28.md",
+      "docs/task_packs/P1 Discord Domain Completion and MGE - Chat Starter - 2026-10-28.md",
+      "docs/task_packs/P1 Discord Domain Completion and MGE - Scope - 2026-10-28.md",
+      "docs/task_packs/P1 MGE A1a - Deployed Closeout - 2026-10-28.md",
+      "docs/task_packs/P1 MGE A1a - Implementation and Validation - 2026-10-28.md",
+      "docs/task_packs/P1 MGE A1b - Deployed Closeout - 2026-10-29.md",
+      "docs/task_packs/P1 MGE A1b - Design and Delivery Packet - 2026-10-28.md",
+      "docs/task_packs/P1 MGE A1b - Implementation and Validation - 2026-10-28.md",
+      "docs/task_packs/P1 MGE A1b - Scope and Handoff - 2026-10-28.md",
+      "docs/task_packs/P1 MGE A1b - Updater Inventory Correction - 2026-10-29.md",
+      "docs/task_packs/P1 MGE Finalisation and Shared Board Lifecycle - 2026-10-29.md",
+      "docs/task_packs/P1 MGE Lifecycle - Accepted Closeout - 2026-10-28.md",
+      "docs/task_packs/P1 MGE Lifecycle - Implementation and Evidence.md",
+      "docs/task_packs/P1 Startup Coordination and Background Delivery - Chat Starter - 2026-10-26.md",
+      "docs/task_packs/P1 Startup Coordination and Background Delivery - Scope - 2026-10-26.md",
+      "docs/task_packs/README.md",
+      "mge/dal/mge_completion_dal.py",
+      "mge/dal/mge_finalisation_dal.py",
+      "mge/dal/mge_roster_dal.py",
+      "mge/dal/mge_rules_dal.py",
+      "mge/dal/mge_signup_dal.py",
+      "mge/mge_completion_service.py",
+      "mge/mge_embed_manager.py",
+      "mge/mge_finalisation.py",
+      "mge/mge_publish_service.py",
+      "mge/mge_recovery.py",
+      "mge/mge_scheduler.py",
+      "tests/fixtures/p1_mge_finalisation_source_pairs.json",
+      "tests/test_mge_a1b_update_transition.py",
+      "tests/test_mge_completion_service.py",
+      "tests/test_mge_finalisation.py",
+      "tests/test_mge_finalisation_source_bridge.py",
+      "tests/test_mge_recovery.py",
+      "tests/test_mge_scheduler_completion.py",
+      "tests/test_mge_signup_dal.py",
+      "tests/test_mge_signup_mutation_contract.py",
+      "tests/test_updater_reader_capabilities.py",
+      "tests/updater_source_assertions.py",
+      "ui/views/mge_admin_completion_view.py"
+    ]
+  },
+  "sql": {
+    "base": "7e91989f619deb46836194c7e705b0a9eb2ebe11",
+    "implementation_head": "d649d6d659a586939e6566dd48c1ece6d3310e9a",
+    "branch": "codex/mge-board-finalisation",
+    "migration_id": "20261029_001_mge_board_finalisation",
+    "members": [
+      {
+        "path": "migrations/20261029_001_mge_board_finalisation.sql",
+        "git_blob_sha256": "fd64e9e6cd9b42d1fcd69ed81e012cac66a14baabbf7641fd78825fd0c52d633",
+        "bytes": 3511
+      },
+      {
+        "path": "sql_schema/dbo.MGE_BoardFinalisation.Table.sql",
+        "git_blob_sha256": "88056f2ff67691b0d4ffa2a53b93796ceea5818044548b5e29f410545e60c56c",
+        "bytes": 1778
+      },
+      {
+        "path": "sql_schema/dbo.tr_MGE_Awards_Frozen.Trigger.sql",
+        "git_blob_sha256": "cf4025829e220cec0d8216de5c085973ffd16db1a96985eab91499385108922b",
+        "bytes": 712
+      },
+      {
+        "path": "sql_schema/dbo.tr_MGE_Events_Frozen.Trigger.sql",
+        "git_blob_sha256": "211751a3e7c7a794f8d2d42f5fd5280d3f6c40275db1338e37837d262aa02c8b",
+        "bytes": 466
+      },
+      {
+        "path": "sql_schema/dbo.tr_MGE_Signups_Frozen.Trigger.sql",
+        "git_blob_sha256": "3a9b96ce2e746d47bbc72b766cd02e273b6a844e6f86b84361c99b651cfc5b8f",
+        "bytes": 470
+      }
+    ],
+    "native_fixture_dependencies": [
+      {
+        "path": "sql_schema/dbo.MGE_Variants.Table.sql",
+        "git_blob_sha256": "527d44f45e485b590745ec404508912682aad4051fd5ac8aba3dedc44b3804f5",
+        "bytes": 2183
+      },
+      {
+        "path": "sql_schema/dbo.MGE_Commanders.Table.sql",
+        "git_blob_sha256": "0c31811c587c0bba133e42c7863bfdfaf989f6522e976d68e8bb167d12627930",
+        "bytes": 2591
+      },
+      {
+        "path": "sql_schema/dbo.MGE_Events.Table.sql",
+        "git_blob_sha256": "b2cbc2194ef35233b96dbc99cb674594de483e8a6fd672de9d77ee7b39e65d95",
+        "bytes": 9007
+      },
+      {
+        "path": "sql_schema/dbo.MGE_Signups.Table.sql",
+        "git_blob_sha256": "71e2580ab84ba73ac52ce577ef4c2cdb86acee68f1884fd357831ebb1501e866",
+        "bytes": 8325
+      },
+      {
+        "path": "sql_schema/dbo.MGE_Awards.Table.sql",
+        "git_blob_sha256": "5c69321416d0a3ee55a175f3bd882b97204bc360b8e120b12d4ad9092e74c0c1",
+        "bytes": 6935
+      },
+      {
+        "path": "sql_schema/dbo.MGE_SignupAudit.Table.sql",
+        "git_blob_sha256": "5c31acc2db9d84e35b9898b5c784e6a6855fb896b55fd432b0c58b96687c5051",
+        "bytes": 3978
+      },
+      {
+        "path": "sql_schema/dbo.MGE_AwardAudit.Table.sql",
+        "git_blob_sha256": "3b17db9b13289090fe18f838def43dee1f14ffc3000437b722bcd06e91c9a781",
+        "bytes": 3417
+      },
+      {
+        "path": "sql_schema/dbo.MGE_ResultImports.Table.sql",
+        "git_blob_sha256": "06135e89f8a484720fbc98f12a7f91505da8b71fac4d6dd15d6bebceb627af63",
+        "bytes": 3227
+      },
+      {
+        "path": "sql_schema/dbo.MGE_FinalResults.Table.sql",
+        "git_blob_sha256": "144b27466a2582ef44e7debe44ea5febce092377f03590ef656cb6f2e35a6b2b",
+        "bytes": 3488
+      },
+      {
+        "path": "sql_schema/dbo.MGE_DefaultRules.Table.sql",
+        "git_blob_sha256": "59e5ddbfea7a780fc6e2d8183f4e81a4e6dc260830d236069869376c6b671865",
+        "bytes": 2186
+      },
+      {
+        "path": "sql_schema/dbo.MGE_RuleAudit.Table.sql",
+        "git_blob_sha256": "7ee6a1b46f131a3655d009e42015dc358390af5c994de23924aac00253f6656d",
+        "bytes": 2241
+      }
+    ],
+    "release_profile_path": null,
+    "release_profile_sha256": null
+  },
+  "observed_remote_main_refs": {
+    "method": "git ls-remote refs/heads/main, this preparation turn",
+    "mirror": "139038e416c657cb589f24ca8a4ff61a913b7a3b",
+    "production": "2c31de42eb91cf6b7f9f61f3aaf3efc3597c4ea6",
+    "sql": "7e91989f619deb46836194c7e705b0a9eb2ebe11"
+  },
+  "reviewed_supporting_source": {
+    "bot": [
+      {
+        "path": "scripts/prepare_k98_update.py",
+        "git_blob_sha256": "2000624484139cd8b4a0e279957a196ad4d55c7ddd8e15d3b25f120da21fe45f",
+        "bytes": 83135
+      },
+      {
+        "path": "scripts/k98_update_transitions.json",
+        "git_blob_sha256": "e49f23ca132693457c4a975bac867465781244c9559f3f948388e0b0213d043f",
+        "bytes": 98729
+      },
+      {
+        "path": "scripts/validate_k98_update_compatibility.py",
+        "git_blob_sha256": "7aa943044880d22d5442a79e1cbf61dff83e68f9e62d5a6a74059b869f6bb588",
+        "bytes": 7729
+      },
+      {
+        "path": "scripts/Deploy-K98Release.ps1",
+        "git_blob_sha256": "85d7dcbfa3fe688e1a5ce9211008b82056a6040e3128540768231db4a010a6bf",
+        "bytes": 25230
+      },
+      {
+        "path": "scripts/Update-K98.ps1",
+        "git_blob_sha256": "e8444adce3f74cea97da50ace5ca34daed872f61d13943ae30e99e6958768e35",
+        "bytes": 19100
+      },
+      {
+        "path": "scripts/K98-SourceUpdate.ps1",
+        "git_blob_sha256": "03a00255e5cd53cffb900ba2ebb2fcb59935029d16eac7f819ff4b188520f0ab",
+        "bytes": 59055
+      },
+      {
+        "path": "scripts/prepare_k98_release.py",
+        "git_blob_sha256": "af15a4063a047a412b2c1c08ede5e71051fc14dfee5416de7ae59fab75d5aa89",
+        "bytes": 11761
+      },
+      {
+        "path": "scripts/package_k98_update_tool.py",
+        "git_blob_sha256": "2c98fff33ff5515ab8e7494074f7690f5413f5d9ec367634720be10462e0493c",
+        "bytes": 9435
+      },
+      {
+        "path": "deploy/k98-release.json",
+        "git_blob_sha256": "925c0f1ad0aa2c7064d574565a26650694c452c5a808b4ff245614e17a3998f6",
+        "bytes": 355
+      }
+    ],
+    "sql": [
+      {
+        "path": "deploy/Deploy-SqlMigration.ps1",
+        "git_blob_sha256": "c4184b0f15834cb1096f98d2996eaa44cb6f155908c4f98feee81e4e6024a2f3",
+        "bytes": 22316
+      },
+      {
+        "path": "deploy/SqlDeploy.ModuleRelease.ps1",
+        "git_blob_sha256": "9aaa18e4b7879f09a1dfdc4f5a643d0c7653e2120dd1295339bdb20ba0dd52d2",
+        "bytes": 20157
+      },
+      {
+        "path": "deploy/SqlDeploy.TableRelease.ps1",
+        "git_blob_sha256": "787022fd575b2f0a257a59041716efa8d881018d2540bbd435911336b30b3482",
+        "bytes": 19806
+      }
+    ]
+  },
+  "qualification_target": {
+    "proposed_server_transport": "lpc:localhost\\K98DEV",
+    "expected_server_identity": "9SX2VF4\\K98DEV",
+    "proposed_database": "K98_MGE_Finalisation_Qualification_20261029_A",
+    "exists_checked": false,
+    "creation_authorized": false,
+    "write_authorized": false,
+    "original_login": null,
+    "data_file_path": null,
+    "log_file_path": null,
+    "backup_file_path": null,
+    "database_collation": null,
+    "tempdb_collation": null,
+    "compatibility_level": null
+  },
+  "production_target": {
+    "repository": "cwatts6/K98-bot",
+    "branch": "main",
+    "planned_host": "MINI_AMD",
+    "repository_default_database": "ROK_TRACKER",
+    "live_endpoint_verified": false,
+    "observed_installed_bot_commit": null,
+    "final_bot_merge_commit": null,
+    "final_sql_reviewed_commit": null,
+    "installed_update_tool_manifest_sha256": null,
+    "candidate_tool_manifest_sha256": null,
+    "release_uuid": null,
+    "release_manifest_sha256": null
+  },
+  "blockers": [
+    "Existing SQL profiles cannot represent this table/index/default/rowversion/trigger bundle.",
+    "No MGE release profile or changed Bot release descriptor exists.",
+    "No installed finalisation source-transition admission exists; historical registry bound is 51.",
+    "Native SQL, actual driver, race and process-loss qualification unexecuted.",
+    "Actual predecessor/installed updater/production metadata and protected source evidence missing.",
+    "Origin push URL is intentionally disabled; publication path must be explicitly resolved."
+  ],
+  "security_scans": [
+    {
+      "repo": "bot",
+      "scan_id": "eaf3b342-16dc-4dd2-9b2c-3b76ad82bbd9",
+      "base": "139038e416c657cb589f24ca8a4ff61a913b7a3b",
+      "head": "c299d64e9f1f1e69e0e013d88616ce027bf9abb2",
+      "findings": 0
+    },
+    {
+      "repo": "sql",
+      "scan_id": "1bb61a7b-905a-43e1-9cbb-3d57be134c0c",
+      "base": "7e91989f619deb46836194c7e705b0a9eb2ebe11",
+      "head": "d649d6d659a586939e6566dd48c1ece6d3310e9a",
+      "findings": 0
+    }
+  ],
+  "qualification_results": []
+}
