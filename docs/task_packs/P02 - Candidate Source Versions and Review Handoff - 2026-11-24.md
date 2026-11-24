@@ -1,5 +1,46 @@
 # P02 - Candidate Source Versions and Review Handoff - 2026-11-24
 
+## Source review follow-up - 24 November 2026
+
+The agreed continuation has published draft source reviews:
+[Bot mirror #550](https://github.com/cwatts6/K98-bot-mirror/pull/550) and
+[SQL #159](https://github.com/cwatts6/K98-bot-SQL-Server/pull/159).
+Both are open drafts, not merged or deployed. The local-only statements below
+remain the earlier source-freeze checkpoint.
+
+The SQL source candidate is now `3dedeae2fde42a42d0bfa4102d3a36634b9d97eb`.
+Its parent `3acf026cf9532ce647d643a6cd8a394d2cf8daab` and all 130 original
+candidate files are unchanged. Six additional CI/test changes correct three
+stale historical assertions and classify authenticated before/after release checks
+separately from executable migrations. Original D3/D4 source pins and historical
+payloads remain intact. The three corrected source checks and twelve sidecar
+membership/refusal cases passed; the SQL repository validator passed with zero
+errors and 36 retained warnings. The first long-path fixture failure is preserved;
+the successful short-path run used fresh owned fixtures and executed no SQL.
+
+The six-file Changes review `252b8d5a-ab0a-4001-8406-059f8268e07b` completed with
+Deep off and no findings, followed by canonical readback. The retained earlier
+Bot/SQL reviews still cover their unchanged executable bytes. This follow-up Bot
+delta is status prose only and uses a precise documentation-only security skip.
+
+The actual private main was verified as
+`d3ca554cc0e706d9d18856ef74f07685e2c894dd`. The existing clean private worktree
+is reused: all 148 mirror paths matched their expected private before-image and
+31 private-only files are preserved. The private counterpart must be derived by
+the normal patch-equivalent flow, not by pushing mirror history. Its eventual
+commit is recorded in the local source-review receipt; neither the mirror SHA nor
+a generated substitute may serve as the private release identity.
+
+Evidence for this follow-up is under
+`A/continuation-20261124/source-review-preparation-01`. The immutable initial
+source-freeze evidence remains in `candidate-source-versions-01`.
+No native packet was run, existing fixture was changed, or private configuration
+copied. Review submission is distinct from merge, release readiness and installation.
+The exact release specification/registry, installed startup and authority IPC,
+compatible return/reupgrade and interruption qualification remain the next gates.
+P02 remains OPEN; D7 remains 1/4. All remaining owners and no-replay boundaries
+below continue to apply.
+
 ## Current decision
 
 The user agreed to continue source review and record proper Bot and SQL Git
