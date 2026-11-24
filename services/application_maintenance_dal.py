@@ -123,28 +123,59 @@ def maintenance_snapshot(cursor, approved, read_metadata):
     objects = policy_objects(approved)
     with schema_observation(cursor):
         result = read_metadata()
-        cursor.execute(
-            "SELECT j.ObjectName,o.object_id AS ObjectID,"
-            "CONVERT(nvarchar(30),o.create_date,126) AS ObjectCreated,"
-            "h.Revision AS HeaderRevision,h.State AS HeaderState,w.KVKNo,"
-            "w.DueGeneration,w.CompletedGeneration,w.DueObjectID,"
-            "CONVERT(nvarchar(30),w.DueObjectCreateDate,126) AS DueObjectCreated,"
-            "w.DueHeaderRevision,w.State,w.ClaimedGeneration,"
-            "a.DueGeneration AS AggregateDue,a.CompletedGeneration AS AggregateCompleted,"
-            "a.State AS AggregateState "
-            "FROM OPENJSON(?) WITH(ObjectName nvarchar(128),KVKNo int) j "
-            "LEFT JOIN sys.tables o ON o.object_id=OBJECT_ID(j.ObjectName,'U') "
-            "LEFT JOIN dbo.KVKFinalReportHeader h ON h.KVK_NO=j.KVKNo "
-            "LEFT JOIN dbo.MaintenanceKvkWork w ON w.KVKNo=j.KVKNo "
-            "LEFT JOIN dbo.MaintenanceWork a ON a.Kind='kvk_output' "
-            "ORDER BY j.ObjectName COLLATE Latin1_General_100_BIN2",
-            json.dumps([{"ObjectName": name, "KVKNo": season} for name, season in objects]),
+        result["maintenance_lifecycle"] = _lifecycle(
+            cursor, objects, "exclusive_schema_observation"
         )
-        from services.export_execution_dal import rows
-
-        result["maintenance_lifecycle"] = {
-            "policy": POLICY,
-            "guard": "exclusive_schema_observation",
-            "outputs": rows(cursor),
-        }
         return result
+
+
+def _lifecycle(cursor, objects, guard):
+    """One shared lifecycle query for predecessor and candidate observations."""
+    cursor.execute(
+        "SELECT j.ObjectName,o.object_id AS ObjectID,"
+        "CONVERT(nvarchar(30),o.create_date,126) AS ObjectCreated,"
+        "h.Revision AS HeaderRevision,h.State AS HeaderState,w.KVKNo,"
+        "w.DueGeneration,w.CompletedGeneration,w.DueObjectID,"
+        "CONVERT(nvarchar(30),w.DueObjectCreateDate,126) AS DueObjectCreated,"
+        "w.DueHeaderRevision,w.State,w.ClaimedGeneration,"
+        "a.DueGeneration AS AggregateDue,a.CompletedGeneration AS AggregateCompleted,"
+        "a.State AS AggregateState "
+        "FROM OPENJSON(?) WITH(ObjectName nvarchar(128),KVKNo int) j "
+        "LEFT JOIN sys.tables o ON o.object_id=OBJECT_ID(j.ObjectName,'U') "
+        "LEFT JOIN dbo.KVKFinalReportHeader h ON h.KVK_NO=j.KVKNo "
+        "LEFT JOIN dbo.MaintenanceKvkWork w ON w.KVKNo=j.KVKNo "
+        "LEFT JOIN dbo.MaintenanceWork a ON a.Kind='kvk_output' "
+        "ORDER BY j.ObjectName COLLATE Latin1_General_100_BIN2",
+        json.dumps([{"ObjectName": name, "KVKNo": season} for name, season in objects]),
+    )
+    from services.export_execution_dal import rows
+
+    return {"policy": POLICY, "guard": guard, "outputs": rows(cursor)}
+
+
+def coherent_maintenance_snapshot(
+    cursor, approved, expected_modules, read_metadata, *, previous_boundary=None, installation=None
+):
+    """Candidate full observation; runtime selection awaits protected contracts.
+
+    The collector receives a checkpoint and retains every existing metadata,
+    identity and effective-permission category. No exclusive observer lock is
+    acquired. The returned typed proof must accompany the full comparator.
+    """
+    from services.catalogue_observation_dal import observe_catalogue
+
+    objects = policy_objects(approved)
+
+    def collect(checkpoint):
+        result = read_metadata(checkpoint)
+        checkpoint()
+        result["maintenance_lifecycle"] = _lifecycle(cursor, objects, "catalogue_generation_v1")
+        return result
+
+    return observe_catalogue(
+        cursor,
+        expected_modules,
+        collect,
+        previous_boundary=previous_boundary,
+        installation=installation,
+    )

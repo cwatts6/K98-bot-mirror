@@ -11,6 +11,14 @@ from services.export_d4_contract import (
     PROFILE_SHA256 as D4_CHECKSUM,
     d4_contract,
 )
+from services.export_observer_contract import (
+    LEGACY_FINGERPRINT_FORMAT,
+    LEGACY_SOURCE_SHA256 as OBSERVER_SOURCE_HASH,
+    MIGRATION_ID as OBSERVER_MIGRATION,
+    PROFILE_SHA256 as OBSERVER_CHECKSUM,
+    canonical_legacy_observation,
+    observer_contract,
+)
 from services.export_phase1_contract import (
     LEGACY_SOURCE_SHA256 as PHASE1_SOURCE_HASH,
     MIGRATION_ID as PHASE1_MIGRATION,
@@ -88,10 +96,15 @@ def validate_contract(approved):
     }
     phase1 = phase1_contract(approved)
     d4 = d4_contract(approved)
+    observer = observer_contract(approved)
     if phase1:
         fields.add("phase1_installation")
     if d4:
         fields.add("d4_installation")
+    if observer:
+        fields.update(("observer_installation", "fingerprint_format"))
+        if approved.get("fingerprint_format") != LEGACY_FINGERPRINT_FORMAT:
+            raise SourceConflict("Exact observer legacy fingerprint format required.")
     amended = isinstance(approved, dict) and "module_amendment" in approved
     if amended:
         fields.add("module_amendment")
@@ -117,7 +130,11 @@ def validate_contract(approved):
             for k in ("migration_hash", "metadata_hash")
         )
         or digest(approved["source"]).hex()
-        != (D4_SOURCE_HASH if d4 else PHASE1_SOURCE_HASH if phase1 else DIRECT_SOURCE_HASH)
+        != (
+            OBSERVER_SOURCE_HASH
+            if observer
+            else D4_SOURCE_HASH if d4 else PHASE1_SOURCE_HASH if phase1 else DIRECT_SOURCE_HASH
+        )
         or approved.get("recovery_installation") != P0_RECEIPT_MIGRATION
         or (
             amended
@@ -261,7 +278,7 @@ def queries(base, source):
         ),
     )
     source_hash = digest(source).hex()
-    if source_hash in {PHASE1_SOURCE_HASH, D4_SOURCE_HASH}:
+    if source_hash in {PHASE1_SOURCE_HASH, D4_SOURCE_HASH, OBSERVER_SOURCE_HASH}:
         query, parameters = result["migration"]
         if query.count("IN (?,?,?,?,?,?)") != 1:
             raise SourceConflict("Exact Phase 1 migration reader required.")
@@ -269,13 +286,21 @@ def queries(base, source):
             query.replace("IN (?,?,?,?,?,?)", "IN (?,?,?,?,?,?,?)"),
             (*parameters, PHASE1_MIGRATION),
         )
-    if source_hash == D4_SOURCE_HASH:
+    if source_hash in {D4_SOURCE_HASH, OBSERVER_SOURCE_HASH}:
         query, parameters = result["migration"]
         if query.count("IN (?,?,?,?,?,?,?)") != 1:
             raise SourceConflict("Exact D4 migration reader required.")
         result["migration"] = (
             query.replace("IN (?,?,?,?,?,?,?)", "IN (?,?,?,?,?,?,?,?)"),
             (*parameters, D4_MIGRATION),
+        )
+    if source_hash == OBSERVER_SOURCE_HASH:
+        query, parameters = result["migration"]
+        if query.count("IN (?,?,?,?,?,?,?,?)") != 1:
+            raise SourceConflict("Exact observer migration reader required.")
+        result["migration"] = (
+            query.replace("IN (?,?,?,?,?,?,?,?)", "IN (?,?,?,?,?,?,?,?,?)"),
+            (*parameters, OBSERVER_MIGRATION),
         )
     return result
 
@@ -284,6 +309,24 @@ def _exact(actual, expected):
     return sorted(json.dumps(r, sort_keys=True) for r in actual) == sorted(
         json.dumps(r, sort_keys=True) for r in expected
     )
+
+
+def _grant_state(grant):
+    """Only the source-pinned three lifecycle denials extend the grant model."""
+    state = grant.get("state", "G")
+    if state == "G":
+        return state
+    if (
+        state != "D"
+        or grant["database"] != "ROK_TRACKER"
+        or grant["principal"] != "ExportLegacyEntryReader"
+        or grant["securable_class"] != "OBJECT"
+        or grant["target"]
+        not in {"dbo.KVKFinalReportHeader", "dbo.MaintenanceKvkWork", "dbo.MaintenanceWork"}
+        or grant["permission"] != "ALTER"
+    ):
+        raise SourceConflict("Unsupported source permission state or lifecycle restriction.")
+    return state
 
 
 def verify(observed, approved, *, profile):
@@ -332,6 +375,11 @@ def verify(observed, approved, *, profile):
         raise SourceConflict("Exact reviewed legacy module closure required.")
     for row in observed["modules"]:
         m = modules[row["ObjectName"]]
+        if "definition_format" in m and (
+            m["definition_format"] != "module_header_lf_body_exact_v1"
+            or "compatible_definition_sha256" in m
+        ):
+            raise SourceConflict("Exact reviewed module body format required.")
         expected_definitions = (
             (FILE_VISIBILITY_MODULE_HASHES[row["ObjectName"]],)
             if amended and row["ObjectName"] in FILE_VISIBILITY_MODULE_HASHES
@@ -355,7 +403,10 @@ def verify(observed, approved, *, profile):
             or row["AnsiNulls"] != 1
             or type(row["QuotedIdentifier"]) is not int
             or row["QuotedIdentifier"] != 1
-            or legacy_definition_hash(row["ModuleDefinition"]) not in expected_definitions
+            or legacy_definition_hash(
+                row["ModuleDefinition"], definition_format=m.get("definition_format")
+            )
+            not in expected_definitions
         ):
             raise SourceConflict("Direct legacy module source/context/owner differs.")
     grants = source["grants"]
@@ -366,12 +417,16 @@ def verify(observed, approved, *, profile):
             SecurableClass=g["securable_class"],
             TargetName=g["target"],
             PermissionName=g["permission"],
-            GrantState="G",
+            GrantState=_grant_state(g),
             MinorID=0,
         )
         for g in grants
     ]
-    allowed = {(g["securable_class"], g["target"], g["permission"]) for g in grants}
+    allowed = {
+        (g["securable_class"], g["target"], g["permission"])
+        for g in grants
+        if _grant_state(g) == "G"
+    }
     caps = json.loads(query_set["capabilities"][1][0])
     expected_caps = [
         dict(
@@ -404,7 +459,9 @@ def verify(observed, approved, *, profile):
             GrantState="G",
         )
         for g in grants
-        if g["database"] == "ROK_TRACKER" and g["permission"].startswith(("ALTER", "CREATE"))
+        if g["database"] == "ROK_TRACKER"
+        and g["permission"].startswith(("ALTER", "CREATE"))
+        and _grant_state(g) == "G"
     ]
     expected_memberships = [
         dict(PrincipalName=approved["principal"], RoleName=r)
@@ -425,7 +482,9 @@ def verify(observed, approved, *, profile):
         raise SourceConflict("Direct privileges differ from the exact reviewed grant plan.")
     expected_migrations = [
         dict(
-            MigrationId=P0_RECEIPT_MIGRATION, ChecksumSha256=P0_RECEIPT_CHECKSUM, Status="Applied"
+            MigrationId=P0_RECEIPT_MIGRATION,
+            ChecksumSha256=P0_RECEIPT_CHECKSUM,
+            Status="Applied",
         ),
         dict(
             MigrationId=DIRECT_MIGRATION,
@@ -480,9 +539,20 @@ def verify(observed, approved, *, profile):
         expected_migrations.append(
             dict(MigrationId=D4_MIGRATION, ChecksumSha256=D4_CHECKSUM, Status="Applied")
         )
+    if observer_contract(approved):
+        expected_migrations.append(
+            dict(
+                MigrationId=OBSERVER_MIGRATION,
+                ChecksumSha256=OBSERVER_CHECKSUM,
+                Status="Applied",
+            )
+        )
     if not _exact(observed["migration"], expected_migrations):
         raise SourceConflict("Exact direct-permission migration receipt required.")
-    if digest(observed).hex() != approved["metadata_hash"]:
+    fingerprint_value = (
+        canonical_legacy_observation(observed) if observer_contract(approved) else observed
+    )
+    if digest(fingerprint_value).hex() != approved["metadata_hash"]:
         raise SourceConflict(
             "Direct permission metadata differs from protected approved fingerprint."
         )

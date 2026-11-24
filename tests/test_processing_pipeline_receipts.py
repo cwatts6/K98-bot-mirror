@@ -56,7 +56,7 @@ def test_maintenance_sets_odbc_timeout_before_cursor_creation(monkeypatch, timeo
             calls.append(statement)
 
         def fetchone(self):
-            return (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock")
+            return (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock", "NoLock")
 
         def fetchmany(self, size):
             return [

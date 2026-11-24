@@ -30,14 +30,26 @@ def checksum(value):
 def sql_observation(bot, prior_record, collected):
     from core.export_process_identity import TRUST_MODEL
     from kvk.dal.new_source_import_dal import digest
+    from services.export_observer_contract import (
+        observer_contract,
+        require_observer_contract_pair,
+        retained_observation,
+    )
     from services.export_runtime_composition import (
         verify_application_installation_contract,
         verify_installation_contract,
         verify_legacy_installation_contract,
     )
 
-    if set(collected) != {"observed_utc", "installation", "legacy", "application"}:
+    successor = observer_contract(bot["application_sql_contract"])
+    fields = {"observed_utc", "installation", "legacy", "application"}
+    if successor:
+        fields.add("application_observation")
+    if set(collected) != fields:
         raise ValueError("Complete collected SQL evidence required.")
+    require_observer_contract_pair(
+        bot["sql_contract"], bot["legacy_sql_contract"], bot["application_sql_contract"]
+    )
     stamp = datetime.fromisoformat(collected["observed_utc"].replace("Z", "+00:00"))
     if stamp.utcoffset() is None or stamp.utcoffset().total_seconds() != 0:
         raise ValueError("Collected UTC observation time required.")
@@ -48,7 +60,17 @@ def sql_observation(bot, prior_record, collected):
         collected["legacy"], bot["legacy_sql_contract"], profile=approved["profile"]
     )
     verify_application_installation_contract(
-        collected["application"], bot["application_sql_contract"]
+        collected["application"],
+        bot["application_sql_contract"],
+        **(
+            {
+                "observation": retained_observation(
+                    collected["application"], collected["application_observation"]
+                )
+            }
+            if successor
+            else {}
+        ),
     )
     target = installed["target"]
     actual_contract = deepcopy(approved)
@@ -147,11 +169,28 @@ def candidate_files(config, directory, read):
     return files
 
 
+def observer_candidate(config, candidate, receipt):
+    """Bind only the sealed template; full comparison and seed hashing follow."""
+    from services.observer_release_issuance import bind_observer_candidate
+
+    bot = bind_observer_candidate(config, json.loads(candidate["bot-template.json"]), receipt)
+    return {**candidate, "bot-template.json": encode(bot)}
+
+
 def prepare_verified_files(config, binding_hash, candidate, proof):
-    if set(proof) != {"release_id", "bindings_sha256", "collected"} or (
+    from services.export_observer_contract import observer_contract
+
+    application = json.loads(candidate["bot-template.json"])["application_sql_contract"]
+    selected = observer_contract(application) and "observation_installation" not in application
+    fields = {"release_id", "bindings_sha256", "collected"}
+    if selected:
+        fields.add("observer_release")
+    if set(proof) != fields or (
         proof["release_id"] != config["release_id"] or proof["bindings_sha256"] != binding_hash
     ):
         raise ValueError("Collected SQL evidence belongs to another release.")
+    if selected:
+        candidate = observer_candidate(config, candidate, proof["observer_release"])
     files = verified_seed(candidate, proof["collected"])
     return {**files, "bindings.json": encode(effective_bindings(config, files))}
 
@@ -213,7 +252,31 @@ def main():
     candidate = candidate_files(config, path.parent, read)
     # This returns actual complete SQL query results only after all three live
     # comparisons pass. Retain those results, including their collection time.
-    collected = verify_bot_sql_contracts(json.loads(candidate["bot-template.json"]))
+    from services.export_observer_contract import observer_contract
+
+    candidate_bot = json.loads(candidate["bot-template.json"])
+    observer_proof = {}
+    if observer_contract(candidate_bot["application_sql_contract"]) and (
+        "observation_installation" not in candidate_bot["application_sql_contract"]
+    ):
+        from functools import partial
+
+        from kvk.dal.new_source_admin_dal import configured_connection
+        from services.application_observation_schedule import (
+            ObservationRequest,
+            read_owned_observation,
+        )
+        from services.observer_release_dal import committed_observer_receipt
+
+        receipt = read_owned_observation(
+            partial(configured_connection, sql_profile=candidate_bot["sql_contract"]["profile"]),
+            committed_observer_receipt,
+            request=ObservationRequest(),
+        )
+        bound = observer_candidate(config, candidate, receipt)
+        candidate_bot = json.loads(bound["bot-template.json"])
+        observer_proof["observer_release"] = receipt
+    collected = verify_bot_sql_contracts(candidate_bot)
     directory = path.parent / "verified-seed"
     if not directory.exists():
         if not args.create:
@@ -251,10 +314,15 @@ def main():
                     release_id=config["release_id"],
                     bindings_sha256=args.sha256,
                     collected=collected,
+                    **observer_proof,
                 )
             ),
         )
     proof = json.loads(read(proof_path))
+    if observer_proof and proof.get("observer_release") != observer_proof["observer_release"]:
+        raise ValueError(
+            "Retained observer release evidence differs from the fresh committed read."
+        )
     files = prepare_verified_files(config, args.sha256, candidate, proof)
     for member in directory.iterdir():
         if member.name not in {*files, "sql-evidence.json"} and not re.fullmatch(

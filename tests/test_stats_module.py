@@ -12,6 +12,15 @@ from stats.dal.immutable_import_dal import ImmutableImportOutcome
 import stats_module
 
 
+@pytest.fixture(autouse=True)
+def isolated_stats_import_metadata(tmp_path, monkeypatch):
+    # Caller tests must not publish or replace a retained operational input
+    # manifest when exercising the real metadata state transitions.
+    monkeypatch.setattr(
+        stats_module, "IMPORT_METADATA_FILE_PATH", str(tmp_path / "stats_import_metadata.json")
+    )
+
+
 @pytest.mark.asyncio
 async def test_completed_sql_pending_capture_keeps_import_audit_complete(monkeypatch, caplog):
     from unittest.mock import Mock

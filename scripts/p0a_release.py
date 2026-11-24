@@ -28,16 +28,40 @@ def specification():
     if len(raw) > 1024 * 1024:
         raise ValueError("Bounded installed recovery policy required.")
     value = json.loads(raw)
+    if isinstance(value, dict) and value.get("version") == 2:
+        if (
+            set(value) != {"version", "releases"}
+            or not isinstance(value["releases"], list)
+            or not 1 <= len(value["releases"]) <= 4
+        ):
+            raise ValueError("Bounded installed coordinated release policies required.")
+        for item in value["releases"]:
+            validate_specification(item)
+        if len({item["before"] for item in value["releases"]}) != len(value["releases"]):
+            raise ValueError("One installed policy per exact predecessor required.")
+        return value
+    validate_specification(value)
+    return value
+
+
+def validate_specification(value):
+    if not isinstance(value, dict):
+        raise ValueError("Exact installed recovery policy required.")
     if set(value) != {"version", "before", "sources", "contracts", "sql"} or value["version"] != 1:
         raise ValueError("Exact installed recovery policy required.")
     if not re.fullmatch(r"[a-f0-9]{40}", value["before"]):
         raise ValueError("Exact recovery predecessor required.")
     if not 1 <= len(value["sources"]) <= 128:
         raise ValueError("Bounded protected recovery inventory required.")
+    family = value.get("sql", {}).get("profile", {}).get("profile")
+    observer = family in {"p02_catalogue_observer_v1", "p02_observer_return_v1"}
+    source_pattern = r"(?:core|services|scripts|ui/views)/[a-z_]+\.py|(?:run_bot|bot_config|constants|processing_pipeline|file_utils)\.py"
+    if observer:
+        source_pattern += r"|scripts/[a-z0-9_]+\.py|kvk/(?:dal|services)/[a-z_]+\.py|(?:bot_instance|proc_config_import|player_stats_cache|kvk_all_importer|stats_module)\.py|deploy/p02_observer_(?:protocol|legacy_source|activation_scope|application_sources)\.json"
     paths = set()
     for row in value["sources"]:
         if set(row) != {"path", "before", "after"} or not re.fullmatch(
-            r"(?:core|services|scripts|ui/views)/[a-z_]+\.py|(?:run_bot|bot_config|constants|processing_pipeline|file_utils)\.py",
+            source_pattern,
             row["path"],
         ):
             raise ValueError("Exact protected recovery source member required.")
@@ -57,7 +81,43 @@ def specification():
         if set(pair) != {"before", "after"}:
             raise ValueError("Exact before/after SQL contracts required.")
     validate_sql_policy(value["sql"])
-    return value
+    if observer:
+        for key, pair in value["contracts"].items():
+            before, after = pair["before"], pair["after"]
+            if (
+                not isinstance(before, dict)
+                or not isinstance(after, dict)
+                or any(
+                    before.get(name) != after.get(name)
+                    for name in ("server", "database", "principal")
+                )
+            ):
+                raise ValueError("Observer contract target cannot be replaced.")
+            if (
+                family == "p02_catalogue_observer_v1"
+                and key != "sql_contract"
+                and (
+                    after.get("observer_installation") != OBSERVER_MIGRATION
+                    or before.get("observer_installation") is not None
+                    or "observation_installation" in after
+                )
+            ):
+                raise ValueError(
+                    "Unissued observer successor over its reviewed predecessor required."
+                )
+        fixed = value["contracts"]["sql_contract"]["after"]
+        if (
+            fixed.get("version") != 4
+            or fixed.get("profile") != "application"
+            or any(
+                pair["after"].get(name) != fixed.get(name)
+                for pair in value["contracts"].values()
+                for name in ("server", "database", "principal")
+            )
+        ):
+            raise ValueError("Three matching application contracts required.")
+        if family == "p02_observer_return_v1":
+            validate_return_contracts(value)
 
 
 def validate_sql_policy(sql):
@@ -66,6 +126,10 @@ def validate_sql_policy(sql):
     ):
         raise ValueError("Exact reviewed SQL revision required.")
     profile = sql["profile"]
+    if isinstance(profile, dict) and profile.get("profile") == "p02_observer_return_v1":
+        return validate_return_sql_policy(sql)
+    if isinstance(profile, dict) and profile.get("profile") == "p02_catalogue_observer_v1":
+        return validate_observer_sql_policy(sql)
     if (
         set(profile) != {"version", "profile", "migration_id", "images", "scripts", "requires"}
         or profile["version"] != 1
@@ -159,8 +223,166 @@ def validate_sql_policy(sql):
         raise ValueError("SQL adapter and migration payload disagree.")
 
 
+OBSERVER_MIGRATION = "20261120_001_p02_catalogue_observer"
+OBSERVER_PROFILE_SHA256 = "cd3bcb8c1f7303b8b45d5dc2b3d118aad70002f684ae847ffaf400c056bc1692"
+
+
+def validate_observer_sql_policy(sql):
+    """Fixed candidate profile and complete runner closure; no live image adoption."""
+    profile = sql["profile"]
+    if (
+        profile.get("version") != 1
+        or profile.get("migration_id") != OBSERVER_MIGRATION
+        or profile.get("bootstrap_generation") != 1
+        or profile.get("requires")
+        != [
+            {
+                "migration_id": "20261111_001_p02_d4_combined",
+                "sha256": "57944777e50b7dc9200220cfcc2ce767edb22a2e0972e02bc2cd6f04e23e8171",
+                "status": "Applied",
+            }
+        ]
+    ):
+        raise ValueError("Exact observer predecessor and profile required.")
+    expected = {
+        "deploy/" + name
+        for name in (
+            "Deploy-SqlMigration.ps1",
+            "SqlDeploy.ModuleRelease.ps1",
+            "SqlDeploy.P02D4Release.ps1",
+            "SqlDeploy.Phase1Release.ps1",
+            "SqlDeploy.P02ObserverRelease.ps1",
+        )
+    }
+    expected.update(
+        "migrations/" + OBSERVER_MIGRATION + suffix
+        for suffix in (".sql", ".release.json", ".before.sql", ".after.sql")
+    )
+    members = sql["members"]
+    if not isinstance(members, list) or len(members) != len(expected):
+        raise ValueError("Complete observer runner and SQL inventory required.")
+    for row in members:
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "sha256"}
+            or row["path"] not in expected
+            or not re.fullmatch(r"[a-f0-9]{64}", row["sha256"])
+        ):
+            raise ValueError("Exact observer SQL member required.")
+    pins = {row["path"]: row["sha256"] for row in members}
+    if (
+        set(pins) != expected
+        or pins["migrations/" + OBSERVER_MIGRATION + ".release.json"] != OBSERVER_PROFILE_SHA256
+    ):
+        raise ValueError("Fixed reviewed observer profile bytes required.")
+    for item, suffix in (
+        (profile["script"], ".sql"),
+        (profile["checks"]["before"], ".before.sql"),
+        (profile["checks"]["after"], ".after.sql"),
+    ):
+        if (
+            set(item) != {"file", "sha256"}
+            or item["file"] != OBSERVER_MIGRATION + suffix
+            or pins["migrations/" + item["file"]] != item["sha256"]
+        ):
+            raise ValueError("Observer source and SQL payload disagree.")
+
+
+RETURN_PROFILES = {
+    "20261123_001_p02_observer_return": (
+        "return",
+        "c7d24d3e25c3a3f62fba6484e993c26a19fcb8cefe1d55a607027907beced71c",
+    ),
+    "20261123_002_p02_observer_reupgrade": (
+        "reupgrade",
+        "4fb8a16cfd8a09420a4d8d11a40a1eb36496fa611e4c16bc6d290b7973f3d577",
+    ),
+}
+
+
+def validate_return_sql_policy(sql):
+    """Only the reviewed return/reupgrade pair, with the existing runner closure."""
+    profile = sql["profile"]
+    identity = profile.get("migration_id")
+    if identity not in RETURN_PROFILES or profile.get("action") != RETURN_PROFILES[identity][0]:
+        raise ValueError("Exact fixed observer return transition required.")
+    expected = {
+        "deploy/" + name
+        for name in (
+            "Deploy-SqlMigration.ps1",
+            "SqlDeploy.ModuleRelease.ps1",
+            "SqlDeploy.P02D4Release.ps1",
+            "SqlDeploy.Phase1Release.ps1",
+            "SqlDeploy.P02ObserverRelease.ps1",
+            "SqlDeploy.P02ObserverReturn.ps1",
+        )
+    }
+    expected.update(
+        "migrations/" + identity + suffix
+        for suffix in (".sql", ".release.json", ".before.sql", ".after.sql")
+    )
+    rows = sql["members"]
+    if (
+        not isinstance(rows, list)
+        or len(rows) != len(expected)
+        or any(
+            not isinstance(row, dict)
+            or set(row) != {"path", "sha256"}
+            or row["path"] not in expected
+            or not re.fullmatch(r"[a-f0-9]{64}", row["sha256"])
+            for row in rows
+        )
+    ):
+        raise ValueError("Complete return SQL runner inventory required.")
+    pins = {row["path"]: row["sha256"] for row in rows}
+    if (
+        set(pins) != expected
+        or pins["migrations/" + identity + ".release.json"] != RETURN_PROFILES[identity][1]
+    ):
+        raise ValueError("Fixed reviewed return profile bytes required.")
+    for member, suffix in (
+        (profile["script"], ".sql"),
+        (profile["checks"]["before"], ".before.sql"),
+        (profile["checks"]["after"], ".after.sql"),
+    ):
+        if (
+            set(member) != {"file", "sha256"}
+            or member["file"] != identity + suffix
+            or pins["migrations/" + member["file"]] != member["sha256"]
+        ):
+            raise ValueError("Return profile and SQL member disagree.")
+
+
+def validate_return_contracts(value):
+    """Carry the independently approved original incarnation through reupgrade."""
+    contracts = value["contracts"]
+    if contracts["sql_contract"]["before"] != contracts["sql_contract"]["after"]:
+        raise ValueError("Return cannot change the fixed SQL authority contract.")
+    phase = "before" if value["sql"]["profile"]["action"] == "return" else "after"
+    plain = "after" if phase == "before" else "before"
+    for name in ("legacy_sql_contract", "application_sql_contract"):
+        observed, predecessor = contracts[name][phase], contracts[name][plain]
+        if observed.get("observer_installation") != OBSERVER_MIGRATION or any(
+            key in predecessor for key in ("observer_installation", "observation_installation")
+        ):
+            raise ValueError("Exact observer and predecessor contract pair required.")
+    installed = contracts["application_sql_contract"][phase].get("observation_installation")
+    if not isinstance(installed, dict) or not installed:
+        raise ValueError("Retained issued observer incarnation required; no new installation.")
+    if "observation_installation" in contracts["legacy_sql_contract"][phase]:
+        raise ValueError("Only the application contract carries the original incarnation.")
+
+
+def selected_specification(before):
+    value = specification()
+    specs = value["releases"] if value.get("version") == 2 else [value]
+    return next((spec for spec in specs if spec["before"] == before), None)
+
+
 def possible_paths(before, changes):
-    spec = specification()
+    spec = selected_specification(before)
+    if spec is None:
+        return set()
     paths = {row["path"] for row in spec["sources"]}
     if before != spec["before"] or not paths.intersection(changes):
         return set()
@@ -173,7 +395,7 @@ def selected(before, target, changes, read_blob):
     paths = possible_paths(before, changes)
     if not paths:
         return None
-    spec = specification()
+    spec = selected_specification(before)
     for row in spec["sources"]:
         for commit, field in ((before, "before"), (target, "after")):
             raw = read_blob(commit, row["path"])
@@ -222,6 +444,32 @@ def sql_payload(spec, environment, read_blob):
             raise ValueError("Reviewed recovery SQL member differs: " + path)
         files[name] = raw
     profile = deepcopy(sql["profile"])
+    name = profile["migration_id"] + ".release.json"
+    if profile.get("profile") in {"p02_catalogue_observer_v1", "p02_observer_return_v1"}:
+        validate_sql_policy(sql)
+        raw = files[name]
+        expected = (
+            OBSERVER_PROFILE_SHA256
+            if profile["profile"] == "p02_catalogue_observer_v1"
+            else RETURN_PROFILES[profile["migration_id"]][1]
+        )
+        if sha(raw) != expected or json.loads(raw) != profile:
+            raise ValueError(
+                "Exact sealed observer profile required; no serialization replacement."
+            )
+        if any(
+            profile[key] != environment[key]
+            for key in ("database_collation", "tempdb_collation", "compatibility_level")
+        ):
+            raise ValueError("Observer environment differs from the reviewed release.")
+        return (
+            dict(
+                commit=sql["commit"],
+                profiles=[dict(id=profile["migration_id"], file=name, sha256=sha(raw))],
+                members=[dict(name=n, sha256=sha(b)) for n, b in sorted(files.items())],
+            ),
+            files,
+        )
     profile.update(
         {
             key: environment[key]

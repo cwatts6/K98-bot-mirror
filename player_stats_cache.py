@@ -523,6 +523,11 @@ def _execute_sp_with_retries(
                 )
             return
         except Exception as error:
+            # The inner owner has acknowledged rollback and cursor close before
+            # this point. A cleanup failure replaces the typed read deferral.
+            from services.legacy_export_snapshot_service import acknowledge_observation_cleanup
+
+            acknowledge_observation_cleanup(cn, error)
             logger.warning(
                 "[CACHE] Player report attempt=%d failed error_type=%s",
                 attempt,

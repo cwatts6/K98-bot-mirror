@@ -284,9 +284,30 @@ def verify_producer_cursor(cursor, *, before_side_effects=False):
     runtime._require_writer(owner)
     _writer_event(owner, "pre_execution_authorization", "requested")
     try:
-        runtime.dal.verify_producer_cursor(owner.claim, cursor)
+        if owner.observation is not None:
+            runtime.dal.verify_producer_cursor(
+                owner.claim,
+                cursor,
+                observation=owner.observation,
+                observation_context=dict(
+                    configuration=runtime.configuration,
+                    registration=json.loads(runtime.configuration)[owner.kind],
+                ),
+            )
+        else:
+            runtime.dal.verify_producer_cursor(owner.claim, cursor)
     except BaseException as error:
         _writer_event(owner, "pre_execution_authorization", "failed", error)
+        from services.catalogue_observation_dal import ObservationDeferred
+
+        if (
+            before_side_effects
+            and not owner.producer_authorized
+            and isinstance(error, ObservationDeferred)
+        ):
+            # This is only a candidate. The actual connection/cursor owner must
+            # acknowledge physical cleanup before it can settle this live claim.
+            owner.observation_refusal = (cursor.connection, error)
         if (
             before_side_effects
             and not owner.producer_authorized
@@ -298,6 +319,30 @@ def verify_producer_cursor(cursor, *, before_side_effects=False):
         raise
     owner.producer_authorized = True
     _writer_event(owner, "pre_execution_authorization", "confirmed")
+
+
+def acknowledge_observation_cleanup(connection, failure):
+    """Confirm this exact entry refusal after caller-owned physical cleanup.
+
+    Only the inspected pre-business callers use this seam, after acknowledged
+    connection close or rollback plus cursor close. It performs no SQL and never
+    reconstructs a proof for a retained/restarted claim.
+    """
+    from core.sql_connection_custody import custody_snapshot
+
+    owner = current_owner()
+    if owner is None or owner.observation_refusal is None:
+        return
+    refused_connection, refused_error = owner.observation_refusal
+    if (
+        connection is refused_connection
+        and failure is refused_error
+        and not owner.closed
+        and not owner.producer_authorized
+        and owner.completion is None
+        and not custody_snapshot()["unconfirmed"]
+    ):
+        owner.safe_pre_execution_refusal = True
 
 
 def _writer_event(owner, stage, outcome, error=None):
@@ -482,7 +527,13 @@ def _writer_scope(kind, *, owner_token=None):
                 and not owner.stats_execution_registered
             ):
                 runtime.unstarted_stats_writer(owner)
-            elif owner.safe_pre_execution_refusal and isinstance(original, CoordinationLockRefused):
+            elif owner.safe_pre_execution_refusal and (
+                isinstance(original, CoordinationLockRefused)
+                or (
+                    owner.observation_refusal is not None
+                    and original is owner.observation_refusal[1]
+                )
+            ):
                 runtime.refused_writer(owner)
             else:
                 runtime.uncertain_writer(owner)
@@ -649,6 +700,9 @@ class WriterOwner:
     stats_execution_registered: bool = False
     stats_import_context: bool = False
     stats_execution_dispatched: bool = False
+    stats_unstarted_withdrawn: bool = False
+    observation: object | None = None
+    observation_refusal: tuple | None = None
 
 
 class LegacyExportRuntime:
@@ -1035,11 +1089,17 @@ class LegacyExportRuntime:
             # writer starts. Its failure cannot silently select the older capture.
             collection.append((scope["consumer"], scope.get("kvk_no"), None))
         connection = None
+        observation = None
         try:
-            connection = self.dal.connect()
-            connection.autocommit = True
-            guard = self.dal.session(claim, connection)
-            guard.__enter__()
+            from services.export_observer_contract import observer_contract
+
+            if observer_contract(getattr(self.dal, "application_sql_contract", None)):
+                connection, guard, observation = self._observed_writer_admission(claim, scope)
+            else:
+                connection = self.dal.connect()
+                connection.autocommit = True
+                guard = self.dal.session(claim, connection)
+                guard.__enter__()
         except BaseException as original:
             try:
                 if connection is not None and not connection_retained(connection):
@@ -1066,8 +1126,81 @@ class LegacyExportRuntime:
                 )
             raise
         owner = WriterOwner(claim, connection, guard, kind, self)
+        owner.observation = observation
         _writer_event(owner, "writer_admission", "confirmed")
         return owner
+
+    def _observed_writer_admission(self, claim, scope):
+        """Continue observation only, retaining this exact unstarted SQL claim.
+
+        The existing producer turn owns local scheduling. Each failed admission
+        guard must unwind and close before a cheap check or replacement starts.
+        No provider input, durable request or business callback is repeated.
+        """
+        from core.sql_connection_custody import (
+            SqlCleanupUnknown,
+            connection_retained,
+            retain_connection,
+        )
+        from services.application_observation_schedule import ObservationRequest
+
+        request = ObservationRequest()
+        configuration = self.configuration
+
+        def current_context():
+            if self.configuration != configuration:
+                raise SnapshotUnavailable("Producer configuration changed during observation.")
+            return dict(configuration=configuration, registration=scope)
+
+        def close(connection, original=None):
+            if connection_retained(connection):
+                raise SqlCleanupUnknown("Observation connection remains retained.") from original
+            try:
+                connection.close()
+            except BaseException as cleanup:
+                retain_connection(
+                    connection,
+                    effect="not_started",
+                    first_failure=original or cleanup,
+                    cleanup_error=cleanup,
+                )
+                raise SqlCleanupUnknown("Observation connection close is unconfirmed.") from (
+                    original or cleanup
+                )
+
+        def collect():
+            context = current_context()
+            request.check()
+            connection = self.dal.connect()
+            try:
+                connection.autocommit = True
+                guard = self.dal.session(
+                    claim,
+                    connection,
+                    observation_context=context,
+                    observation_request=request,
+                )
+                observation = guard.__enter__()
+            except BaseException as original:
+                close(connection, original)
+                raise
+            return connection, guard, observation
+
+        def probe():
+            current_context()
+            request.check()
+            connection = self.dal.connect()
+            failure = None
+            try:
+                connection.autocommit = True
+                self.dal.observation_boundary(connection, request)
+            except BaseException as error:
+                failure = error
+                raise
+            finally:
+                close(connection, failure)
+
+        return request.run(collect, probe)
 
     def _require_writer(self, owner):
         if not isinstance(owner, WriterOwner) or owner.runtime is not self:
@@ -1132,7 +1265,7 @@ class LegacyExportRuntime:
             raise failure
 
     def refused_writer(self, owner):
-        """Release only this live, explicitly unstarted writer after lock refusal.
+        """Release only this live, explicitly unstarted writer after proven refusal.
 
         This proof cannot be reconstructed after restart and never applies to a
         retained uncertain preparation. A failed release keeps durable ownership.
@@ -1141,6 +1274,9 @@ class LegacyExportRuntime:
         if owner.closed or owner.producer_authorized or not owner.safe_pre_execution_refusal:
             raise SnapshotUnavailable("Exact live pre-execution refusal required.")
         self._close_writer(owner)
+        from core.sql_connection_custody import require_sql_admission
+
+        require_sql_admission()
         owner.claim = self.dal.transition(
             owner.claim, expected="writing", state="unavailable", release=True
         )
@@ -1166,6 +1302,7 @@ class LegacyExportRuntime:
         owner.claim = self.dal.transition(
             owner.claim, expected="writing", state="unavailable", release=True
         )
+        owner.stats_unstarted_withdrawn = True
         _writer_event(owner, "pre_import_failure", "withdrawal_commit_acknowledged")
 
     def checkpoint_writer(self, owner, evidence, *, cursor=None):
@@ -1208,6 +1345,9 @@ class LegacyExportRuntime:
         if owner.closed:
             return
         try:
+            from core.sql_connection_custody import require_sql_admission
+
+            require_sql_admission()
             self.authorize_writer(owner)
             scope = json.loads(self.configuration)[owner.kind]
             if scope["consumer"] == "config":

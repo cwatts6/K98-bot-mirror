@@ -64,7 +64,7 @@ def connection(monkeypatch):
             assert owner.timeout == 17
 
         def fetchone(self):
-            return (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock")
+            return (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock", "NoLock")
 
         def fetchmany(self, size):
             assert size == 7
@@ -161,7 +161,9 @@ def test_late_sql_failure_survives_failed_cleanup(connection, monkeypatch):
 def test_foreign_session_owner_is_retained_without_releasing_it(connection, monkeypatch):
     c = connection
     monkeypatch.setattr(
-        c.cursor, "fetchone", lambda: (0, "Exclusive", "NoLock", "NoLock", "NoLock", "NoLock")
+        c.cursor,
+        "fetchone",
+        lambda: (0, "Exclusive", "NoLock", "NoLock", "NoLock", "NoLock", "NoLock"),
     )
     with pytest.raises(custody.SqlCleanupUnknown, match="pre-existing"):
         dal.run_maintenance(lambda: c.owner, timeout_seconds=17)
@@ -184,6 +186,24 @@ def test_unknown_session_release_never_returns_connection_to_pool(connection, mo
     assert "cursor_closed" not in c.events
     assert "closed" not in c.events
     assert custody.custody_snapshot()["admission"] == "closed"
+
+
+@pytest.mark.parametrize("phase", ["entry", "release"])
+def test_unreleased_catalogue_marker_keeps_physical_custody(connection, monkeypatch, phase):
+    calls = 0
+
+    def state():
+        nonlocal calls
+        calls += 1
+        mode = "Shared" if (calls == 1) == (phase == "entry") else "NoLock"
+        return (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock", mode)
+
+    monkeypatch.setattr(connection.cursor, "fetchone", state)
+    with pytest.raises(custody.SqlCleanupUnknown):
+        dal.run_maintenance(lambda: connection.owner, timeout_seconds=17)
+    assert custody.connection_retained(connection.owner)
+    assert "closed" not in connection.events
+    assert (dal.RELEASE_SESSION in connection.events) == (phase == "release")
 
 
 @pytest.mark.parametrize("damage", ["missing", "duplicate", "invalid_state", "false_complete"])

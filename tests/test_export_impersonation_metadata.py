@@ -19,13 +19,9 @@ def test_fixed_read_uses_effective_user_permission_and_bounded_scope(monkeypatch
     connection, cursor = Mock(), Mock()
     connection.cursor.return_value = cursor
     monkeypatch.setattr(dal, "one", lambda _: observed["target"])
-    results = iter(
-        [
-            observed["migrations"],
-            *(observed["metadata"][k] for k in dal._METADATA_QUERIES),
-            observed["permissions"],
-        ]
-    )
+    from tests.fixed_catalogue_fixture import fixed_reader_rowsets
+
+    results = iter(fixed_reader_rowsets(observed))
     monkeypatch.setattr(dal, "rows", lambda _: next(results))
     dal.ExportExecutionDAL(lambda: connection).installation_snapshot()
     sql = cursor.execute.call_args_list[0].args[0]

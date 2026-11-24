@@ -339,7 +339,7 @@ def ingest_prepared_import(
     cur = con.cursor()
     from services.legacy_export_snapshot_service import verify_producer_cursor
 
-    verify_producer_cursor(cur)
+    verify_producer_cursor(cur, before_side_effects=True)
     enable_fast_executemany(cur)
 
     try:

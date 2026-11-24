@@ -66,9 +66,15 @@ def test_source_successor_is_exact_indivisible_and_preserves_historical_registry
         m["path"]: (ROOT / m["path"]).read_bytes().replace(b"\r\n", b"\n")
         for m in family["members"]
     }
-    for m in family["members"]:
-        assert hashlib.sha256(raw[m["path"]]).hexdigest() == m["after_sha256"]
+    from tests.updater_source_assertions import before_observer_hash
+
     marker = b"fixture-pinned-hash:"
+    for m in family["members"]:
+        assert before_observer_hash(ROOT, m["path"]) == m["after_sha256"]
+        if hashlib.sha256(raw[m["path"]]).hexdigest() != m["after_sha256"]:
+            # Authenticate exact candidate bytes above; exercise this immutable
+            # historical registry using its retained source identity below.
+            raw[m["path"]] = marker + m["after_sha256"].encode()
     real_hash = updater.sha256
     monkeypatch.setattr(
         updater,

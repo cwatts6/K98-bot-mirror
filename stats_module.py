@@ -472,6 +472,38 @@ async def run_sql_procedure(
     except asyncio.CancelledError:
         raise
     except Exception as e:
+        from services.catalogue_observation_dal import ObservationDeferred
+
+        if (
+            type(e) is ObservationDeferred
+            and execution_id is None
+            and execution_owner is not None
+            and execution_owner.stats_unstarted_withdrawn
+        ):
+            # Set only after this exact live attempt closed its physical owner
+            # and acknowledged withdrawal. A lost cleanup/withdrawal reply keeps
+            # the existing unknown-outcome path; no import is retried here.
+            from services.export_contention import sql_error_facts
+
+            logger.info(
+                "[SQL_PROC] outcome=observation_deferred; sql_execution=not_started; diagnostics=%s",
+                sql_error_facts(e),
+            )
+            emit_telemetry_event(
+                {
+                    "event": "sql_proc",
+                    "status": "observation_deferred",
+                    "task_name": TASK_NAME,
+                    "sql_execution": "not_started",
+                    "completed_filename": completed_filename,
+                }
+            )
+            return (
+                False,
+                "[DEFERRED] SQL import did not start because catalogue observation could not settle. "
+                "The prepared input is retained; no import or capture was repeated.",
+                None,
+            )
         # A checkpoint/capture exception can follow committed SQL. Establish the
         # exact outcome before describing the operation as a failure.
         sql_state = None

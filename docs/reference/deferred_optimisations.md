@@ -938,3 +938,24 @@ entry was consolidated into the existing executor and isolated-offseason owners,
 - Impact: low
 - Risk: low
 - Dependencies: Diagnostic fingerprint contract owner; actual D3 stage/ownership tests remain independently passing.
+
+### Deferred Optimisation
+- Area: SQL `sql_schema/dbo.sp_ExcelOutput_ByKVK.StoredProcedure.sql`, `KVK_RANK` projection
+- Type: consistency
+- Description: The existing `ROW_NUMBER() OVER (ORDER BY D.[DKP_SCORE] DESC)` has no tie-breaker. P02 observer lab publications on 20 November 2026 preserved all 415 governor rows and all other 59 fields, but the 352 governors with zero DKP exchanged ranks 64-415. Both rankings are valid under the current SQL ordering; exact raw equality failed. Evidence is preserved in observer packets `20261120095412651` and `20261120100655925`, with offline adjudication in `publisher-rank-comparison-20261120.json`. This is existing ranking behavior, not a proven observer regression.
+- Suggested Fix: In a separate SQL reporting consistency change, agree whether tied governors should have stable unique positions or shared ranks, then implement that rule and verify existing export/report consumers and paired business-preservation comparisons. Do not discard arbitrary rank differences or alter rank policy merely to pass the observer proof.
+- Impact: medium
+- Risk: medium
+- Dependencies: Ranking/report semantics and exact SQL/Bot source-contract transition. P02 parent-flow and paired-cost evidence must explicitly account for tie semantics; this captured item does not waive those acceptance gates.
+
+### Deferred Optimisation
+- Area: `tests/test_export_production_compatibility.py`, SQL historical source-reference byte verification
+- Type: consistency
+- Description: The immutable names-reference test pins LF bytes while the Phase 1 reference pins CRLF bytes. On 20 November 2026 the clean SQL checkout failed 19 cases at the names reference; a separate exact Git-blob export resolved that reference but left nine failures at the Phase 1 reference. Both pinned representations were independently confirmed by line-ending conversion, without changing JSON values. This precedes the observer comparator logic and is not evidence of a runtime SQL regression.
+- Suggested Fix: In a focused historical test-custody change, authenticate the explicitly supported transport representation for each retained reference while recording its raw digest. Preserve every historical content hash and negative source-drift case; do not accept arbitrary reference changes or regenerate expected values from current observations.
+- Impact: medium
+- Risk: low
+- Dependencies: SQL/Bot historical source-test owners and final observer regression accounting. Original checkout, references, failures and test pins remain unchanged; this item does not declare the compatibility gate passed.
+
+
+Historical SQL reference transport — resolved 23 November 2026: the preceding byte-representation item is closed by the retained 49 passing LF/CRLF checks with every historical content pin and negative drift check unchanged. Original failures remain evidence; they are not an open reference gap. The separate final-regression historical-family fixture correction reuses the exact authenticated observer source bridge and does not reopen or replace those accepted reference checks.

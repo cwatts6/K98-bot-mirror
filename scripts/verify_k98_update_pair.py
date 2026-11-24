@@ -162,6 +162,9 @@ CONTRACT_ARCHIVE_MEMBERS = (
     "core/sql_connection_custody.py",
     "core/sql_operation_policy.py",
     "deploy/p02_d4_activation_scope.json",
+    "deploy/p02_observer_activation_scope.json",
+    "deploy/p02_observer_legacy_source.json",
+    "deploy/p02_observer_protocol.json",
     "deploy/p02_phase1_activation_scope.json",
     "deploy/s11_activation_scope.json",
     "deploy/s11_application_grants.json",
@@ -186,6 +189,14 @@ CONTRACT_ARCHIVE_MEMBERS = (
     "services/__init__.py",
     "services/application_maintenance_contract.py",
     "services/application_maintenance_dal.py",
+    "services/application_observation_fingerprint.py",
+    "services/application_observation_schedule.py",
+    "services/catalogue_observation_batch_dal.py",
+    "services/catalogue_observation_batches.py",
+    "services/catalogue_observation_columns_dal.py",
+    "services/catalogue_observation_contract.py",
+    "services/catalogue_observation_dal.py",
+    "services/catalogue_observation_query_dal.py",
     "services/event_cache_service.py",
     "services/export_contention.py",
     "services/export_contract_resources.py",
@@ -194,6 +205,7 @@ CONTRACT_ARCHIVE_MEMBERS = (
     "services/export_execution_authority.py",
     "services/export_execution_dal.py",
     "services/export_execution_protocol.py",
+    "services/export_observer_contract.py",
     "services/export_phase1_contract.py",
     "services/export_publication_metrics.py",
     "services/export_request_budget.py",
@@ -201,6 +213,8 @@ CONTRACT_ARCHIVE_MEMBERS = (
     "services/export_schema_fingerprint.py",
     "services/export_snapshot_store.py",
     "services/export_sql_direct_permissions.py",
+    "services/observer_release_dal.py",
+    "services/observer_release_issuance.py",
 )
 
 
@@ -636,6 +650,18 @@ def verify_bot_sql_contracts(bot, *, connection_factory=None):
     )
 
     approved = bot["sql_contract"]
+    from services.export_observer_contract import (
+        observation_record,
+        require_observer_contract_pair,
+    )
+
+    require_observer_contract_pair(
+        approved, bot["legacy_sql_contract"], bot["application_sql_contract"]
+    )
+    from services.export_observer_contract import observer_contract
+
+    successor_observer = observer_contract(bot["application_sql_contract"])
+    observation_evidence = {}
     factory = connection_factory or partial(configured_connection, sql_profile=approved["profile"])
 
     def phase(name):
@@ -650,31 +676,35 @@ def verify_bot_sql_contracts(bot, *, connection_factory=None):
         **({"migrations": installation_migrations(approved)} if approved["version"] == 4 else {})
     )
     verify_installation_contract(installation, approved)
-    connection = factory()
-    try:
-        connection.autocommit = True
-        cursor = connection.cursor()
-        try:
-            phase("legacy")
-            legacy = legacy_installation_snapshot(cursor, bot["legacy_sql_contract"]["source"])
-            verify_legacy_installation_contract(
-                legacy,
-                bot["legacy_sql_contract"],
-                profile=approved["profile"],
-            )
+    from services.application_observation_schedule import read_owned_observation
+
+    def read_legacy(cursor):
+        phase("legacy")
+        legacy = legacy_installation_snapshot(cursor, bot["legacy_sql_contract"]["source"])
+        verify_legacy_installation_contract(
+            legacy, bot["legacy_sql_contract"], profile=approved["profile"]
+        )
+        application = None
+        if not successor_observer:
             phase("application")
             application = application_snapshot_for_contract(cursor, bot["application_sql_contract"])
             verify_application_installation_contract(application, bot["application_sql_contract"])
-        finally:
-            from core.sql_connection_custody import connection_retained
+        return legacy, application
 
-            if not connection_retained(connection):
-                cursor.close()
-    finally:
-        from core.sql_connection_custody import connection_retained
+    legacy, application = read_owned_observation(factory, read_legacy)
+    if successor_observer:
+        from services.application_observation_schedule import observe_application
 
-        if not connection_retained(connection):
-            connection.close()
+        phase("application")
+        request_factory = getattr(type(factory), "observation_request", None)
+        observation_options = (
+            {"request": request_factory(factory)} if request_factory is not None else {}
+        )
+        application = observe_application(
+            factory, bot["application_sql_contract"], **observation_options
+        )
+        observation_evidence["application_observation"] = observation_record(application)
+        application = application.value
     print(json.dumps(dict(stage="STARTUP_SQL_CONTRACTS_VERIFIED", business_work=False)))
     # Return the complete actual catalog evidence, not expected contract fields.
     # Callers can retain and reverify this observation; no expectation is adopted
@@ -684,6 +714,7 @@ def verify_bot_sql_contracts(bot, *, connection_factory=None):
         installation=installation,
         legacy=legacy,
         application=application,
+        **observation_evidence,
     )
 
 

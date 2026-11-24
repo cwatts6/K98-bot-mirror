@@ -5,6 +5,129 @@ import json
 
 from scripts import p0a_release, prepare_k98_update
 
+# Exact test-only bridge from the local observer candidate to its Git predecessor.
+# It keeps historical transition tests meaningful while the successor is under
+# qualification. These pairs neither register a production update nor issue an
+# installed contract; the actual updater rehearsal and Changes reviews remain open.
+_OBSERVER_SOURCE_PAIRS = {
+    "scripts/verify_k98_running_release.py": (
+        "ca138803dc70e88981c3fd4c1716247130dc8b33ae0fb2ada52b019d16f4af16",
+        "cd77a733a692ad10d92c093192efba0f73ae602935dba8ca79e61767f31665ba",
+    ),
+    "kvk/dal/kvk_admin_dal.py": (
+        "634cf1210a7e6fa67426104b971a67b0e94f1f294e291d5938dd1607e26829bf",
+        "141e3cc6314bf1c182924c82d751352695afe827997f78dbf33ad6aa22ac59b3",
+    ),
+    "kvk/dal/kvk_all_import_dal.py": (
+        "e5b6560c27f9c90b6cebd6f874681e01cbc9520e943d5b0f23285cddba894190",
+        "c7ebf640b9be8a27e21f3249799fc15fc3a316d24260548b7a2b58fa9166dcfa",
+    ),
+    "kvk_all_importer.py": (
+        "53a8184faea794101e8084e81358dbe707404a9de91096b06b587f1ffcfb1290",
+        "1bd8a3d8fdb6578b3d6ae0b8ebe31087b3ba1ea580e0f98e9479551b6fe515a1",
+    ),
+    "player_stats_cache.py": (
+        "2ac4257bb5695c0d2f6b1ef27f63012c9fb58165e5db752fa8594ecec6811ed3",
+        "a9947757f3574d5d9e1b5974aa55158ae777295bde372dcab056c3812aeb3920",
+    ),
+    "proc_config_import.py": (
+        "8661fb89b484a4020bf6511803b7f3b48e3baf196a4cb9612e8a1f290f5301ab",
+        "da86ec5838e620f798af618f555118158db633a5a4fce856084ad9aa529c97bd",
+    ),
+    "scripts/p0a_release.py": (
+        "b9087b8f048e387688de53555489cfd5e685975bda535ba2235dd48712f24e6c",
+        "1dc4e146069a9f200483ce912284da0754080688fc94e72a1c8cce80650e3437",
+    ),
+    "scripts/recovery_release_seed.py": (
+        "e266ea6c4f7c1f714406d5e7ff18e4342d8e298c0626e084f0c6cdf68963221b",
+        "9705d9314a26f43da1034a0cf85a9fd92da2800a456c6827fa076793db9e2329",
+    ),
+    "scripts/verify_k98_update_pair.py": (
+        "0ace1f6d6a412cba6b76ce84588b3aefe85fcda802a558c8d8917265e6ffc079",
+        "517fcd956d57a160c5b9f8bd5a4bca688679354cdb092f40e2d38145ea836405",
+    ),
+    "services/application_maintenance_contract.py": (
+        "a2a17c772f6ebbe389f0630b26197e6f6e458372add741f099a4a2e04c7c3728",
+        "b71930b8e562d20e83b97b16674a91a8341a9d2a848ed43b22b47fcc5c984241",
+    ),
+    "services/application_maintenance_dal.py": (
+        "74d889a920bb1947df49fb1b6020996c77066340cbe2237938b6b3fce57de911",
+        "da5321325b1362d7386eeca3a5c49650588b2c80bd20f16575d9d13b0f138957",
+    ),
+    "services/export_contract_resources.py": (
+        "e545f01fe7fab35bbb80f0a8817935143fa8f1bdff67ca124290a4ac1e21b04c",
+        "c572ddc2d462d77348f459684117e43e7961180ba05abee33322a488a3e46309",
+    ),
+    "services/export_execution_dal.py": (
+        "b7fbe072b34d35d3b54c84d949dca0d6755c5d26c36008810296749d3945b7e2",
+        "43fc41388cd3c9316eee21ae27f9d7d838f98294e7ad199ccf5dec956d2bdd97",
+    ),
+    "services/export_runtime_composition.py": (
+        "32ea5667129f2a8eafad4e1e944a038295ed4598090fa76517c6e9da2f06e1a9",
+        "126ad4b0239c7582f765bd5667a1c32b08e9a35f51122f75a951e459450bff5c",
+    ),
+    "services/export_sql_direct_permissions.py": (
+        "02abee1b52097ee242a3bc7e2cdc973e3e683e990042e3f1051ca309b0162694",
+        "1f77156a59fb61b4f310d77e377d2e659120a591e72f5dad3cb65536aa4afc3b",
+    ),
+    "services/legacy_export_snapshot_dal.py": (
+        "917e22fd547cf73d66198c0cc3be3ed8d8ff49c8108ead5673ea88bfd366afe6",
+        "e737ff1941c41fe400cc23e753e8340687ff5c621cf25a4fabb276bb37f31b71",
+    ),
+    "services/legacy_export_snapshot_service.py": (
+        "59da485a415c381c3f5b124b2e7d3ffc4b021e73df939349f2c2c10c0456809f",
+        "88774eec926e0ae90352398dd9c97448426f6cc0385f5a88119a88a1bde715f7",
+    ),
+    "services/maintenance_dal.py": (
+        "347e799e7424f257b3f19109fb041b9a209a1022bbc2748e199b2f1e5bd11360",
+        "eb83661cb7ddc492539bfe1200c4e62ff3db788ee43018cadf4c4fba3f7fff87",
+    ),
+    "services/runtime_admission_diagnostics.py": (
+        "5044ffe1b8f1e31d6e7cf95855aa9bf477c92ca4abf559e125bb01ee5fa3d988",
+        "d593c8bb0294d764ec33f38dc525ad66f4f2cd535b41fb9e7790ec60ef585ed3",
+    ),
+}
+
+
+# Exact qualified reader and local caller/custody candidate bytes.
+# Historical observer pairs and production registry pins below remain unchanged.
+# This test-only mapping never admits arbitrary or installed source bytes.
+_OBSERVER_QUALIFIED_CANDIDATE_PAIRS = {
+    "scripts/p0a_release.py": (
+        "1dc4e146069a9f200483ce912284da0754080688fc94e72a1c8cce80650e3437",
+        "adde16d2cc6cced1e0a6b9376b99627510e28c8448481ffaeeb5fb8f5c6557da",
+    ),
+    "services/export_execution_dal.py": (
+        "43fc41388cd3c9316eee21ae27f9d7d838f98294e7ad199ccf5dec956d2bdd97",
+        "7a7337d7f49f6a859baee6b299e03fcda4b74be446a41c42f420ef135c8e7df5",
+    ),
+    "services/legacy_export_snapshot_dal.py": (
+        "e737ff1941c41fe400cc23e753e8340687ff5c621cf25a4fabb276bb37f31b71",
+        "7a146d6719022fb8a015a4b624964e07da62216cfc0b779d432e73f922706ac6",
+    ),
+    "services/legacy_export_snapshot_service.py": (
+        "88774eec926e0ae90352398dd9c97448426f6cc0385f5a88119a88a1bde715f7",
+        "c5e096838456853565f9db083203c7b87af064ec17ca26dca4ec68334f6832e1",
+    ),
+    "stats_module.py": (
+        "c1a02bf76b5b34475899febc490fd83aae358d96551ce32645b476d9bfdf6e3d",
+        "6d292c2783e297a88cdcbea826a9c734579d2b15f41bca3647a27f0cbbd91bca",
+    ),
+}
+
+
+def before_observer_hash(root, path):
+    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path in _OBSERVER_QUALIFIED_CANDIDATE_PAIRS:
+        predecessor, candidate = _OBSERVER_QUALIFIED_CANDIDATE_PAIRS[path]
+        assert actual == candidate, path
+        actual = predecessor
+    if path in _OBSERVER_SOURCE_PAIRS:
+        predecessor, candidate = _OBSERVER_SOURCE_PAIRS[path]
+        assert actual == candidate, path
+        return predecessor
+    return actual
+
 
 def installed_contract_archive_hash(root):
     """Pin the real packaged verifier in candidate installed-tool fixtures."""
@@ -50,7 +173,7 @@ _D4_CONTRACT_PAIRS = {
 
 def before_catalog_cleanup_hash(root, path):
     """Require exact successor bytes without changing historical release evidence."""
-    actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    actual = before_observer_hash(root, path)
     if path in prepare_k98_update.P02_CATALOG_PATHS:
         transition = next(
             t

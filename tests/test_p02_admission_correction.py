@@ -654,7 +654,9 @@ def test_exact_source_transition_preserves_history_and_rejects_partial_or_unknow
     # The offline release rehearsal separately reads the actual predecessor Git blobs.
     marker = b"test-only-pinned-sha256:"
     for member in transition["members"]:
-        if member["path"] in updater.P02_VERIFICATION_PATHS:
+        # Each current successor was authenticated through the exact historical
+        # bridge above, including the observer's bounded deferral diagnostic.
+        if hashlib.sha256(raw[member["path"]]).hexdigest() != member["after_sha256"]:
             raw[member["path"]] = marker + member["after_sha256"].encode()
     real_hash = updater.sha256
     monkeypatch.setattr(
@@ -683,3 +685,47 @@ def test_exact_source_transition_preserves_history_and_rejects_partial_or_unknow
         raw[path] += b"\n# unknown\n"
         assert not updater.matches_protocol_transition(transition, read, "before", "after")
         raw[path] = original
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["active_writer", "generation_changed", "catalogue_busy", "statement_limit", "private payload"],
+)
+def test_startup_deferral_preserves_bounded_closed_settlement(monkeypatch, admission, reason):
+    from services.catalogue_observation_dal import ObservationDeferred
+
+    for name, value in (
+        ("_installed", None),
+        ("_recovery_bundle", None),
+        ("_installing", False),
+        ("_runtime_stopped", False),
+    ):
+        monkeypatch.setattr(runtime, name, value)
+    monkeypatch.setattr("bot_config.EXPORT_COORDINATION_ENABLED", True)
+    error = ObservationDeferred(reason)
+    if reason == "catalogue_busy":
+        import pyodbc
+
+        error.__cause__ = pyodbc.ProgrammingError("42000", "private payload (1222)")
+    prepare = Mock(side_effect=error)
+    monkeypatch.setattr(runtime, "_prepare_configured_runtime", prepare)
+    with pytest.raises(ObservationDeferred) as caught:
+        diagnostic.install_startup_runtime()
+    assert caught.value is error
+    record = admission[-1]()
+    assert record["outcome"] == "failed"
+    assert record["reason"] == "catalogue_observation_deferred"
+    assert record.get("observation_reason") == (None if reason == "private payload" else reason)
+    assert "private payload" not in json.dumps(record)
+    if reason == "catalogue_busy":
+        assert record["diagnostic"]["sql_numbers"] == [1222]
+        assert record["diagnostic"]["sqlstates"] == ["42000"]
+        assert caught.value.__cause__ is error.__cause__
+    assert runtime._installed is runtime._recovery_bundle is None
+    assert not runtime._installing
+    # Monitor/admin wakes cannot reset an exhausted logical startup read budget.
+    runtime.retry_recovery_admission()
+    prepare.assert_called_once()
+    config, journal, start, _, _ = admission
+    with pytest.raises(ValueError, match="admission failed"):
+        verifier.startup_admission_result(config, journal, start)

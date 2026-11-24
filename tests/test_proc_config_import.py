@@ -303,6 +303,9 @@ def test_transactional_rollback_and_manifest(monkeypatch, tmp_path):
         def __init__(self):
             self.executed = []
 
+        def close(self):
+            self.closed = True
+
         def execute(self, *args, **kwargs):
             self.executed.append(args)
             # Simulate DBCC SQLPERF being called; if called, return empty fetch

@@ -15,6 +15,17 @@ Testing in this project is not only about proving the happy path. A good test st
 Tests should be proportionate to change size, but every meaningful production change requires a
 deliberate test decision.
 
+### Local development and VM qualification
+
+Operator correction, 19 November 2026: local development and VM testing has no cumulative time allowance, consumable test quota, reserve, countdown or shortfall gate. Earlier elapsed-time and fixture counters remain historical observations; they do not constrain the current test plan or require replenishment. Use actual machine capacity and practical safeguards, not inherited quota arithmetic.
+
+- Give each selected test a concrete behavior, regression, risk or unresolved evidence gap and an observable pass/fail outcome. Required coverage is not an invitation to generate tests for their own sake.
+- Reuse valid evidence for unchanged behavior, remove duplicate coverage and group compatible checks. Once sufficient checks pass, proceed with delivery. Expand or repeat only for a relevant change, failure or unresolved concern, with its reason stated.
+- Plan a finite set of meaningful cases. Case families and traceability records are coverage questions, not a target number of tests. Avoid an ever-expanding list and unnecessary tests of test infrastructure.
+- Use realistic operation and batch timeouts based on the workload, with a clear stop/diagnosis path for a hang or failure and bounded cleanup. Do not let tests run forever or repeatedly rerun a failure without a hypothesis or correction.
+- Measure elapsed time to assess product performance, plan work and diagnose hangs. Do not debit it from a cumulative balance or request more testing seconds. Choose representative fixture sizes for the evidence needed; historical fixture/input counts are not a new consumable quota.
+- Preserve original evidence, actual outcomes and completed business work. This local testing policy does not change production runtime contracts or authorise deployment, recovery or provider effects.
+
 ## 2. Minimum Expectations By Change Type
 
 ### Bug Fix

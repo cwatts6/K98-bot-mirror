@@ -13,7 +13,7 @@ import pytest
 
 KINDS = ("import", "configuration", "player_report", "kvk_output", "final_stats", "post_import")
 CLAIM = "11111111-1111-4111-8111-111111111111"
-QUIET = (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock")
+QUIET = (0, "NoLock", "NoLock", "NoLock", "NoLock", "NoLock", "NoLock")
 
 
 def rows():

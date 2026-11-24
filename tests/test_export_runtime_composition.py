@@ -1555,6 +1555,19 @@ def installation_fixture(*, profile="authority"):
     metadata["foreign_keys"] = [
         dict(ObjectName="dbo.ExportResource", Disabled=0, Untrusted=0, ReferencedColumn="fixture")
     ]
+    for column in metadata["columns"]:
+        column.update(
+            dict.fromkeys(
+                (
+                    "DefaultName",
+                    "DefaultDefinition",
+                    "ComputedDefinition",
+                    "ComputedPersisted",
+                    "IdentitySeed",
+                    "IdentityIncrement",
+                )
+            )
+        )
     target = dict(
         ServerName="fixture-server",
         DatabaseName="fixture-db",
@@ -2269,13 +2282,9 @@ def test_installation_reader_is_explicit_parameterized_and_closes_every_connecti
     if failure == "visibility":
         observed["target"]["ViewDefinition"] = None
     monkeypatch.setattr(module, "one", lambda _: deepcopy(observed["target"]))
-    rowsets = iter(
-        [
-            observed["migrations"],
-            *(observed["metadata"][k] for k in module._METADATA_QUERIES),
-            observed["permissions"],
-        ]
-    )
+    from tests.fixed_catalogue_fixture import fixed_reader_rowsets
+
+    rowsets = iter(fixed_reader_rowsets(observed))
 
     def fetch(_cursor):
         if failure == "metadata" and cursor.execute.call_count == 4:
@@ -2288,7 +2297,20 @@ def test_installation_reader_is_explicit_parameterized_and_closes_every_connecti
             dal.installation_snapshot()
     else:
         assert dal.installation_snapshot() == observed
-        assert cursor.execute.call_count == 9
+        assert cursor.execute.call_count == 15
+        from services.catalogue_observation_query_dal import CATALOGUE_BATCH_QUERIES
+
+        index_calls = [
+            call.args
+            for call in cursor.execute.call_args_list
+            if "JOIN sys.indexes i" in call.args[0]
+        ]
+        assert index_calls == [
+            (
+                CATALOGUE_BATCH_QUERIES["metadata.indexes"],
+                json.dumps(sorted(module.INSTALLATION_OBJECTS)),
+            )
+        ]
     cursor.close.assert_called_once_with()
     connection.close.assert_called_once_with()
     connection.commit.assert_not_called()
@@ -2304,7 +2326,12 @@ def test_installation_reader_is_explicit_parameterized_and_closes_every_connecti
             )
         )
         if parameters:
-            assert len(parameters) == 1 and isinstance(json.loads(parameters[0]), list)
+            if "WHERE c.object_id IN (OBJECT_ID(?)" in query:
+                assert 1 <= len(parameters) <= 16
+                assert set(parameters) <= set(module.INSTALLATION_OBJECTS)
+                assert query.count("?") == len(parameters)
+            else:
+                assert len(parameters) == 1 and isinstance(json.loads(parameters[0]), list)
     if failure is None:
         query, scope = cursor.execute.call_args.args
         assert "c.name,'COLUMN'" in query

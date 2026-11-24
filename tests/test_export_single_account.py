@@ -475,7 +475,21 @@ def test_shared_client_requires_explicit_model_and_both_incarnations():
 
 
 @pytest.mark.parametrize(
-    "damage", [None, "old_version", "principal", "supervisor_sql", "manual_pair", "snapshot_off"]
+    "damage",
+    [
+        None,
+        "old_version",
+        "principal",
+        "supervisor_sql",
+        "manual_pair",
+        "snapshot_off",
+        "observer",
+        "observer_cursor_close",
+        "observer_connection_close",
+        "observer_snapshot_off",
+        "observer_mismatch",
+        "observer_deferred",
+    ],
 )
 def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     monkeypatch, tmp_path, damage
@@ -490,6 +504,27 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     from tests.test_export_runtime_composition import registration_fixture
 
     observed, sql = application_installation()
+    observer = isinstance(damage, str) and damage.startswith("observer")
+    if observer:
+        sql.update(version=4, database="ROK_TRACKER")
+        sql["migration_hashes"] = {
+            key: digest(key).hex() for key in dal.installation_migrations(sql)
+        }
+        observed["target"]["DatabaseName"] = sql["database"]
+        permissions = dal.installation_permissions("application", direct=True)
+        for column in observed["metadata"]["columns"]:
+            for permission in ("SELECT", "UPDATE"):
+                permissions[(column["ObjectName"], column["ColumnName"], permission)] = permissions[
+                    (column["ObjectName"], None, permission)
+                ]
+        observed["permissions"] = [
+            dict(ObjectName=n, ColumnName=c, PermissionName=p, Allowed=v)
+            for (n, c, p), v in permissions.items()
+        ]
+        observed["migrations"] = [
+            dict(MigrationId=k, ChecksumSha256=v, Status="Applied")
+            for k, v in sql["migration_hashes"].items()
+        ]
     target = {key: sql[key] for key in ("server", "database", "principal")}
     export = tmp_path / "export.json"
     export.write_text("[]")
@@ -513,6 +548,19 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
         export_config_file=str(export),
         export_config_sha256=hashlib.sha256(export.read_bytes()).hexdigest(),
     )
+    if observer:
+        from tests.test_observer_contract_selection import approved as observer_contract
+
+        application = observer_contract.__wrapped__()
+        application.update(target)
+        application["observation_installation"].update(target, login=target["principal"])
+        config["application_sql_contract"] = application
+        config["legacy_sql_contract"].update(
+            version=2,
+            phase1_installation=application["phase1_installation"],
+            d4_installation=application["d4_installation"],
+            observer_installation=application["observer_installation"],
+        )
     if damage == "manual_pair":
         from core.export_process_pair import bind_templates
         from tests.test_export_process_pair import pair_fixture
@@ -551,13 +599,42 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     monkeypatch.setattr(dal, "legacy_installation_snapshot", Mock())
     monkeypatch.setattr(dal, "application_installation_snapshot", Mock())
     connection = Mock()
+    connection.cursor.return_value.connection = connection
     connection.cursor.return_value.fetchone.return_value = (0 if damage == "snapshot_off" else 1,)
     connector = Mock(return_value=connection)
+    observer_connection = Mock()
+    observer_connection.cursor.return_value.connection = observer_connection
+    observer_connection.cursor.return_value.fetchone.return_value = (
+        0 if damage == "observer_snapshot_off" else 1,
+    )
+    if observer:
+        from core.sql_connection_custody import SqlCleanupUnknown, connection_retained
+        from services.catalogue_observation_dal import ObservationDeferred
+        from tests.test_observer_contract_selection import sample_proof
+
+        connector.side_effect = [connection, observer_connection]
+        if damage == "observer_cursor_close":
+            connection.cursor.return_value.close.side_effect = OSError("lost cursor close")
+        elif damage == "observer_connection_close":
+            connection.close.side_effect = OSError("lost connection close")
+        proof = sample_proof()
+
+        def collect(cursor, approved):
+            connection.close.assert_called_once()
+            assert cursor.connection is observer_connection
+            assert approved == config["application_sql_contract"]
+            if damage == "observer_deferred":
+                raise ObservationDeferred("observation_deadline")
+            if damage == "observer_mismatch":
+                raise SourceConflict("application differs")
+            return proof
+
+        monkeypatch.setattr(runtime, "application_snapshot_for_contract", collect)
     monkeypatch.setattr(admin, "configured_connection", connector)
     monkeypatch.setattr(
         dal,
         "ExportExecutionDAL",
-        lambda _: SimpleNamespace(installation_snapshot=lambda: observed),
+        lambda _: SimpleNamespace(installation_snapshot=lambda **kw: observed),
     )
     reply = dict(
         deployment_hash=config["authority"]["deployment_hash"],
@@ -571,6 +648,41 @@ def test_actual_bot_factory_binds_shared_profile_and_same_sql_contract(
     bundle_factory = Mock()
     monkeypatch.setattr(runtime, "ExportRuntime", bundle_factory)
     monkeypatch.setattr(store, "ExportSnapshotStore", Mock())
+    if observer:
+        if damage == "observer":
+            assert runtime._prepare_configured_runtime() is bundle_factory.return_value
+            runtime.verify_application_installation_contract.assert_called_once_with(
+                proof.value,
+                config["application_sql_contract"],
+                observation=proof,
+            )
+            client_factory.assert_called_once()
+        else:
+            expected = (
+                SqlCleanupUnknown
+                if damage in {"observer_cursor_close", "observer_connection_close"}
+                else (
+                    RuntimeError
+                    if damage == "observer_snapshot_off"
+                    else ObservationDeferred if damage == "observer_deferred" else SourceConflict
+                )
+            )
+            with pytest.raises(expected):
+                runtime._prepare_configured_runtime()
+            client_factory.assert_not_called()
+            bundle_factory.assert_not_called()
+        if damage in {"observer_cursor_close", "observer_connection_close"}:
+            assert connection_retained(connection)
+            assert connector.call_count == 1
+            if damage == "observer_cursor_close":
+                connection.close.assert_not_called()
+            runtime.verify_application_installation_contract.assert_not_called()
+        else:
+            assert connector.call_count == 2
+            connection.close.assert_called_once()
+            observer_connection.cursor.return_value.close.assert_called_once()
+            observer_connection.close.assert_called_once()
+        return
     if damage == "snapshot_off":
         with pytest.raises(RuntimeError, match="SNAPSHOT"):
             runtime._prepare_configured_runtime()

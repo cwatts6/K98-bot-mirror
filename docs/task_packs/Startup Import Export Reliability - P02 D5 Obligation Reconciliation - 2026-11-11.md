@@ -1,3 +1,7 @@
+> **Current handoff, 23 November 2026:** [Programme/P02 scope refresh and remaining work](P02%20-%20Scope%20Refresh%20and%20Remaining%20Work%20Handover%20-%202026-11-23.md) records the completed five-pair business comparison and fixed-reader timing follow-through. P02 remains open; D7 remains 1/4; all 68 requirements and 73 policy pairs retain their owners. The new chat starts with review and a finite remaining plan, then waits for the user to reconfirm before implementation or VM checks. Earlier pending/quota/design-only wording is historical; completed work and original failures must not be replayed.
+
+> **P02 offline design review, 19 November 2026:** [Observer/admission decision and qualification plan](P02%20-%20Observer%20Admission%20Design%20and%20Qualification%20-%202026-11-19.md) recommends coherently versioned observation with same-admission reuse, subject to complete SQL invalidation and real concurrent cost/progress gates. This is a reviewable proposal, not implementation or execution approval. D7 remains 1/4; E1 is closed and failed E2 is preserved. MINI_AMD stays running. The new traceability supplement retains all 68 requirement records and 73 policy pairs. Current operator policy removes cumulative local test quotas and shortfall gates: use a finite, evidence-led plan with realistic timeouts, reuse and bounded cleanup. Earlier quota ledgers are historical records only.
+
 # P02 D5 complete obligation reconciliation
 
 Latest checkpoint, 12 November 2026: **1,421 native seconds and 50 Windows-test

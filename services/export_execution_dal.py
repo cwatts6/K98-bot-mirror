@@ -585,12 +585,18 @@ APPLICATION_ACTIVATION_SCOPE_HASH = (
 )
 
 
-def application_activation_scope(*, phase1=False, d4=False):
+def application_activation_scope(*, phase1=False, d4=False, observer=False):
     from services.export_d4_contract import ACTIVATION_SCOPE_SHA256 as D4_SCOPE_SHA256
     from services.export_phase1_contract import ACTIVATION_SCOPE_SHA256
 
     if d4 and not phase1:
         raise SourceConflict("D4 activation scope requires its Phase 1 lineage.")
+    if observer:
+        from services.export_observer_contract import observer_activation_scope
+
+        if not d4 or not phase1:
+            raise SourceConflict("Observer scope requires its retained D4 lineage.")
+        return observer_activation_scope()
     resource = "p02_phase1_activation_scope.json" if phase1 else "s11_activation_scope.json"
     expected = ACTIVATION_SCOPE_SHA256 if phase1 else APPLICATION_ACTIVATION_SCOPE_HASH
     if d4:
@@ -707,16 +713,25 @@ LEGACY_SERVER_CAPABILITIES = (
 )
 
 
-def legacy_definition_hash(definition):
+def legacy_definition_hash(definition, *, definition_format=None):
     """Compare source bodies; exported signatures still require exact installed bytes."""
     if not isinstance(definition, str) or not definition.strip():
         raise SourceConflict("Visible legacy module definition required.")
-    canonical = definition.replace("\r\n", "\n").strip(" \t\r\n")
-    canonical = re.sub(r"^(?:ALTER|CREATE OR ALTER)\b", "CREATE", canonical)
+    if definition_format is None:
+        # Historical source contracts keep their original byte interpretation.
+        canonical = definition.replace("\r\n", "\n").strip(" \t\r\n")
+        canonical = re.sub(r"^(?:ALTER|CREATE OR ALTER)\b", "CREATE", canonical)
+    elif definition_format == "module_header_lf_body_exact_v1":
+        from services.catalogue_observation_dal import canonical_module
+
+        canonical = canonical_module(definition)
+    else:
+        raise SourceConflict("Unsupported reviewed module definition format.")
     return hashlib.sha256(canonical.encode("utf-16-le")).hexdigest()
 
 
 def validate_legacy_permission_source(source):
+    from services.export_observer_contract import LEGACY_SOURCE_SHA256 as OBSERVER_SOURCE_HASH
     from services.export_sql_direct_permissions import (
         D4_SOURCE_HASH,
         DIRECT_SOURCE_HASH,
@@ -724,7 +739,7 @@ def validate_legacy_permission_source(source):
     )
 
     expected = (
-        {DIRECT_SOURCE_HASH, PHASE1_SOURCE_HASH, D4_SOURCE_HASH}
+        {DIRECT_SOURCE_HASH, PHASE1_SOURCE_HASH, D4_SOURCE_HASH, OBSERVER_SOURCE_HASH}
         if isinstance(source, dict) and source.get("permission_model") == "direct_application_v1"
         else {LEGACY_PERMISSION_SOURCE_HASH}
     )
@@ -949,7 +964,8 @@ _APPLICATION_INDEX_METADATA = (
 
 
 # The large pinned application scope needs materialized membership for these
-# catalog joins too. Keep the fixed export contract and unscoped reader intact.
+# catalog joins too. Fixed readers reuse selected projections below; the
+# complete result contract and unscoped application reader stay intact.
 _APPLICATION_SCOPED_METADATA = {
     "indexes": _APPLICATION_INDEX_METADATA,
     "columns": _APPLICATION_INDEX_SCOPE
@@ -1042,7 +1058,116 @@ _APPLICATION_IDENTITY_QUERIES = {
 }
 
 
-def application_installation_snapshot(cursor, *, scope=None, metadata_format=None):
+def _application_rows(cursor, checkpoint):
+    result = rows(cursor)
+    if checkpoint is not None:
+        checkpoint()
+    return result
+
+
+def _application_scoped_rows(cursor, query, scope, checkpoint, category, observation_batches):
+    if not observation_batches:
+        cursor.execute(query, *((json.dumps(scope),) if scope is not None else ()))
+        return _application_rows(cursor, checkpoint)
+    from services.catalogue_observation_batch_dal import CatalogueBatchCursor
+    from services.catalogue_observation_batches import combine, scopes
+    from services.catalogue_observation_query_dal import (
+        CATALOGUE_BATCH_QUERIES,
+        IDENTITY_BATCH_QUERIES,
+    )
+
+    query = IDENTITY_BATCH_QUERIES.get(category, CATALOGUE_BATCH_QUERIES.get(category, query))
+    parts = scopes(scope, category, combined_boundaries=type(cursor) is CatalogueBatchCursor)
+    result = []
+    for part in parts:
+        if category == "metadata.columns":
+            from services.catalogue_observation_columns_dal import column_batch
+
+            result.extend(
+                column_batch(cursor, part, lambda actual: _application_rows(actual, checkpoint))
+            )
+        elif category == "identity.columns":
+            from services.catalogue_observation_columns_dal import identity_column_query
+
+            cursor.execute(identity_column_query(len(part)), *part)
+            result.extend(_application_rows(cursor, checkpoint))
+        else:
+            cursor.execute(query, json.dumps(part))
+            result.extend(_application_rows(cursor, checkpoint))
+    return combine(result, scope, category) if len(parts) > 1 else result
+
+
+def _application_target(cursor, checkpoint):
+    cursor.execute(
+        "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,"
+        "DB_NAME() AS DatabaseName,USER_NAME() AS Principal,"
+        "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','VIEW DEFINITION') AS ViewDefinition"
+    )
+    target = one(cursor)
+    if target is None or target["ViewDefinition"] != 1:
+        raise SourceConflict("Whole application metadata must be visible.")
+    if checkpoint is not None:
+        checkpoint()
+    return target
+
+
+def _application_permissions(cursor, scope, checkpoint, observation_batches=False):
+    result = {}
+    object_filter = (
+        "" if scope is None else " AND o.object_id IN (SELECT OBJECT_ID(value) FROM OPENJSON(?)) "
+    )
+    cursor.execute(
+        "SELECT s.name AS SchemaName,p.permission_name AS PermissionName,p.subentity_name AS Subentity "
+        "FROM sys.schemas s CROSS APPLY sys.fn_my_permissions(QUOTENAME(s.name),'SCHEMA') p "
+        "WHERE s.name NOT IN ('sys','INFORMATION_SCHEMA') "
+        "ORDER BY s.name COLLATE Latin1_General_100_BIN2,p.permission_name,p.subentity_name"
+    )
+    result["schema_permissions"] = _application_rows(cursor, checkpoint)
+    object_query = (
+        "SELECT SCHEMA_NAME(o.schema_id)+'.'+o.name AS ObjectName,"
+        "p.permission_name AS PermissionName,p.subentity_name AS Subentity "
+        "FROM sys.objects o CROSS APPLY sys.fn_my_permissions(QUOTENAME(SCHEMA_NAME(o.schema_id))+'.'+QUOTENAME(o.name),'OBJECT') p "
+        "WHERE o.is_ms_shipped=0 AND o.type IN ('U','V','P','FN','IF','TF') "
+        + object_filter
+        + "ORDER BY (SCHEMA_NAME(o.schema_id)+'.'+o.name) COLLATE Latin1_General_100_BIN2,p.permission_name,p.subentity_name"
+    )
+    result["object_permissions"] = _application_scoped_rows(
+        cursor, object_query, scope, checkpoint, "object_permissions", observation_batches
+    )
+    column_query = (
+        "SELECT SCHEMA_NAME(o.schema_id)+'.'+o.name AS ObjectName,c.name AS ColumnName,"
+        "p.PermissionName,HAS_PERMS_BY_NAME(QUOTENAME(SCHEMA_NAME(o.schema_id))+'.'+QUOTENAME(o.name),'OBJECT',p.PermissionName,c.name,'COLUMN') AS Allowed "
+        "FROM sys.objects o JOIN sys.columns c ON c.object_id=o.object_id "
+        "CROSS JOIN (VALUES ('SELECT'),('UPDATE'),('REFERENCES')) p(PermissionName) "
+        "WHERE o.is_ms_shipped=0 AND o.type IN ('U','V','IF','TF') "
+        + object_filter
+        + "ORDER BY (SCHEMA_NAME(o.schema_id)+'.'+o.name) COLLATE Latin1_General_100_BIN2,c.name COLLATE Latin1_General_100_BIN2,p.PermissionName"
+    )
+    result["column_permissions"] = _application_scoped_rows(
+        cursor, column_query, scope, checkpoint, "column_permissions", observation_batches
+    )
+    return result
+
+
+def application_authority_snapshot(
+    cursor, *, scope=None, checkpoint=None, observation_batches=False
+):
+    """Read fresh target/effective permissions; never reuse another session's authority."""
+    if type(observation_batches) is not bool:
+        raise SourceConflict("Explicit observation batching selection required.")
+    if observation_batches:
+        from services.catalogue_observation_batch_dal import CatalogueBatchCursor
+        from services.catalogue_observation_batches import validate_scope
+
+        validate_scope(scope, checkpoint, combined_boundaries=type(cursor) is CatalogueBatchCursor)
+    result = {"target": _application_target(cursor, checkpoint)}
+    result.update(_application_permissions(cursor, scope, checkpoint, observation_batches))
+    return result
+
+
+def application_installation_snapshot(
+    cursor, *, scope=None, metadata_format=None, checkpoint=None, observation_batches=False
+):
     """Read complete application metadata/permissions on the caller's session.
 
     No business query/procedure, transaction transition, DDL or data import runs.
@@ -1051,13 +1176,24 @@ def application_installation_snapshot(cursor, *, scope=None, metadata_format=Non
     included in that comparison and cannot disappear behind the fixed 30-object
     coordination contract or the 38-module signing contract.
     """
+    from services.application_observation_fingerprint import FORMAT as OBSERVER_FORMAT
     from services.export_execution_protocol import encode
+    from services.export_schema_fingerprint import FORMAT
 
+    if type(observation_batches) is not bool:
+        raise SourceConflict("Explicit observation batching selection required.")
+    if observation_batches:
+        from services.catalogue_observation_batch_dal import CatalogueBatchCursor
+        from services.catalogue_observation_batches import validate_scope
+
+        validate_scope(scope, checkpoint, combined_boundaries=type(cursor) is CatalogueBatchCursor)
+        if metadata_format not in (FORMAT, OBSERVER_FORMAT):
+            raise SourceConflict("Observer batching requires the complete portable fingerprint.")
     if metadata_format is not None:
-        from services.export_schema_fingerprint import FORMAT
-
-        if metadata_format != FORMAT or scope is None:
+        if metadata_format not in (FORMAT, OBSERVER_FORMAT) or scope is None:
             raise SourceConflict("Explicit supported fingerprint format and pinned scope required.")
+    if metadata_format == OBSERVER_FORMAT and not observation_batches:
+        raise SourceConflict("Observer metadata requires checkpointed observation batches.")
     result = {"version": 2 if metadata_format is not None else 1, "metadata": {}}
     required = (
         "SELECT object_id FROM sys.objects WHERE is_ms_shipped=0 "
@@ -1069,20 +1205,15 @@ def application_installation_snapshot(cursor, *, scope=None, metadata_format=Non
     object_filter = (
         "" if scope is None else " AND o.object_id IN (SELECT OBJECT_ID(value) FROM OPENJSON(?)) "
     )
-    cursor.execute(
-        "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,"
-        "DB_NAME() AS DatabaseName,USER_NAME() AS Principal,"
-        "HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','VIEW DEFINITION') AS ViewDefinition"
-    )
-    result["target"] = one(cursor)
-    if result["target"] is None or result["target"]["ViewDefinition"] != 1:
-        raise SourceConflict("Whole application metadata must be visible.")
+    result["target"] = _application_target(cursor, checkpoint)
     for name, query in _METADATA_QUERIES.items():
         if name in _APPLICATION_SCOPED_METADATA and scope is not None:
-            cursor.execute(_APPLICATION_SCOPED_METADATA[name].replace("@scope", "?"), *parameters)
+            statement = _APPLICATION_SCOPED_METADATA[name].replace("@scope", "?")
         else:
-            cursor.execute("WITH required AS (" + required + ") " + query, *parameters)
-        result["metadata"][name] = rows(cursor)
+            statement = "WITH required AS (" + required + ") " + query
+        result["metadata"][name] = _application_scoped_rows(
+            cursor, statement, scope, checkpoint, "metadata." + name, observation_batches
+        )
     cursor.execute(
         "SELECT SCHEMA_NAME(t.schema_id)+'.'+t.name AS TypeName,c.column_id AS Ordinal,"
         "c.name AS ColumnName,SCHEMA_NAME(st.schema_id)+'.'+st.name AS ColumnType,"
@@ -1098,8 +1229,8 @@ def application_installation_snapshot(cursor, *, scope=None, metadata_format=Non
         + "ORDER BY (SCHEMA_NAME(t.schema_id)+'.'+t.name) COLLATE Latin1_General_100_BIN2,c.column_id",
         *parameters,
     )
-    result["metadata"]["table_types"] = rows(cursor)
-    cursor.execute(
+    result["metadata"]["table_types"] = _application_rows(cursor, checkpoint)
+    dependency_query = (
         "SELECT OBJECT_SCHEMA_NAME(d.referencing_id)+'.'+OBJECT_NAME(d.referencing_id) AS ObjectName,"
         "d.referencing_minor_id AS MinorID,d.referenced_server_name AS ServerName,"
         "d.referenced_database_name AS DatabaseName,d.referenced_schema_name AS SchemaName,"
@@ -1109,55 +1240,40 @@ def application_installation_snapshot(cursor, *, scope=None, metadata_format=Non
         "JOIN sys.objects o ON o.object_id=d.referencing_id WHERE o.is_ms_shipped=0 "
         + object_filter
         + "ORDER BY (OBJECT_SCHEMA_NAME(d.referencing_id)+'.'+OBJECT_NAME(d.referencing_id)) COLLATE Latin1_General_100_BIN2,MinorID,ServerName,DatabaseName,"
-        "SchemaName,EntityName,ReferencedMinorID",
-        *parameters,
+        "SchemaName,EntityName,ReferencedMinorID"
     )
-    result["metadata"]["dependencies"] = rows(cursor)
+    result["metadata"]["dependencies"] = _application_scoped_rows(
+        cursor,
+        dependency_query,
+        scope,
+        checkpoint,
+        "metadata.dependencies",
+        observation_batches,
+    )
     cursor.execute(
         "SELECT SCHEMA_NAME(schema_id)+'.'+name AS ObjectName,base_object_name AS Target "
         "FROM sys.synonyms ORDER BY (SCHEMA_NAME(schema_id)+'.'+name) COLLATE Latin1_General_100_BIN2"
     )
-    result["metadata"]["synonyms"] = rows(cursor)
+    result["metadata"]["synonyms"] = _application_rows(cursor, checkpoint)
     cursor.execute(
         "SELECT t.name AS TriggerName,t.is_disabled AS Disabled,m.definition AS ModuleDefinition,"
         "m.execute_as_principal_id AS ExecuteAsPrincipal FROM sys.triggers t "
         "LEFT JOIN sys.sql_modules m ON m.object_id=t.object_id WHERE t.parent_class=0 "
         "ORDER BY t.name COLLATE Latin1_General_100_BIN2"
     )
-    result["metadata"]["database_triggers"] = rows(cursor)
-    cursor.execute(
-        "SELECT s.name AS SchemaName,p.permission_name AS PermissionName,p.subentity_name AS Subentity "
-        "FROM sys.schemas s CROSS APPLY sys.fn_my_permissions(QUOTENAME(s.name),'SCHEMA') p "
-        "WHERE s.name NOT IN ('sys','INFORMATION_SCHEMA') "
-        "ORDER BY s.name COLLATE Latin1_General_100_BIN2,p.permission_name,p.subentity_name"
-    )
-    result["schema_permissions"] = rows(cursor)
-    cursor.execute(
-        "SELECT SCHEMA_NAME(o.schema_id)+'.'+o.name AS ObjectName,"
-        "p.permission_name AS PermissionName,p.subentity_name AS Subentity "
-        "FROM sys.objects o CROSS APPLY sys.fn_my_permissions(QUOTENAME(SCHEMA_NAME(o.schema_id))+'.'+QUOTENAME(o.name),'OBJECT') p "
-        "WHERE o.is_ms_shipped=0 AND o.type IN ('U','V','P','FN','IF','TF') "
-        + object_filter
-        + "ORDER BY (SCHEMA_NAME(o.schema_id)+'.'+o.name) COLLATE Latin1_General_100_BIN2,p.permission_name,p.subentity_name",
-        *parameters,
-    )
-    result["object_permissions"] = rows(cursor)
-    cursor.execute(
-        "SELECT SCHEMA_NAME(o.schema_id)+'.'+o.name AS ObjectName,c.name AS ColumnName,"
-        "p.PermissionName,HAS_PERMS_BY_NAME(QUOTENAME(SCHEMA_NAME(o.schema_id))+'.'+QUOTENAME(o.name),'OBJECT',p.PermissionName,c.name,'COLUMN') AS Allowed "
-        "FROM sys.objects o JOIN sys.columns c ON c.object_id=o.object_id "
-        "CROSS JOIN (VALUES ('SELECT'),('UPDATE'),('REFERENCES')) p(PermissionName) "
-        "WHERE o.is_ms_shipped=0 AND o.type IN ('U','V','IF','TF') "
-        + object_filter
-        + "ORDER BY (SCHEMA_NAME(o.schema_id)+'.'+o.name) COLLATE Latin1_General_100_BIN2,c.name COLLATE Latin1_General_100_BIN2,p.PermissionName",
-        *parameters,
-    )
-    result["column_permissions"] = rows(cursor)
+    result["metadata"]["database_triggers"] = _application_rows(cursor, checkpoint)
+    result.update(_application_permissions(cursor, scope, checkpoint, observation_batches))
     if metadata_format is not None:
         result["schema_identity"] = {}
         for name, query in _APPLICATION_IDENTITY_QUERIES.items():
-            cursor.execute(query.replace("@scope", "?"), json.dumps(scope))
-            result["schema_identity"][name] = rows(cursor)
+            result["schema_identity"][name] = _application_scoped_rows(
+                cursor,
+                query.replace("@scope", "?"),
+                scope,
+                checkpoint,
+                "identity." + name,
+                observation_batches,
+            )
     encode(result)
     return result
 
@@ -1208,13 +1324,33 @@ class ExportExecutionDAL:
                 )
                 migrations = rows(cursor)
                 metadata = {}
+                scope = sorted(INSTALLATION_OBJECTS)
                 for name, query in _METADATA_QUERIES.items():
-                    cursor.execute(
-                        "WITH required AS (SELECT OBJECT_ID(value) AS object_id FROM OPENJSON(?)) "
-                        + query,
-                        json.dumps(sorted(INSTALLATION_OBJECTS)),
-                    )
-                    metadata[name] = rows(cursor)
+                    if name == "columns":
+                        from services.catalogue_observation_batches import combine
+                        from services.catalogue_observation_columns_dal import column_batch
+
+                        metadata[name] = combine(column_batch(cursor, scope, rows), scope, name)
+                    else:
+                        if name == "indexes":
+                            from services.catalogue_observation_query_dal import (
+                                CATALOGUE_BATCH_QUERIES,
+                            )
+
+                            # The same complete projection already serves the bounded
+                            # application observer. Reuse its scope-first index read.
+                            statement = CATALOGUE_BATCH_QUERIES["metadata.indexes"]
+                        elif name == "foreign_keys":
+                            # Forced join order regressed foreign keys; retain the
+                            # separately qualified unhinted projection.
+                            statement = _APPLICATION_SCOPED_METADATA[name].replace("@scope", "?")
+                        else:
+                            statement = (
+                                "WITH required AS (SELECT OBJECT_ID(value) AS object_id FROM OPENJSON(?)) "
+                                + query
+                            )
+                        cursor.execute(statement, json.dumps(scope))
+                        metadata[name] = rows(cursor)
                 cursor.execute(
                     "WITH permission_scope AS (SELECT ObjectName,PermissionName "
                     "FROM OPENJSON(?) WITH (ObjectName nvarchar(256) '$.object',PermissionName nvarchar(128) '$.permission')) "

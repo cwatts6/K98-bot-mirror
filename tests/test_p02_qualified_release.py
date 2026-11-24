@@ -12,6 +12,7 @@ from tests.test_p02_maintenance_update import (
     bot,  # noqa: F401
     test_complete_source_seed_start_readiness_packet_never_replays_sql as complete_packet,
 )
+from tests.updater_source_assertions import before_observer_hash
 
 ROOT = Path(__file__).resolve().parents[1]
 BASES = ("729ece15c2dd665906525a4a457667d53516e805", "7491c71a945f6f961a3ca5a25698668ef8f19cfc")
@@ -43,9 +44,18 @@ def authenticated_admission_successor(monkeypatch):
         for successor in successors
     ]
     original = updater.sha256
+    # Authenticate exact local successor bytes before bridging to retained history.
+    # Runtime registry entries and their immutable expected hashes are unchanged.
+    observer_pairs = {
+        original(
+            (ROOT / member["path"]).read_bytes().replace(b"\r\n", b"\n")
+        ): before_observer_hash(ROOT, member["path"])
+        for member in family()["members"]
+    }
 
     def historical_hash(raw):
-        value = original(raw)
+        value = original(raw.replace(b"\r\n", b"\n"))
+        value = observer_pairs.get(value, value)
         for mapping in pairs:
             value = mapping.get(value, value)
         return value

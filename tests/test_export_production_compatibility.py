@@ -38,6 +38,16 @@ def source_definition(raw):
     return re.sub(r"^(?:ALTER|CREATE OR ALTER)\b", "CREATE", source)
 
 
+def historical_reference_bytes(raw, expected_sha256, newline, label):
+    """Recover only the pinned LF/CRLF transport of a test-only source reference."""
+    lf = raw.replace(b"\r\n", b"\n")
+    uniform = b"\r" not in lf and (b"\r\n" not in raw or b"\n" not in raw.replace(b"\r\n", b""))
+    assert uniform, label
+    pinned = lf if newline == b"\n" else lf.replace(b"\n", b"\r\n")
+    assert hashlib.sha256(pinned).hexdigest() == expected_sha256, label
+    return pinned
+
+
 def historical_source_bytes(module, raw, outcome_source):
     """Check the exact forward image before undoing only reviewed amendments.
 
@@ -139,10 +149,12 @@ def historical_source_bytes(module, raw, outcome_source):
     names_predecessor = False
     names_path = SQL_ROOT / "qualification/p02_report_names/reviewed_sources.json"
     if names_path.is_file():
-        names_bytes = names_path.read_bytes()
-        assert hashlib.sha256(names_bytes).hexdigest() == (
-            "fef6497466e14efbef05b72db19cb86530768dea0bfeff6cf9439d6205fc3934"
-        ), "Shared names historical reference drift"
+        names_bytes = historical_reference_bytes(
+            names_path.read_bytes(),
+            "fef6497466e14efbef05b72db19cb86530768dea0bfeff6cf9439d6205fc3934",
+            b"\n",
+            "Shared names historical reference drift",
+        )
         names = json.loads(names_bytes)
         entry = names.get(Path(module["path"]).name)
         if entry is not None:
@@ -175,10 +187,12 @@ def historical_source_bytes(module, raw, outcome_source):
                 raw = matches[0]
     reference_path = SQL_ROOT / "qualification/p02_phase1/released_sources.json"
     if reference_path.is_file():
-        reference_bytes = reference_path.read_bytes()
-        assert hashlib.sha256(reference_bytes).hexdigest() == (
-            "b159bf7f836c739a3def745c136c78f9ffbcae427d04414c710fdbcda2fdb4a2"
-        ), "Phase 1 historical reference drift"
+        reference_bytes = historical_reference_bytes(
+            reference_path.read_bytes(),
+            "b159bf7f836c739a3def745c136c78f9ffbcae427d04414c710fdbcda2fdb4a2",
+            b"\r\n",
+            "Phase 1 historical reference drift",
+        )
         references = {m["name"]: m for m in json.loads(reference_bytes)["modules"]}
         if name in references:
             reference = references[name]
@@ -627,3 +641,58 @@ def test_d3_historical_bridge_refuses_successor_drift(permission_sources, name):
     raw = (SQL_ROOT / module["path"]).read_bytes()
     with pytest.raises(AssertionError, match=r"D3 .* source drift"):
         historical_source_bytes(module, raw + b"-- unreviewed\n", outcome)
+
+
+@pytest.mark.parametrize("names_newline", [b"\n", b"\r\n"], ids=["names-lf", "names-crlf"])
+@pytest.mark.parametrize("phase1_newline", [b"\n", b"\r\n"], ids=["phase1-lf", "phase1-crlf"])
+def test_historical_reference_transports_keep_exact_source_pin(
+    permission_sources, monkeypatch, names_newline, phase1_newline
+):
+    manifest, outcome = permission_sources
+    module = next(m for m in manifest["modules"] if m["name"] == "dbo.POWERSUMMARY_PROC")
+    raw = (SQL_ROOT / module["path"]).read_bytes()
+    paths = {
+        SQL_ROOT / "qualification/p02_report_names/reviewed_sources.json": names_newline,
+        SQL_ROOT / "qualification/p02_phase1/released_sources.json": phase1_newline,
+    }
+    original = Path.read_bytes
+
+    def read(path):
+        value = original(path)
+        if path in paths:
+            return value.replace(b"\r\n", b"\n").replace(b"\n", paths[path])
+        return value
+
+    monkeypatch.setattr(Path, "read_bytes", read)
+    historical = historical_source_bytes(module, raw, outcome)
+    assert hashlib.sha256(historical).hexdigest() == module["source_sha256"]
+
+
+@pytest.mark.parametrize(
+    "path,pin,newline",
+    [
+        (
+            "qualification/p02_report_names/reviewed_sources.json",
+            "fef6497466e14efbef05b72db19cb86530768dea0bfeff6cf9439d6205fc3934",
+            b"\n",
+        ),
+        (
+            "qualification/p02_phase1/released_sources.json",
+            "b159bf7f836c739a3def745c136c78f9ffbcae427d04414c710fdbcda2fdb4a2",
+            b"\r\n",
+        ),
+    ],
+)
+@pytest.mark.parametrize("change", ["extra-space", "bom", "mixed-newlines", "lone-cr"])
+def test_historical_reference_transport_does_not_accept_other_bytes(
+    permission_sources, path, pin, newline, change
+):
+    raw = (SQL_ROOT / path).read_bytes().replace(b"\r\n", b"\n")
+    changed = {
+        "extra-space": raw + b" ",
+        "bom": b"\xef\xbb\xbf" + raw,
+        "mixed-newlines": raw.replace(b"\n", b"\r\n", 1),
+        "lone-cr": raw.replace(b"\n", b"\r", 1),
+    }[change]
+    with pytest.raises(AssertionError, match="reference drift"):
+        historical_reference_bytes(changed, pin, newline, "reference drift")

@@ -396,7 +396,10 @@ class ExportRuntime(RuntimeLifetime):
         super().__init__(legacy)
         self.reconciler = AuthorityReconciler(client)
         from services.export_recovery_dal import ExportRecoveryDAL
-        from services.export_recovery_service import ExportRecoveryAdapter, RolloverRecoveryAdapter
+        from services.export_recovery_service import (
+            ExportRecoveryAdapter,
+            RolloverRecoveryAdapter,
+        )
 
         recovery_discovery = ExportRecoveryDAL(connect, registration=registration)
         budget = lambda account: RequestBudget(self.dal, account)
@@ -956,6 +959,13 @@ def _prepare_configured_runtime():
     validate_installation_contract(config["sql_contract"])
     validate_legacy_installation_contract(config["legacy_sql_contract"])
     validate_application_installation_contract(config["application_sql_contract"])
+    from services.export_observer_contract import require_observer_contract_pair
+
+    require_observer_contract_pair(
+        config["sql_contract"],
+        config["legacy_sql_contract"],
+        config["application_sql_contract"],
+    )
     if (config["sql_contract"]["version"] == 4) != (config["legacy_sql_contract"]["version"] == 2):
         raise SourceConflict("Direct legacy and fixed SQL permission models must agree.")
     if config["sql_contract"]["profile"] != ("application" if shared else "reader") or any(
@@ -1009,36 +1019,42 @@ def _prepare_configured_runtime():
         ),
         config["sql_contract"],
     )
+    from services.export_observer_contract import observer_contract
+
+    successor_observer = observer_contract(config["application_sql_contract"])
     stage("legacy_sql_contract")
-    connection = connection_factory()
-    try:
-        connection.autocommit = True
-        cursor = connection.cursor()
-        try:
-            verify_legacy_installation_contract(
-                legacy_installation_snapshot(cursor, config["legacy_sql_contract"]["source"]),
-                config["legacy_sql_contract"],
-                profile=config["sql_contract"]["profile"],
-            )
+    from services.application_observation_schedule import read_owned_observation
+
+    def read_legacy(cursor):
+        verify_legacy_installation_contract(
+            legacy_installation_snapshot(cursor, config["legacy_sql_contract"]["source"]),
+            config["legacy_sql_contract"],
+            profile=config["sql_contract"]["profile"],
+        )
+        if not successor_observer:
             stage("application_sql_contract")
-            verify_application_installation_contract(
-                application_snapshot_for_contract(cursor, config["application_sql_contract"]),
-                config["application_sql_contract"],
-            )
+            verify_application_cursor(cursor, config["application_sql_contract"])
             from core.recovery_sql_snapshot import require_recovery_snapshot_isolation
 
             stage("recovery_isolation")
             require_recovery_snapshot_isolation(cursor)
-        finally:
-            from core.sql_connection_custody import connection_retained
 
-            if not connection_retained(connection):
-                cursor.close()
-    finally:
-        from core.sql_connection_custody import connection_retained
+    read_owned_observation(connection_factory, read_legacy)
+    if successor_observer:
+        from services.application_observation_schedule import observe_application
 
-        if not connection_retained(connection):
-            connection.close()
+        def recovery_prerequisite(cursor):
+            from core.recovery_sql_snapshot import require_recovery_snapshot_isolation
+
+            stage("recovery_isolation")
+            require_recovery_snapshot_isolation(cursor)
+
+        stage("application_sql_contract")
+        observe_application(
+            connection_factory,
+            config["application_sql_contract"],
+            after_read=recovery_prerequisite,
+        )
     stage("authority_ready")
     client = AuthorityClient(
         **{k: authority[k] for k in ("pipe_id", "authority_sid", "bot_sid", "deployment_hash")},
@@ -1623,12 +1639,19 @@ def verify_installation_contract(observed, approved):
 
 
 def validate_application_installation_contract(approved):
+    from services.application_observation_fingerprint import FORMAT as OBSERVER_FORMAT
     from services.export_d4_contract import (
         ACTIVATION_SCOPE_SHA256 as D4_SCOPE_SHA256,
         APPLICATION_SOURCE_SHA256 as D4_SOURCE_SHA256,
         d4_contract,
     )
     from services.export_execution_dal import APPLICATION_SCHEMA_SOURCE_HASH
+    from services.export_observer_contract import (
+        ACTIVATION_SCOPE_SHA256 as OBSERVER_SCOPE_SHA256,
+        APPLICATION_SOURCE_SHA256 as OBSERVER_SOURCE_SHA256,
+        observation_installation,
+        observer_contract,
+    )
     from services.export_phase1_contract import (
         ACTIVATION_SCOPE_SHA256,
         APPLICATION_SOURCE_SHA256,
@@ -1637,6 +1660,7 @@ def validate_application_installation_contract(approved):
 
     phase1 = phase1_contract(approved)
     d4 = d4_contract(approved)
+    observer = observer_contract(approved)
 
     fields = {
         "version",
@@ -1655,6 +1679,11 @@ def validate_application_installation_contract(approved):
             raise SourceConflict("Phase 1 requires the portable application schema contract.")
     if d4:
         fields.add("d4_installation")
+    if observer:
+        fields.update(("observer_installation", "observation_installation"))
+        if approved.get("version") != 3 or "maintenance_policy" not in approved:
+            raise SourceConflict("Observer requires the complete portable lifecycle contract.")
+        observation_installation(approved)
     if isinstance(approved, dict) and "maintenance_policy" in approved:
         fields.add("maintenance_policy")
     if isinstance(approved, dict) and approved.get("version") in (2, 3):
@@ -1664,13 +1693,15 @@ def validate_application_installation_contract(approved):
         expected_scope = ACTIVATION_SCOPE_SHA256 if phase1 else APPLICATION_ACTIVATION_SCOPE_HASH
         if d4:
             expected_scope = D4_SCOPE_SHA256
+        if observer:
+            expected_scope = OBSERVER_SCOPE_SHA256
         if approved.get("scope_hash") != expected_scope:
             raise SourceConflict("Exact reviewed S11 activation dependency scope required.")
     if isinstance(approved, dict) and approved.get("version") == 3:
         from services.export_schema_fingerprint import FORMAT
 
         fields.add("fingerprint_format")
-        if approved.get("fingerprint_format") != FORMAT:
+        if approved.get("fingerprint_format") != (OBSERVER_FORMAT if observer else FORMAT):
             raise SourceConflict("Exact supported application fingerprint format required.")
     if (
         not isinstance(approved, dict)
@@ -1689,9 +1720,13 @@ def validate_application_installation_contract(approved):
         or not isinstance(approved["sources"], list)
         or digest(approved["sources"]).hex()
         != (
-            D4_SOURCE_SHA256
-            if d4
-            else APPLICATION_SOURCE_SHA256 if phase1 else APPLICATION_SCHEMA_SOURCE_HASH
+            OBSERVER_SOURCE_SHA256
+            if observer
+            else (
+                D4_SOURCE_SHA256
+                if d4
+                else APPLICATION_SOURCE_SHA256 if phase1 else APPLICATION_SCHEMA_SOURCE_HASH
+            )
         )
     ):
         raise SourceConflict("Complete independently reviewed application SQL contract required.")
@@ -1699,7 +1734,7 @@ def validate_application_installation_contract(approved):
     if approved["version"] in (2, 3):
         from services.export_execution_dal import application_activation_scope
 
-        if not set(application_activation_scope(phase1=phase1, d4=d4)) <= {
+        if not set(application_activation_scope(phase1=phase1, d4=d4, observer=observer)) <= {
             s["name"] for s in approved["sources"]
         }:
             raise SourceConflict("Activation dependency scope is outside reviewed SQL sources.")
@@ -1740,9 +1775,14 @@ def application_contract_scope(approved):
         return None
     from services.export_d4_contract import d4_contract
     from services.export_execution_dal import application_activation_scope
+    from services.export_observer_contract import observer_contract
     from services.export_phase1_contract import phase1_contract
 
-    scope = application_activation_scope(phase1=phase1_contract(approved), d4=d4_contract(approved))
+    scope = application_activation_scope(
+        phase1=phase1_contract(approved),
+        d4=d4_contract(approved),
+        observer=observer_contract(approved),
+    )
     if any(not set(row["producer_modules"]) <= set(scope) for row in approved["dynamic_objects"]):
         raise SourceConflict("Dynamic producers must belong to the activation dependency scope.")
     return sorted(scope + [row["name"] for row in approved["dynamic_objects"]])
@@ -1752,6 +1792,27 @@ def application_snapshot_for_contract(cursor, approved):
     from services.export_execution_dal import application_installation_snapshot
 
     scope = application_contract_scope(approved)
+    from services.export_observer_contract import observation_installation, observer_contract
+
+    if observer_contract(approved):
+        from services.application_maintenance_dal import coherent_maintenance_snapshot
+        from services.catalogue_observation_batch_dal import CatalogueBatchCursor
+
+        installation = observation_installation(approved)
+        batched = CatalogueBatchCursor(cursor)
+        return coherent_maintenance_snapshot(
+            batched,
+            approved,
+            dict(installation.modules),
+            lambda checkpoint: application_installation_snapshot(
+                batched,
+                scope=scope,
+                metadata_format=approved["fingerprint_format"],
+                checkpoint=checkpoint,
+                observation_batches=True,
+            ),
+            installation=installation,
+        )
     if scope is None:
         return application_installation_snapshot(cursor)
     if approved["version"] == 3:
@@ -1771,9 +1832,60 @@ def application_snapshot_for_contract(cursor, approved):
     return application_installation_snapshot(cursor, scope=scope)
 
 
-def verify_application_installation_contract(observed, approved):
+def verify_application_cursor(cursor, approved):
+    """Collect and compare once; return the complete raw value for existing receipts."""
+    from services.catalogue_observation_dal import CoherentObservation
+    from services.export_observer_contract import observer_contract
+
+    if observer_contract(approved):
+        from services.application_observation_schedule import ObservationRequest, observation_lane
+
+        request = ObservationRequest()
+        # Capture recovery borrows a business cursor and cannot wait or reconnect
+        # beneath that owner's transaction/guards. It receives a truthful pending
+        # result if another full read is active; no operation is replayed.
+        with observation_lane.enter(request, wait=False), request.collection():
+            result = application_snapshot_for_contract(request.cursor(cursor), approved)
+            if type(result) is not CoherentObservation:
+                raise SourceConflict("Complete coherent application observation required.")
+            verify_application_installation_contract(result.value, approved, observation=result)
+            return result.value
+    result = application_snapshot_for_contract(cursor, approved)
+    verify_application_installation_contract(result, approved)
+    return result
+
+
+def verify_application_installation_contract(observed, approved, *, observation=None):
     """Check whole schema, UDTs, dependencies and effective permissions separately."""
     from services.export_execution_dal import INSTALLATION_METADATA
+    from services.export_observer_contract import observation_installation, observer_contract
+
+    observation_guard = "exclusive_schema_observation"
+    if observer_contract(approved) and observation is None:
+        raise SourceConflict("Observer successor requires its complete coherent proof.")
+    if observation is not None:
+        from services.catalogue_observation_dal import CoherentObservation, ObservationBoundary
+
+        if (
+            not isinstance(observation, CoherentObservation)
+            or not isinstance(observation.boundary, ObservationBoundary)
+            or len(observation.boundary.identity) != 12
+            or observation.value is not observed
+            or observation.guard != "catalogue_generation_v1"
+            or "maintenance_policy" not in approved
+        ):
+            raise SourceConflict("Exact coherent application observation required.")
+        identity = observation.boundary.identity
+        target = observed.get("target", {}) if isinstance(observed, dict) else {}
+        if not isinstance(target, dict) or tuple(
+            target.get(key) for key in ("ServerName", "DatabaseName", "Principal")
+        ) != (identity[0], identity[1], identity[3]):
+            raise SourceConflict("Coherent observation target differs from its metadata.")
+        observation_guard = observation.guard
+        if observer_contract(approved):
+            observation_installation(approved).require_boundary(
+                identity, observation.boundary.generation
+            )
 
     validate_application_installation_contract(approved)
     scope = application_contract_scope(approved)
@@ -1808,7 +1920,13 @@ def verify_application_installation_contract(observed, approved):
     if (
         not isinstance(metadata, dict)
         or set(metadata)
-        != {*INSTALLATION_METADATA, "table_types", "dependencies", "synonyms", "database_triggers"}
+        != {
+            *INSTALLATION_METADATA,
+            "table_types",
+            "dependencies",
+            "synonyms",
+            "database_triggers",
+        }
         or any(not isinstance(v, list) for v in metadata.values())
     ):
         raise SourceConflict("Whole application metadata categories are incomplete.")
@@ -1822,7 +1940,9 @@ def verify_application_installation_contract(observed, approved):
             if "maintenance_policy" in approved:
                 from services.application_maintenance_contract import lifecycle_fingerprint
 
-                metadata_hash = lifecycle_fingerprint(observed, approved)
+                metadata_hash = lifecycle_fingerprint(
+                    observed, approved, observation_guard=observation_guard
+                )
             else:
                 metadata_hash = application_metadata_fingerprint(
                     metadata, observed["schema_identity"]
@@ -2055,7 +2175,9 @@ def verify_legacy_installation_contract(observed, approved, *, profile="reader")
         raise SourceConflict("Missing, extra, changed or invalid legacy module signature.")
     expected_certs = []
     for name, pin in approved["certificate_pins"].items():
-        for database in ["ROK_TRACKER", "master"] if name == "S11LegacyImport" else ["ROK_TRACKER"]:
+        for database in (
+            ["ROK_TRACKER", "master"] if name == "S11LegacyImport" else ["ROK_TRACKER"]
+        ):
             expected_certs.append(
                 dict(
                     DatabaseName=database,
@@ -2067,7 +2189,8 @@ def verify_legacy_installation_contract(observed, approved, *, profile="reader")
                 )
             )
     if not exact_rows(
-        observed["certificates"], [c for c in expected_certs if c["DatabaseName"] == "ROK_TRACKER"]
+        observed["certificates"],
+        [c for c in expected_certs if c["DatabaseName"] == "ROK_TRACKER"],
     ) or not exact_rows(
         observed["master_certificates"],
         [c for c in expected_certs if c["DatabaseName"] == "master"],
@@ -2710,7 +2833,10 @@ class AuthorityClient:
         if self.process_bindings is not None:
             import os
 
-            from core.export_process_identity import authenticate_process_peer, open_pinned_process
+            from core.export_process_identity import (
+                authenticate_process_peer,
+                open_pinned_process,
+            )
 
             own = open_pinned_process(os.getpid(), self.process_bindings["bot"])
             own.Close()
@@ -2734,7 +2860,10 @@ class AuthorityClient:
             pipe.send(message)
             reply = pipe.receive()
             if self.process_bindings is not None:
-                from core.export_process_identity import process_snapshot, verify_process_snapshot
+                from core.export_process_identity import (
+                    process_snapshot,
+                    verify_process_snapshot,
+                )
 
                 verify_process_snapshot(
                     process_snapshot(server), self.process_bindings["authority"]
@@ -2763,7 +2892,8 @@ class AuthorityClient:
     def execute(self, message):
         request = ProviderRequest.parse(message)
         result = self._wait_execution(
-            dict(version=1, action="execute_start", request=request.message()), request.request_id
+            dict(version=1, action="execute_start", request=request.message()),
+            request.request_id,
         )
         if (
             not isinstance(result, dict)
@@ -3027,7 +3157,11 @@ class AuthorityClient:
 
     def apply_configuration_recovery(self, preparation_id, token, actor, reason):
         return self._configuration_recovery(
-            "apply_configuration_recovery", preparation_id, token=token, actor=actor, reason=reason
+            "apply_configuration_recovery",
+            preparation_id,
+            token=token,
+            actor=actor,
+            reason=reason,
         )
 
     def contain_configuration_recovery(self, preparation_id, token, actor, reason):
@@ -3047,7 +3181,14 @@ class AuthorityClient:
         if (
             not isinstance(result, dict)
             or set(result)
-            != {"preparation_id", "token", "outcome", "eligible", "settled_token", "explanation"}
+            != {
+                "preparation_id",
+                "token",
+                "outcome",
+                "eligible",
+                "settled_token",
+                "explanation",
+            }
             or result["preparation_id"] != preparation_id
             or not isinstance(result["token"], str)
             or re.fullmatch(r"[0-9a-f]{64}", result["token"]) is None
@@ -3096,7 +3237,12 @@ class AuthorityClient:
             current_attempt_id=current_attempt_id,
             old_attempt_id=old_attempt_id,
         )
-        if kind in {"publication", "retirement_recovery", "rollover_drain", "rollover_complete"}:
+        if kind in {
+            "publication",
+            "retirement_recovery",
+            "rollover_drain",
+            "rollover_complete",
+        }:
             from time import sleep
 
             request_id = str(uuid4())

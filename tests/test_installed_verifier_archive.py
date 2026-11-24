@@ -195,6 +195,13 @@ for member in v['CONTRACT_ARCHIVE_MEMBERS']:
   name=member[:-3].replace('/','.').removesuffix('.__init__')
   module=importlib.import_module(name)
   assert module.__file__.startswith(sys.argv[2]), name
+from services.catalogue_observation_contract import reviewed_protocol_modules
+from services.catalogue_observation_dal import MODULES
+from services.export_execution_dal import legacy_definition_hash
+protocol=reviewed_protocol_modules()
+assert set(protocol)==MODULES
+assert all(legacy_definition_hash(body,definition_format='module_header_lf_body_exact_v1')
+           for body in protocol.values())
 import core.export_release_seed as seed
 import core.export_sql_connection as sql
 assert pathlib.Path(seed.__file__)==root/'core/export_release_seed.py'
@@ -220,6 +227,35 @@ else:raise AssertionError('unexpected package fallback')
         path,
         sha(archive),
         application,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_observer_resource_cannot_be_replaced_by_matching_outer_archive_hash(tmp_path, archive):
+    with zipfile.ZipFile(io.BytesIO(archive)) as zipped:
+        members = {name: zipped.read(name) for name in zipped.namelist()}
+    resource = "deploy/p02_observer_protocol.json"
+    source = json.loads(members[resource])
+    source["modules"][0]["definition"] += "\n-- unreviewed"
+    members[resource] = json.dumps(source).encode()
+    raw = verifier._archive_bytes(members)
+    path = tmp_path / verifier.CONTRACT_ARCHIVE
+    path.write_bytes(raw)
+    # A valid loose source resource in ROOT must not rescue the changed bundle.
+    result = isolated(
+        """
+import runpy,sys
+v=runpy.run_path(sys.argv[1]);v['activate_contract_archive'](sys.argv[2],sys.argv[3],sys.argv[4])
+from services.catalogue_observation_contract import reviewed_protocol_modules
+from services.catalogue_observation_dal import ObservationContractError
+try:reviewed_protocol_modules()
+except ObservationContractError:pass
+else:raise AssertionError('Unreviewed resource admitted')
+""",
+        ROOT / "scripts/verify_k98_update_pair.py",
+        path,
+        sha(raw),
+        ROOT,
     )
     assert result.returncode == 0, result.stderr
 

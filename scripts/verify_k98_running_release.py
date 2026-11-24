@@ -55,6 +55,13 @@ class ObservationConnections:
         self.observations = []
         self.first_failure = None
 
+    def observation_request(self):
+        """Share this owner's original deadline with any quiet-state waits."""
+        from services.application_observation_schedule import ObservationRequest
+
+        self.check()
+        return ObservationRequest(clock=self.clock, deadline=self.deadline)
+
     def observation_phase(self, phase):
         if phase not in {"export", "legacy", "application", "sessions", "retained_work"}:
             raise ValueError("Unknown observation phase")

@@ -111,6 +111,7 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
         before_admission_hash,
         before_catalog_cleanup_hash,
         before_d5_qualification_hash,
+        before_observer_hash,
         before_p013_hash,
         before_p014_hash,
         before_p015_hash,
@@ -124,8 +125,9 @@ def test_registry_matches_delivered_protocol_and_is_not_target_metadata():
         if transition["id"] == update.P02_CATALOG_TRANSITION:
             assert {m["path"] for m in transition["members"]} == update.P02_CATALOG_PATHS
             for member in transition["members"]:
-                raw = (root / member["path"]).read_bytes().replace(b"\r\n", b"\n")
-                assert update.sha256(raw) == member["after_sha256"]
+                # Authenticate the candidate before comparing its exact retained
+                # predecessor; production transition hashes are immutable.
+                assert before_observer_hash(root, member["path"]) == member["after_sha256"]
                 assert before_catalog_cleanup_hash(root, member["path"]) == member["before_sha256"]
             continue
         if transition["id"] == update.P02_VERIFICATION_TRANSITION:

@@ -697,6 +697,7 @@ def run_proc_config_import(
     conn = None
     cursor = None
     admission = None
+    admission_failure = None
     committed_tables: list[str] = []
     _tx_tables = [t.strip() for t in IMPORT_TRANSACTIONAL_TABLES.split(",") if t.strip()]
 
@@ -739,12 +740,12 @@ def run_proc_config_import(
         df = df[df["KVK_NO"].notna()]
         admission = writer_scope("scan_data")
         admission.__enter__()
-        attempt_phase("writes_may_start")
         conn = _get_import_connection_with_retry()
         cursor = conn.cursor()
         from services.legacy_export_snapshot_service import verify_producer_cursor
 
-        verify_producer_cursor(cursor)
+        verify_producer_cursor(cursor, before_side_effects=True)
+        attempt_phase("writes_may_start")
 
         from services.legacy_export_snapshot_service import has_runtime_context
 
@@ -1090,6 +1091,7 @@ def run_proc_config_import(
                     raise
 
         except Exception as e:
+            admission_failure = e
             logger.exception("[IMPORT][TX] Transactional block failed")
             try:
                 if conn:
@@ -1133,7 +1135,8 @@ def run_proc_config_import(
                 report["targets_master_mode"] = "incremental" if latest_kvk else "full"
                 report["targets_master_kvk"] = latest_kvk
                 report["transaction_duration_sec"] = time.time() - tx_start
-            except Exception:
+            except Exception as error:
+                admission_failure = error
                 logger.exception("Atomic configuration publication did not acknowledge completion")
                 # A commit reply may be lost. Rollback is cleanup only; recovery
                 # determines the outcome from the durable atomic checkpoint.
@@ -1325,39 +1328,74 @@ def run_proc_config_import(
         _set_last_import_report(report)
         return False, report
     except (pyodbc.OperationalError, HttpError) as e:
+        admission_failure = e
         logger.exception("Transient failure (will have been retried as applicable): %s", e)
         report["errors"].append(str(e))
         report["success"] = False
         _set_last_import_report(report)
         return False, report
-    except Exception:
-        logger.exception("ProcConfig import critical failure")
-        report["errors"].append("ProcConfig import critical failure")
+    except Exception as error:
+        from services.catalogue_observation_dal import ObservationDeferred
+
+        admission_failure = error
+        if isinstance(error, ObservationDeferred):
+            logger.warning("[IMPORT] SQL observation deferred before publication: %s", error.reason)
+            report["errors"].append("Configuration publication deferred before SQL changes.")
+            report["recovery_status"] = "configuration_observation_deferred"
+        else:
+            logger.exception("ProcConfig import critical failure")
+            report["errors"].append("ProcConfig import critical failure")
         report["success"] = False
         _set_last_import_report(report)
         return False, report
+    except BaseException as error:
+        admission_failure = error
+        raise
     finally:
+        from types import SimpleNamespace
+
+        from core.sql_connection_custody import (
+            SqlCleanupUnknown,
+            preserve_failure,
+            retain_connection,
+        )
+        from services.legacy_export_snapshot_service import acknowledge_observation_cleanup
+
         retained = conn is not None and retain_connection_resource(conn, cursor)
-        try:
-            if cursor and not retained:
-                try:
+        cleanup_error = None
+        if conn is not None and not retained:
+            try:
+                if cursor is not None:
                     cursor.close()
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        try:
-            if conn and not retained:
                 conn.close()
-        except Exception:
-            pass
-        if admission is not None:
-            if report.get("errors"):
-                admission.__exit__(
-                    RuntimeError, RuntimeError("Configuration outcome unavailable"), None
+            except BaseException as error:
+                cleanup_error = error
+                admission_failure = preserve_failure(
+                    admission_failure, error, "configuration_close"
                 )
+                retain_connection(
+                    SimpleNamespace(connection=conn, cursor=cursor),
+                    effect="unknown",
+                    first_failure=admission_failure,
+                    cleanup_error=error,
+                )
+                report["errors"].append(
+                    "Configuration SQL cleanup is unconfirmed; ownership retained."
+                )
+                report["success"] = False
+                report["recovery_status"] = "configuration_cleanup_unconfirmed"
+            else:
+                acknowledge_observation_cleanup(conn, admission_failure)
+        if admission is not None:
+            if admission_failure is not None or report.get("errors") or retained or cleanup_error:
+                failure = admission_failure or RuntimeError("Configuration outcome unavailable")
+                admission.__exit__(type(failure), failure, failure.__traceback__)
             else:
                 admission.__exit__(None, None, None)
+        if cleanup_error is not None:
+            raise SqlCleanupUnknown(
+                "Configuration SQL cleanup is unconfirmed."
+            ) from admission_failure
 
 
 # ---------------------------------------------------------------------------

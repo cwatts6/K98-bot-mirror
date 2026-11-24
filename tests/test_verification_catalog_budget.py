@@ -263,12 +263,10 @@ def test_complete_contract_readers_and_comparators_share_bounded_owner(monkeypat
         application["metadata"]["columns"][0]["Nullable"] = True
     installed = collected["installation"]
     legacy = collected["legacy"]
+    from tests.fixed_catalogue_fixture import fixed_reader_rowsets
+
     answers = {
-        "export": deque(
-            [[installed["target"]], installed["migrations"]]
-            + [installed["metadata"][name] for name in catalog._METADATA_QUERIES]
-            + [installed["permissions"]]
-        ),
+        "export": deque([[installed["target"]]] + fixed_reader_rowsets(installed)),
         "legacy": deque(
             legacy[name]
             for name in catalog.legacy_permission_queries(bot["legacy_sql_contract"]["source"])

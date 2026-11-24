@@ -53,6 +53,7 @@ def _identity():
 
 
 def _emit(attempt, outcome, error=None):
+    from services.catalogue_observation_dal import ObservationDeferred
     from services.export_failure_diagnostics import failure_record
     from services.recovery_health import failure_detail
 
@@ -66,6 +67,21 @@ def _emit(attempt, outcome, error=None):
     if error is not None:
         record["diagnostic"] = failure_detail(error)
         record["diagnostic"]["chain_frames"] = failure_record(error)["code_locations"]
+        if type(error) is ObservationDeferred:
+            # The bounded logical startup attempt has settled without admission.
+            # Preserve the existing v1 failed settlement for installed verifiers;
+            # this is not a mismatch or permission to reset its read budget.
+            record["reason"] = "catalogue_observation_deferred"
+            if error.reason in {
+                "active_writer",
+                "generation_changed",
+                "catalogue_busy",
+                "observation_pending",
+                "observation_deadline",
+                "observation_limit",
+                "statement_limit",
+            }:
+                record["observation_reason"] = error.reason
         # Compare only known code-owned prose; never render an arbitrary message.
         reasons = {
             "Application schema observation is busy or refused; no retry performed.": "schema_observation_refused",

@@ -134,20 +134,31 @@ def _pending_publication(row, season):
     )
 
 
-def lifecycle_fingerprint(observed, approved):
+def lifecycle_fingerprint(observed, approved, *, observation_guard="exclusive_schema_observation"):
     """Project only proved missing upkeep indexes into the fixed baseline shape.
 
     Canonicalize the *actual* complete catalogue first, retaining its provenance
     validation. Raw observations are never edited or replaced with expected rows.
     The returned hash must still match the independently pinned full baseline.
     """
+    canonical = canonical_lifecycle_metadata(
+        observed, approved, observation_guard=observation_guard
+    )
+    return hashlib.sha256(encode(canonical)).hexdigest()
+
+
+def canonical_lifecycle_metadata(
+    observed, approved, *, observation_guard="exclusive_schema_observation"
+):
+    """Preserve the full validated projection for source-derived contract preparation."""
     objects = policy_objects(approved)
     proof = observed.get("maintenance_lifecycle")
     _require(
         isinstance(proof, dict)
         and set(proof) == {"policy", "guard", "outputs"}
         and proof["policy"] == POLICY
-        and proof["guard"] == "exclusive_schema_observation"
+        and observation_guard in {"exclusive_schema_observation", "catalogue_generation_v1"}
+        and proof["guard"] == observation_guard
         and isinstance(proof["outputs"], list)
         and len(proof["outputs"]) == len(objects),
         "complete guarded observation required.",
@@ -165,7 +176,19 @@ def lifecycle_fingerprint(observed, approved):
         )
         rows[row["ObjectName"]] = row
     _require(set(rows) == {name for name, _ in objects}, "output proof coverage differs.")
-    canonical = canonical_application_metadata(observed["metadata"], observed["schema_identity"])
+    from services.application_observation_fingerprint import FORMAT as OBSERVER_FORMAT
+
+    if approved.get("fingerprint_format") == OBSERVER_FORMAT:
+        from services.application_observation_fingerprint import canonical_observer_metadata
+
+        _require(
+            observation_guard == "catalogue_generation_v1", "observer generation proof required."
+        )
+        canonical = canonical_observer_metadata(observed["metadata"], observed["schema_identity"])
+    else:
+        canonical = canonical_application_metadata(
+            observed["metadata"], observed["schema_identity"]
+        )
     indexes = canonical["metadata"]["indexes"]
     for name, season in objects:
         for suffix, column in (("GovID", "Gov_ID"), ("KVK_NO", "KVK_NO")):
@@ -179,4 +202,4 @@ def lifecycle_fingerprint(observed, approved):
                 _pending_publication(rows[name], season)
                 indexes.append(expected)
     indexes.sort(key=encode)
-    return hashlib.sha256(encode(canonical)).hexdigest()
+    return canonical

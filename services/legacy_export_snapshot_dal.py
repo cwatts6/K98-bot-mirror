@@ -670,7 +670,7 @@ class LegacySnapshotDAL:
             self._release(cursor, claim)
 
     @contextmanager
-    def session(self, claim, connection):
+    def session(self, claim, connection, *, observation_context=None, observation_request=None):
         """Only the producer acquires this; nested helpers receive its token.
 
         The connection must remain open and autocommit at entry/exit. Procedure
@@ -683,6 +683,7 @@ class LegacySnapshotDAL:
         failure = None
         cleanup_error = None
         attempted = False
+        observation = None
         try:
             if self.execution_evidence:
                 from services.export_execution_dal import legacy_installation_snapshot
@@ -700,19 +701,29 @@ class LegacySnapshotDAL:
             attempted = True
             acquire_snapshot_guard(cursor)
             if self.application_sql_contract is not None:
-                from services.export_runtime_composition import (
-                    application_snapshot_for_contract,
-                    verify_application_installation_contract,
-                )
+                from services.export_observer_contract import observer_contract
+                from services.export_runtime_composition import verify_application_cursor
 
-                verify_application_installation_contract(
-                    application_snapshot_for_contract(cursor, self.application_sql_contract),
-                    self.application_sql_contract,
-                )
-            yield claim
+                if observer_contract(self.application_sql_contract):
+                    from services.application_observation_admission import AdmissionMetadata
+
+                    binding, modules = self._observation_binding(claim, observation_context)
+                    observation = AdmissionMetadata(
+                        binding, approved=self.application_sql_contract, expected_modules=modules
+                    )
+                    observation.__enter__()
+                    if observation_request is None:
+                        observation.collect(cursor)
+                    else:
+                        observation.collect(cursor, request=observation_request)
+                else:
+                    verify_application_cursor(cursor, self.application_sql_contract)
+            yield observation if observation is not None else claim
         except BaseException as error:
             failure = error
         finally:
+            if observation is not None:
+                observation.__exit__(None, None, None)
             from types import SimpleNamespace
 
             from core.sql_connection_custody import (
@@ -756,7 +767,32 @@ class LegacySnapshotDAL:
         if failure is not None:
             raise failure
 
-    def verify_producer_cursor(self, claim, cursor):
+    def observation_boundary(self, connection, request):
+        """One read-only quiet check; no producer guard or durable state change."""
+        from services.catalogue_observation_dal import read_boundary
+        from services.export_observer_contract import observation_installation
+        from services.import_capture_recovery_dal import capture_cursor
+
+        installation = observation_installation(self.application_sql_contract)
+        # Reuse the existing cursor owner: a failed close retains SQL custody.
+        with capture_cursor(connection) as cursor:
+            return read_boundary(
+                request.cursor(cursor), dict(installation.modules), installation=installation
+            )
+
+    def _observation_binding(self, claim, context):
+        from services.application_observation_admission import AdmissionBinding
+        from services.export_observer_contract import observation_installation
+
+        if not isinstance(context, dict) or set(context) != {"configuration", "registration"}:
+            raise SourceConflict("Current producer configuration and registration required.")
+        modules = dict(observation_installation(self.application_sql_contract).modules)
+        binding = AdmissionBinding.for_claim(
+            claim, approved=self.application_sql_contract, expected_modules=modules, **context
+        )
+        return binding, modules
+
+    def verify_producer_cursor(self, claim, cursor, *, observation=None, observation_context=None):
         """Check the actual producer session without committing or rolling it back."""
         self.authorize(claim)
         if not self.execution_evidence:
@@ -770,8 +806,7 @@ class LegacySnapshotDAL:
             legacy_installation_snapshot,
         )
         from services.export_runtime_composition import (
-            application_snapshot_for_contract,
-            verify_application_installation_contract,
+            verify_application_cursor,
             verify_legacy_installation_contract,
         )
 
@@ -781,10 +816,17 @@ class LegacySnapshotDAL:
             profile=self.sql_profile,
         )
         if self.application_sql_contract is not None:
-            verify_application_installation_contract(
-                application_snapshot_for_contract(cursor, self.application_sql_contract),
-                self.application_sql_contract,
-            )
+            if observation is not None:
+                from services.application_observation_admission import AdmissionMetadata
+
+                if type(observation) is not AdmissionMetadata:
+                    raise SourceConflict("Exact owned admission observation required.")
+                binding, _ = self._observation_binding(claim, observation_context)
+                observation.consume(cursor, binding)
+            else:
+                # Capture-only recovery has no earlier cold admission to reuse.
+                # Its real owner still needs one complete current comparison.
+                verify_application_cursor(cursor, self.application_sql_contract)
 
     def begin_producer_transaction(self, claim, cursor):
         """The actual business connection owns the fence until its atomic commit.
@@ -830,10 +872,10 @@ class LegacySnapshotDAL:
         """Read all mutable output under producer admission; no provider or rebuild."""
         from core.export_numeric import sql_output_frame
         import gsheet_module as gm
+        from services.import_capture_recovery_dal import capture_cursor
         from services.legacy_export_snapshot_service import OutputSection
 
-        cursor = connection.cursor()
-        try:
+        with capture_cursor(connection) as cursor:
             if scope["consumer"] == "all_kvk":
                 cursor.execute("EXEC KVK.sp_KVK_Get_Exports @KVK_NO=?", scope["kvk_no"])
                 raw = LegacySnapshotDAL.capture_result_sets(cursor, gm.KVK_EXPORT_SECTION_NAMES)
@@ -857,5 +899,3 @@ class LegacySnapshotDAL:
             return gm.plan_legacy_outputs(
                 scope, frames=[sql_output_frame(s.rows, s.columns) for s in results]
             )
-        finally:
-            cursor.close()

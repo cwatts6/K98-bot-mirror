@@ -147,6 +147,8 @@ def _ingest_validated_workbook(
         username=username,
         password=password,
     )
+    failure = None
+    result = None
     try:
         result = kvk_all_import_dal.ingest_prepared_import(
             con=con,
@@ -156,12 +158,39 @@ def _ingest_validated_workbook(
             uploader_id=uploader_id,
             scan_ts_utc=scan_ts_utc,
         )
+    except BaseException as error:
+        failure = error
+        raise
     finally:
-        try:
-            if not connection_retained(con):
+        from core.sql_connection_custody import (
+            SqlCleanupUnknown,
+            preserve_failure,
+            retain_connection,
+        )
+        from services.legacy_export_snapshot_service import acknowledge_observation_cleanup
+
+        if not connection_retained(con):
+            try:
                 con.close()
-        except Exception:
-            pass
+            except BaseException as cleanup:
+                failure = preserve_failure(failure, cleanup, "kvk_import_close")
+                retain_connection(
+                    con, effect="unknown", first_failure=failure, cleanup_error=cleanup
+                )
+                from services.upload_outcome_service import CommittedKvkResult
+
+                if not isinstance(result, CommittedKvkResult):
+                    raise SqlCleanupUnknown(
+                        "KVK import connection cleanup is unconfirmed."
+                    ) from failure
+                # Keep acknowledged business completion. The outer admission
+                # refuses capture while custody is retained and marks that
+                # separate outcome on this exact committed result.
+                result.pop("export_preparation_id", None)
+                result["capture_outcome"] = "unconfirmed"
+                result["capture_error_type"] = "SqlCleanupUnknown"
+            else:
+                acknowledge_observation_cleanup(con, failure)
 
     return result
 

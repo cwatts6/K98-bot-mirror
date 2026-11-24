@@ -224,18 +224,28 @@ def recompute_windows(kvk_no: int | None = None) -> int:
     """Keep fixed legacy admission locked through EXEC and its single commit."""
     from kvk.dal.new_source_import_dal import lock_scope, transaction
     from kvk.dal.season_source_dal import require_source
+    from services.catalogue_observation_dal import ObservationDeferred
+    from services.legacy_export_snapshot_service import acknowledge_observation_cleanup
 
-    with transaction(get_conn_with_retries) as cursor:
-        from services.legacy_export_snapshot_service import verify_producer_cursor
+    cursor = None
+    try:
+        with transaction(get_conn_with_retries) as cursor:
+            from services.legacy_export_snapshot_service import verify_producer_cursor
 
-        verify_producer_cursor(cursor)
-        resolved_kvk = resolve_current_kvk_no_from_cursor(cursor, kvk_no)
-        lock_scope(cursor, resolved_kvk)
-        require_source(cursor, resolved_kvk, "legacy_full_data")
-        validate_writer_season(resolved_kvk)
-        logger.info("[KVK ADMIN] recomputing windows kvk_no=%s", resolved_kvk)
-        cursor.execute(RECOMPUTE_SQL, (resolved_kvk,))
-        record_writer_completion(cursor=cursor, procedure="KVK recompute", kvk_no=resolved_kvk)
+            verify_producer_cursor(cursor, before_side_effects=True)
+            resolved_kvk = resolve_current_kvk_no_from_cursor(cursor, kvk_no)
+            lock_scope(cursor, resolved_kvk)
+            require_source(cursor, resolved_kvk, "legacy_full_data")
+            validate_writer_season(resolved_kvk)
+            logger.info("[KVK ADMIN] recomputing windows kvk_no=%s", resolved_kvk)
+            cursor.execute(RECOMPUTE_SQL, (resolved_kvk,))
+            record_writer_completion(cursor=cursor, procedure="KVK recompute", kvk_no=resolved_kvk)
+    except ObservationDeferred as error:
+        # The dedicated transaction owner has rolled back and closed; unknown
+        # cleanup raises its own outcome and cannot reach this acknowledgement.
+        if cursor is not None:
+            acknowledge_observation_cleanup(cursor.connection, error)
+        raise
     return resolved_kvk
 
 
