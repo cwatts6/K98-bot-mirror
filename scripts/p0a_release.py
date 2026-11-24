@@ -396,6 +396,8 @@ def selected(before, target, changes, read_blob):
     if not paths:
         return None
     spec = selected_specification(before)
+    if spec is None:
+        raise ValueError("Protected recovery policy changed during selection.")
     for row in spec["sources"]:
         for commit, field in ((before, "before"), (target, "after")):
             raw = read_blob(commit, row["path"])

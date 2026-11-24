@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from typing import Any
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -622,7 +623,7 @@ def build(sql_root, resume_from=None, combined_proof=None):
     members["source/activation-scope.json"] = json.dumps(scope).encode()
     # Whole-database collection does not use a lab alias to bypass the protected
     # ROK_TRACKER validator. Final protected-contract acceptance is a later gate.
-    manifest = dict(
+    manifest: dict[str, Any] = dict(
         version=1,
         stage="representative-install-and-recovery",
         database=DATABASE,

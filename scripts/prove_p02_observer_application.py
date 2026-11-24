@@ -15,6 +15,7 @@ import secrets
 import subprocess
 import sys
 import time
+from typing import Any
 
 HISTORY_SQL = """SELECT MigrationId,MigrationFile,ChecksumSha256,AppliedAtUtc,
 GitCommit,DeploymentId,Status FROM dbo.SchemaMigrationHistory ORDER BY MigrationId"""
@@ -130,7 +131,7 @@ def main():
 
     pyodbc.pooling = False
     budget = runpy.run_path(str(packet / "Verify-RunningRelease.py"))
-    receipt = dict(
+    receipt: dict[str, Any] = dict(
         schema="p02-observer-application-proof/1",
         started=datetime.now(UTC).isoformat(),
         production_operations=0,

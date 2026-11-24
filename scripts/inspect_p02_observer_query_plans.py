@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from typing import Any
 
 sys.path.append(r"C:\discord_file_downloader\venv\Lib\site-packages")
 import pyodbc
@@ -82,7 +83,7 @@ def main(destination):
     if os.environ.get("COMPUTERNAME") != "MINI_AMD":
         raise RuntimeError("Exact isolated qualification guest required")
     pyodbc.pooling = False
-    receipt = dict(
+    receipt: dict[str, Any] = dict(
         schema="p02-observer-query-plans/1",
         utc=datetime.now(UTC).isoformat(),
         sql_mutations=0,

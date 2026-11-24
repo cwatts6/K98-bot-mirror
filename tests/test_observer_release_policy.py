@@ -124,6 +124,21 @@ def test_installed_two_release_selection_preserves_legacy_and_exact_source_pins(
         policy.selected(spec["before"], "b" * 40, changes, lambda *key: blobs.get(key))
 
 
+def test_policy_disappearing_during_selection_stops_before_source_reads(release, monkeypatch):
+    spec, _, _, _ = release
+    selections = iter([spec, None])
+    monkeypatch.setattr(policy, "selected_specification", lambda before: next(selections))
+    reads = []
+    with pytest.raises(ValueError, match="policy changed during selection"):
+        policy.selected(
+            spec["before"],
+            "b" * 40,
+            [row["path"] for row in spec["sources"]],
+            lambda *key: reads.append(key),
+        )
+    assert reads == []
+
+
 @pytest.mark.parametrize(
     "damage",
     [

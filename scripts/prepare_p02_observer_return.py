@@ -11,6 +11,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+from typing import Any
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -215,7 +216,7 @@ RelatedSQLPR: Local candidate; not published
 */
 """
         script = (header + bodies[identifier]).encode("utf-8")
-        profile = dict(
+        profile: dict[str, Any] = dict(
             version=1,
             profile=PROFILE,
             migration_id=identifier,

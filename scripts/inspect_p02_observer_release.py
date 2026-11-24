@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from typing import Any
 
 QUERIES = {
     "target": """SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')) AS ServerName,
@@ -73,7 +74,7 @@ def main(output):
     import pyodbc
 
     pyodbc.pooling = False
-    receipt = dict(
+    receipt: dict[str, Any] = dict(
         schema="p02-observer-release-prerequisites/1",
         utc=datetime.now(UTC).isoformat(),
         sql_mutations=0,

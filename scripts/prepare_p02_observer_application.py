@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from typing import Any
 from uuid import uuid4
 import zipfile
 
@@ -90,7 +91,7 @@ def build():
     )
     stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")[:17]
     sid = uuid4().hex
-    approved = dict(
+    approved: dict[str, Any] = dict(
         version=3,
         server="MINI_AMD",
         database="ROK_TRACKER",

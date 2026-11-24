@@ -6,12 +6,16 @@ producer callback may return its existing live admission owner. Only an explicit
 coherence deferral can schedule another read; business work is never replayed.
 """
 
+from collections.abc import Callable
 from contextlib import contextmanager
 from threading import Condition, get_ident
 import time
+from typing import Any, TypeVar
 
 from core.sql_connection_custody import require_sql_admission
 from services.catalogue_observation_dal import ObservationDeferred
+
+_ObservationResult = TypeVar("_ObservationResult")
 
 
 class ObservationLane:
@@ -231,7 +235,9 @@ def observe_application(connect, approved, *, request=None, after_read=None):
     return result
 
 
-def read_owned_observation(connect, read, *, request=None):
+def read_owned_observation(
+    connect, read: Callable[[Any], _ObservationResult], *, request=None
+) -> _ObservationResult:
     """Own an autocommit observer through acknowledged cursor/connection close."""
     from types import SimpleNamespace
 
@@ -249,7 +255,7 @@ def read_owned_observation(connect, read, *, request=None):
     connection = connect()
     cursor = None
     failure = None
-    result = None
+    result: Any = None
     try:
         connection.autocommit = True
         cursor = connection.cursor()

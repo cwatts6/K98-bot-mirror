@@ -1,5 +1,43 @@
 # P02 - Candidate Source Versions and Review Handoff - 2026-11-24
 
+## Hosted CI correction follow-up - 24 November 2026
+
+The source drafts are [mirror #550](https://github.com/cwatts6/K98-bot-mirror/pull/550),
+[private Bot #751](https://github.com/cwatts6/k98-bot/pull/751) and
+[SQL #159](https://github.com/cwatts6/K98-bot-SQL-Server/pull/159). They remain
+unmerged. SQL CI passed all steps. Private updater, release-identity and credential
+checks passed on the earlier candidate; the full Quality job exposed one missing
+blank line, then 26 type-check errors in P02 qualification/release helpers. Both
+first failures are retained. The formatting-only fix has identical AST/literals.
+
+The focused correction makes ten type-only changes with identical executable
+logic after annotations are removed. It also explicitly refuses a protected
+policy that disappears between the existing selection reads, before reading any
+source blob. Its negative regression checks that boundary. No SQL statement,
+privilege, native packet, retry, physical ownership or receipt behavior was changed.
+The type check passed with the shared interpreter (87 files, zero errors/warnings).
+All 184 focused cases passed: the first group passed 131 and skipped 53 needing
+retained source inputs; those 53 then passed against the genuine authenticated
+archive and SQL worktree. Operational logs were unchanged. Required static gates,
+in-process formatting and Ruff without fixes passed.
+
+The exact twelve-file Changes review `9ff3839c-446a-4802-8ba6-cf71ba1ccf82`
+completed with Deep off and no findings; canonical results were read back.
+This following status prose has a precise documentation-only security skip.
+Evidence is retained under `A/ci-types-24-01`, including before-images and
+annotation equivalence. The post-commit receipt records the updated mirror and
+patch-equivalent private revisions; earlier source identities below remain dated
+checkpoints. All original SQL candidate/migration bytes remain unchanged.
+
+The installed-updater controls require actual private `main` and exact SQL
+ancestry on SQL `main`; a draft branch must not be relabelled to pass them.
+Complete the source checks and normal source delivery before binding the final
+release specification, registry and independent contracts. Rebuild the protected
+tool package from those exact inputs: candidate 06 retains its old byte identity
+and is not silently rebound to this correction. The grouped G0-G5 VM plan remains
+non-executable until those inputs and the faithful fresh startup fixture are ready.
+No merge, native execution or production deployment is performed by this checkpoint.
+
 ## Source review follow-up - 24 November 2026
 
 The agreed continuation has published draft source reviews:

@@ -10,6 +10,7 @@ import runpy
 import subprocess
 import sys
 import time
+from typing import Any
 
 
 def unprotect(blob):
@@ -71,7 +72,7 @@ def main():
 
     pyodbc.pooling = False
     budget = runpy.run_path(str(packet / "Verify-RunningRelease.py"))
-    receipt = dict(
+    receipt: dict[str, Any] = dict(
         schema="p02-observer-application-continuation/1",
         started=datetime.now(UTC).isoformat(),
         production_operations=0,
