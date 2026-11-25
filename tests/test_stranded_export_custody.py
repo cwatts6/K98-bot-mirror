@@ -17,6 +17,7 @@ pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Native Windows 
 @pytest.fixture
 def custody(tmp_path):
     import win32api
+    import win32event
     import win32job
     import win32process
 
@@ -66,16 +67,24 @@ def custody(tmp_path):
         )
         win32job.AssignProcessToJobObject(job, process)
         win32process.ResumeThread(thread)
-        yield dict(
-            binding=binding, child_script=script, manifest_path=manifest, child_id=child_id
-        ), job, process, argv
+        yield (
+            dict(binding=binding, child_script=script, manifest_path=manifest, child_id=child_id),
+            job,
+            process,
+            argv,
+        )
     finally:
-        if process is not None:
-            win32job.TerminateJobObject(job, 1)
-            process.Close()
-        if thread is not None:
-            thread.Close()
-        job.Close()
+        try:
+            if process is not None:
+                win32job.TerminateJobObject(job, 1)
+                assert win32event.WaitForSingleObject(process, 30000) == 0
+                assert win32job.QueryInformationJobObject(job, 1)["ActiveProcesses"] == 0
+        finally:
+            if process is not None:
+                process.Close()
+            if thread is not None:
+                thread.Close()
+            job.Close()
 
 
 def test_native_custody_is_positive_and_does_not_terminate(custody):
@@ -170,3 +179,49 @@ def test_parent_mismatch_is_rejected(custody, monkeypatch):
     with pytest.raises(CustodyUnavailable, match="incarnation differs"):
         inspect_custody(**args)
     assert win32event.WaitForSingleObject(process, 0) == 258
+
+
+@pytest.mark.parametrize("fixture_name", ["custody", "writer"])
+def test_native_fixture_teardown_observes_exit_before_return(tmp_path, monkeypatch, fixture_name):
+    """A termination request alone must not leak a dying sibling into the next case."""
+    from test_stranded_export_host import writer
+    import win32api
+    import win32event
+    import win32job
+
+    fixture = custody.__wrapped__(tmp_path) if fixture_name == "custody" else writer.__wrapped__()
+    if fixture_name == "custody":
+        _, job, process, _ = next(fixture)
+    else:
+        _, _, job, process = next(fixture)
+    current = win32api.GetCurrentProcess()
+    retained_process = win32api.DuplicateHandle(current, process, current, 0, False, 2)
+    retained_job = win32api.DuplicateHandle(current, job, current, 0, False, 2)
+    terminate = win32job.TerminateJobObject
+    wait = win32event.WaitForSingleObject
+    requested = []
+
+    def request_termination(handle, code):
+        # Keep the native sleeper alive after acknowledgement, as the Windows
+        # termination API permits. The retained Job prevents kill-on-last-close.
+        requested.append(code)
+
+    def observe_exit(handle, timeout):
+        if int(handle) == int(process) and timeout > 0 and requested:
+            terminate(retained_job, requested[-1])
+        return wait(handle, timeout)
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(win32job, "TerminateJobObject", request_termination)
+            patch.setattr(win32event, "WaitForSingleObject", observe_exit)
+            fixture.close()
+        assert requested
+        assert wait(retained_process, 0) == 0, "fixture returned before physical child exit"
+        assert win32job.QueryInformationJobObject(retained_job, 1)["ActiveProcesses"] == 0
+    finally:
+        terminate(retained_job, 1)
+        assert wait(retained_process, 30000) == 0
+        retained_process.Close()
+        retained_job.Close()
+        fixture.close()

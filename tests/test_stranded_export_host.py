@@ -17,6 +17,7 @@ pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Native Windows 
 @pytest.fixture
 def writer():
     import win32api
+    import win32event
     import win32job
     import win32process
 
@@ -64,12 +65,17 @@ def writer():
         )
         yield RecoveryHost(binding), birth, job, process
     finally:
-        if process is not None:
-            win32job.TerminateJobObject(job, 1)
-            process.Close()
-        if thread is not None:
-            thread.Close()
-        job.Close()
+        try:
+            if process is not None:
+                win32job.TerminateJobObject(job, 1)
+                assert win32event.WaitForSingleObject(process, 30000) == 0
+                assert win32job.QueryInformationJobObject(job, 1)["ActiveProcesses"] == 0
+        finally:
+            if process is not None:
+                process.Close()
+            if thread is not None:
+                thread.Close()
+            job.Close()
 
 
 def test_native_inspect_leaves_writer_live_then_exact_termination_is_observed(writer):
