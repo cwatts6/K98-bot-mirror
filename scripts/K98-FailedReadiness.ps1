@@ -276,6 +276,27 @@ function Read-CompletedRetirement([string]$Directory) {
  $null=Read-RetirementBytes $context.barrier (Hash $context.marker)
  [pscustomobject]@{profile=$profile;intent=$intent;complete=$complete}
 }
+function Assert-RetirementSuccessor([string]$Directory,$Record,[string]$Before,[string]$Target) {
+ # A separately reviewed continuation may name one new successor without
+ # rewriting the original failed release, intent, or completed retirement.
+ if($Target -cnotmatch '^[a-f0-9]{40}$' -or $Target -ceq $Before){throw 'Canonical distinct retirement successor required'}
+ $path=Join-Path $Directory ('successor-'+$Target+'.json')
+ if(-not(Test-Path -LiteralPath $path)){throw 'Failed-readiness successor target differs from the reviewed correction'}
+ $review=[Text.Encoding]::UTF8.GetString((Read-RetirementBytes $path '' 65536))|ConvertFrom-Json
+ $fields='approved_target,installed_target,kind,previous_approved_target,release_id,retirement_complete_sha256,tool_sha256,version'
+ if((($review.PSObject.Properties.Name|Sort-Object) -join ',') -cne $fields){throw 'Exact reviewed retirement successor required'}
+ foreach($field in $review.PSObject.Properties) {
+  if($field.Name -cne 'version' -and $field.Value -isnot [string]){throw 'Retirement successor field type differs'}
+ }
+ if($review.version -isnot [int] -or $review.version -ne 1 -or $review.kind -cne 'failed_readiness_successor_review' -or
+    $review.release_id -cne $Record.profile.release_id -or $review.installed_target -cne $Before -or
+    $review.previous_approved_target -cne $Record.profile.approved_target -or $review.approved_target -cne $Target -or
+    $review.retirement_complete_sha256 -cnotmatch '^[a-f0-9]{64}$' -or $review.tool_sha256 -cnotmatch '^[a-f0-9]{64}$') {
+  throw 'Retirement successor identity differs'
+ }
+ $null=Read-RetirementBytes (Join-Path $Directory 'complete.json') $review.retirement_complete_sha256 65536
+ $null=Read-RetirementBytes 'C:\ProgramData\K98\S11\updater\update-tool.json' $review.tool_sha256 65536
+}
 function Assert-RetirementUpdates([string]$Before='', [string]$Target='') {
  $root='C:\ProgramData\K98\S11\updates\retirements'
  if(-not(Test-Path -LiteralPath $root)){return}
@@ -285,7 +306,9 @@ function Assert-RetirementUpdates([string]$Before='', [string]$Target='') {
  foreach($item in $items) {
   if(-not $item.PSIsContainer -or $item.Name -cnotmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$'){throw 'Retirement history inventory differs'}
   $record=Read-CompletedRetirement $item.FullName
-  if($Before -and $Before -ceq $record.intent.installed_target -and $Target -cne $record.profile.approved_target){throw 'Failed-readiness successor target differs from the reviewed correction'}
+  if($Before -and $Before -ceq $record.intent.installed_target -and $Target -cne $record.profile.approved_target){
+   Assert-RetirementSuccessor $item.FullName $record $Before $Target
+  }
  }
 }
 function Assert-ReleaseNotRetired([string]$ReleaseId) {

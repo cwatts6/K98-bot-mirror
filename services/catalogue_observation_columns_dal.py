@@ -7,7 +7,7 @@ column IDs join these temporary results only; they never become cached authority
 import json
 
 from kvk.dal.new_source_import_dal import SourceConflict
-from services.catalogue_observation_batches import COLUMN_BASE_WIDTH
+from services.catalogue_observation_batches import COLUMN_BASE_WIDTH, scopes
 from services.catalogue_observation_query_dal import _SCOPE
 
 COLUMN_QUERIES = {
@@ -68,8 +68,10 @@ def _unique(rows, keys):
     return result
 
 
-def column_batch(cursor, scope, consume):
+def column_batch(cursor, scope, consume, *, consolidate=False):
     """Preserve the original left-join semantics and checkpoint every native read."""
+    if consolidate:
+        return _consolidated_columns(cursor, scope, consume)
     facts = {}
     for category, statement in COLUMN_QUERIES.items():
         if category == "columns":
@@ -81,6 +83,10 @@ def column_batch(cursor, scope, consume):
         else:
             cursor.execute(statement, json.dumps(scope))
             facts[category] = consume(cursor)
+    return _assemble_columns(facts)
+
+
+def _assemble_columns(facts):
     columns = facts["columns"]
     column_keys = _unique(columns, ("NativeObjectID", "Ordinal"))
     defaults = _unique(facts["defaults"], ("NativeDefaultID",))
@@ -106,3 +112,61 @@ def column_batch(cursor, scope, consume):
             row.update((name, source.get(name)) for name in names)
         result.append(row)
     return result
+
+
+def column_scope(scope, objects):
+    """Exclude only observed object types which cannot have sys.columns rows.
+
+    This is used only after the full object read and its coherent checkpoint.
+    Missing/unknown types stay in scope; the complete comparator still owns
+    admission. No approved source name or object record is removed from it.
+    """
+    excluded = {
+        row["ObjectName"].casefold()
+        for row in objects
+        if row.get("ObjectType") in {"P", "FN"} and isinstance(row.get("ObjectName"), str)
+    }
+    return [name for name in scope if name.casefold() not in excluded]
+
+
+def _consolidated_columns(cursor, scope, consume):
+    """Read base facts once, then only their possible decorations, still bounded.
+
+    Queries and projections are unchanged. Every physical read is consumed and
+    checkpointed before another dispatch. Facts live only in this collection;
+    a changed generation discards them through the original caller.
+    """
+    if not isinstance(scope, list) or len(scope) > 2048:
+        raise SourceConflict("Bounded column scope required.")
+    facts = {category: [] for category in COLUMN_QUERIES}
+    for group in scopes(scope, "metadata.columns"):
+        for offset in range(0, len(group), COLUMN_BASE_WIDTH):
+            part = group[offset : offset + COLUMN_BASE_WIDTH]
+            cursor.execute(column_query(len(part)), *part)
+            facts["columns"].extend(consume(cursor))
+    columns = facts["columns"]
+    allowed = {name.casefold() for name in scope}
+    for row in columns:
+        if (
+            not isinstance(row.get("ObjectName"), str)
+            or row["ObjectName"].casefold() not in allowed
+            or type(row.get("NativeDefaultID")) is not int
+            or row["NativeDefaultID"] < 0
+            or type(row.get("IsComputed")) is not bool
+            or type(row.get("IsIdentity")) is not bool
+        ):
+            raise SourceConflict("Complete scoped native column facts required.")
+    _unique(columns, ("NativeObjectID", "Ordinal"))
+    for category, field in (
+        ("defaults", "NativeDefaultID"),
+        ("computed", "IsComputed"),
+        ("identity", "IsIdentity"),
+    ):
+        names = {row["ObjectName"].casefold() for row in columns if row[field]}
+        selected = [name for name in scope if name.casefold() in names]
+        if not selected:
+            continue
+        for part in scopes(selected, "metadata.columns"):
+            cursor.execute(COLUMN_QUERIES[category], json.dumps(part))
+            facts[category].extend(consume(cursor))
+    return _assemble_columns(facts)

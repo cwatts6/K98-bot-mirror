@@ -1076,6 +1076,21 @@ def _application_scoped_rows(cursor, query, scope, checkpoint, category, observa
         IDENTITY_BATCH_QUERIES,
     )
 
+    if category in {"metadata.columns", "identity.columns"} and not scope:
+        return []
+    if category == "metadata.columns" and type(cursor) is CatalogueBatchCursor:
+        from services.catalogue_observation_columns_dal import column_batch
+
+        return combine(
+            column_batch(
+                cursor,
+                scope,
+                lambda actual: _application_rows(actual, checkpoint),
+                consolidate=True,
+            ),
+            scope,
+            category,
+        )
     query = IDENTITY_BATCH_QUERIES.get(category, CATALOGUE_BATCH_QUERIES.get(category, query))
     parts = scopes(scope, category, combined_boundaries=type(cursor) is CatalogueBatchCursor)
     result = []
@@ -1206,14 +1221,24 @@ def application_installation_snapshot(
         "" if scope is None else " AND o.object_id IN (SELECT OBJECT_ID(value) FROM OPENJSON(?)) "
     )
     result["target"] = _application_target(cursor, checkpoint)
+    column_names = scope
     for name, query in _METADATA_QUERIES.items():
         if name in _APPLICATION_SCOPED_METADATA and scope is not None:
             statement = _APPLICATION_SCOPED_METADATA[name].replace("@scope", "?")
         else:
             statement = "WITH required AS (" + required + ") " + query
         result["metadata"][name] = _application_scoped_rows(
-            cursor, statement, scope, checkpoint, "metadata." + name, observation_batches
+            cursor,
+            statement,
+            column_names if name == "columns" else scope,
+            checkpoint,
+            "metadata." + name,
+            observation_batches,
         )
+        if name == "objects" and observation_batches and type(cursor) is CatalogueBatchCursor:
+            from services.catalogue_observation_columns_dal import column_scope
+
+            column_names = column_scope(scope, result["metadata"]["objects"])
     cursor.execute(
         "SELECT SCHEMA_NAME(t.schema_id)+'.'+t.name AS TypeName,c.column_id AS Ordinal,"
         "c.name AS ColumnName,SCHEMA_NAME(st.schema_id)+'.'+st.name AS ColumnType,"
@@ -1269,7 +1294,7 @@ def application_installation_snapshot(
             result["schema_identity"][name] = _application_scoped_rows(
                 cursor,
                 query.replace("@scope", "?"),
-                scope,
+                column_names if name == "columns" else scope,
                 checkpoint,
                 "identity." + name,
                 observation_batches,

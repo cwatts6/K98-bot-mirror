@@ -141,8 +141,21 @@ _OBSERVER_OPTIONS_CORRECTION_PAIRS = {
 }
 
 
+# Exact reviewed column-cost successor; test-only, never updater admission.
+_OBSERVER_COLUMN_COST_PAIRS = {
+    "services/export_execution_dal.py": (
+        "7a7337d7f49f6a859baee6b299e03fcda4b74be446a41c42f420ef135c8e7df5",
+        "dafcbe69a7c9e003cb5481b768f3c2698d60e6cf7c86faf9b8eb99699b048dad",
+    ),
+}
+
+
 def before_observer_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path in _OBSERVER_COLUMN_COST_PAIRS:
+        predecessor, candidate = _OBSERVER_COLUMN_COST_PAIRS[path]
+        assert actual == candidate, path
+        actual = predecessor
     if path in _OBSERVER_OPTIONS_CORRECTION_PAIRS:
         predecessor, candidate = _OBSERVER_OPTIONS_CORRECTION_PAIRS[path]
         assert actual == candidate, path

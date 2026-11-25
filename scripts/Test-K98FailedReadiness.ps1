@@ -263,6 +263,55 @@ function Assert-RetirementDirectory([string]$Path) {if($Path -ceq $history){& $r
 function Get-ChildItem([string]$LiteralPath,[switch]$Force) {Microsoft.PowerShell.Management\Get-ChildItem -LiteralPath $paths.root -Force}
 Assert-RetirementUpdates ('a'*40) ('b'*40);Check $true 'reviewed first target'
 Reject {Assert-RetirementUpdates ('a'*40) ('c'*40)} '*successor target differs*'
+# An additional successor needs its own exact protected approval and the new
+# tool manifest. It never edits or replaces the completed retirement record.
+$successorFile=Join-Path $paths.directory ('successor-'+('c'*40)+'.json')
+$toolFixture=Join-Path $fixture 'successor-tool.json';[IO.File]::WriteAllText($toolFixture,'{"version":1}')
+$readSuccessorBytes=${function:Read-RetirementBytes}
+function Read-RetirementBytes([string]$Path,[string]$Expected='', [long]$Limit=2MB) {
+ if($Path -ceq 'C:\ProgramData\K98\S11\updater\update-tool.json'){$Path=$toolFixture}
+ & $readSuccessorBytes $Path $Expected $Limit
+}
+$unchangedRetirement=@{}
+foreach($name in @('profile.json','intent.json','complete.json','active.json')){
+ $unchangedRetirement[$name]=Hash ([IO.File]::ReadAllBytes((Join-Path $paths.directory $name)))
+}
+$approval=[pscustomobject][ordered]@{version=1;kind='failed_readiness_successor_review';release_id=$profile.release_id;
+ installed_target=('a'*40);previous_approved_target=('b'*40);approved_target=('c'*40);
+ retirement_complete_sha256=$unchangedRetirement['complete.json'];tool_sha256=(Hash ([IO.File]::ReadAllBytes($toolFixture)))}
+[IO.File]::WriteAllBytes($successorFile,(Retirement-Bytes $approval))
+Assert-RetirementUpdates ('a'*40) ('c'*40);Check $true 'exact independently reviewed successor'
+Assert-RetirementUpdates ('a'*40) ('b'*40);Check $true 'original successor remains immutable'
+Assert-RetirementUpdates;Check $true 'upgrade history read does not select a target'
+Reject {Assert-RetirementUpdates ('a'*40) ('f'*40)} '*successor target differs*'
+Reject {Assert-RetirementUpdates ('a'*40) '..\elsewhere'} '*Canonical distinct*'
+Reject {Assert-RetirementUpdates ('a'*40) ('a'*40)} '*Canonical distinct*'
+foreach($field in @('kind','release_id','installed_target','previous_approved_target','approved_target','retirement_complete_sha256','tool_sha256')) {
+ $bad=$approval|ConvertTo-Json|ConvertFrom-Json;$bad.$field='invalid'
+ [IO.File]::WriteAllBytes($successorFile,(Retirement-Bytes $bad))
+ Reject {Assert-RetirementUpdates ('a'*40) ('c'*40)} '*successor identity differs*'
+ $bad.$field=@($approval.$field)
+ [IO.File]::WriteAllBytes($successorFile,(Retirement-Bytes $bad))
+ Reject {Assert-RetirementUpdates ('a'*40) ('c'*40)} '*field type differs*'
+}
+foreach($badVersion in @($true,2,'1')) {
+ $bad=$approval|ConvertTo-Json|ConvertFrom-Json;$bad.version=$badVersion
+ [IO.File]::WriteAllBytes($successorFile,(Retirement-Bytes $bad))
+ Reject {Assert-RetirementUpdates ('a'*40) ('c'*40)} '*successor identity differs*'
+}
+$bad=$approval|ConvertTo-Json|ConvertFrom-Json;$bad|Add-Member NoteProperty command 'unreviewed'
+[IO.File]::WriteAllBytes($successorFile,(Retirement-Bytes $bad))
+Reject {Assert-RetirementUpdates ('a'*40) ('c'*40)} '*Exact reviewed*'
+foreach($field in @('retirement_complete_sha256','tool_sha256')) {
+ $bad=$approval|ConvertTo-Json|ConvertFrom-Json;$bad.$field='f'*64
+ [IO.File]::WriteAllBytes($successorFile,(Retirement-Bytes $bad))
+ Reject {Assert-RetirementUpdates ('a'*40) ('c'*40)} '*checksum differs*'
+}
+[IO.File]::WriteAllBytes($successorFile,(Retirement-Bytes $approval))
+Assert-RetirementUpdates ('a'*40) ('c'*40);Check $true 'exact successor read restored'
+foreach($entry in $unchangedRetirement.GetEnumerator()) {
+ Check ((Hash ([IO.File]::ReadAllBytes((Join-Path $paths.directory $entry.Key)))) -ceq $entry.Value) 'original retirement bytes changed'
+}
 Assert-RetirementUpdates ('d'*40) ('e'*40);Check $true 'later ordinary release'
 Reject {Assert-ReleaseNotRetired $profile.release_id} '*do not resume*'
 $completeFile=Join-Path $paths.directory 'complete.json';$savedComplete=[IO.File]::ReadAllBytes($completeFile)

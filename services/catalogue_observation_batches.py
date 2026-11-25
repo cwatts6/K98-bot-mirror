@@ -36,6 +36,8 @@ _COMBINED_WIDTHS = {
 
 
 def statement_count(scope, *, combined_boundaries=False):
+    # Conservative ceiling: full observers can consolidate column decorations
+    # and exclude observed non-column types. Never raise admission on that saving.
     # 22 catalogue reads, one lifecycle read and a boundary after each, plus
     # opening/final boundaries. Splitting adds a read and boundary per part.
     widths = _WIDTHS | _COMBINED_WIDTHS if combined_boundaries else _WIDTHS
