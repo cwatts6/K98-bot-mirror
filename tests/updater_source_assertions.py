@@ -120,7 +120,7 @@ _OBSERVER_QUALIFIED_CANDIDATE_PAIRS = {
 _OBSERVER_OPTIONS_CORRECTION_PAIRS = {
     "scripts/p0a_release.py": [
         "0dc53a4bdff370b776c36a66d2f4be7edd39b6970734af9e5c475d15017713f0",
-        "1d3eed488fcce8e40cef158a6eac2bb3341ae6c8c74fe2067329bf4df6a67924",
+        "4930e7b81a8ca53ae043ff9d74a3885c69c9e0c1d953a65eaeaccb1dd2aa9c3d",
     ],
     "scripts/recovery_release_seed.py": [
         "9705d9314a26f43da1034a0cf85a9fd92da2800a456c6827fa076793db9e2329",

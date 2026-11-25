@@ -600,9 +600,11 @@ def sql_payload(spec, environment, read_blob):
         expected = (
             OBSERVER_PROFILE_SHA256
             if profile["profile"] == "p02_catalogue_observer_v1"
-            else OPTIONS_PROFILE_SHA256
-            if profile["profile"] == "p02_observer_options_v1"
-            else RETURN_PROFILES[profile["migration_id"]][1]
+            else (
+                OPTIONS_PROFILE_SHA256
+                if profile["profile"] == "p02_observer_options_v1"
+                else RETURN_PROFILES[profile["migration_id"]][1]
+            )
         )
         if sha(raw) != expected or json.loads(raw) != profile:
             raise ValueError(
