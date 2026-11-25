@@ -164,6 +164,7 @@ CONTRACT_ARCHIVE_MEMBERS = (
     "deploy/p02_d4_activation_scope.json",
     "deploy/p02_observer_activation_scope.json",
     "deploy/p02_observer_legacy_source.json",
+    "deploy/p02_observer_options_protocol.json",
     "deploy/p02_observer_protocol.json",
     "deploy/p02_phase1_activation_scope.json",
     "deploy/s11_activation_scope.json",

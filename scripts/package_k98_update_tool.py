@@ -98,6 +98,8 @@ def retirement_profile(raw):
         "request",
         "start",
     )
+    if isinstance(profile, dict) and profile.get("version") == 2:
+        hashes += ("derived_bindings",)
     fields = {
         "version",
         "kind",
@@ -116,7 +118,7 @@ def retirement_profile(raw):
         or set(profile) != fields
         or any(not isinstance(profile[key], str) for key in fields - {"version", "receipts"})
         or type(profile["version"]) is not int
-        or profile["version"] != 1
+        or profile["version"] not in (1, 2)
         or profile["kind"] != "failed_readiness_retirement"
         or profile["host"] != "MINI_AMD"
         or not re.fullmatch(r"S-1-5-21-(?:[0-9]+-){3}[0-9]+", profile["sid"])
@@ -132,6 +134,9 @@ def retirement_profile(raw):
         for step in ("source", "seed", "start")
         for state in ("intent", "complete")
     }
+    if profile["version"] == 2:
+        receipts.remove("start.complete.json")
+        receipts.update({"sql-00.intent.json", "sql-00.complete.json"})
     if (
         not isinstance(profile["receipts"], dict)
         or set(profile["receipts"]) != receipts

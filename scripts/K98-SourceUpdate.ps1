@@ -223,7 +223,8 @@ function Assert-ContractVerifier {
  if($archive.Count -ne 1 -or $archive[0].sha256 -cne $c.contract_verifier_sha256){throw 'Contract verifier not sealed'}
  $null=Read-Bytes (Join-Path $PSScriptRoot 'contract_verifier.zip') $c.contract_verifier_sha256 2MB
 }
-function Resolve-RecoverySeed([switch]$Create) {
+function Resolve-RecoverySeed([switch]$Create,[switch]$RetainedOnly) {
+ if($Create -and $RetainedOnly){throw 'Choose seed creation or retained verification'}
  if($null -eq $c.PSObject.Properties['recovery_seed']){return 0}
  if($c.recovery_seed -cne 'live_sql_observation_v1'){throw 'Unknown recovery seed protocol'}
  Assert-Source $c.new_pins $c.target
@@ -238,6 +239,7 @@ function Resolve-RecoverySeed([switch]$Create) {
  $null=Read-Bytes $c.venv.path $c.venv.sha256 4MB
  $arguments=@('-I','-B',$helper,'--bindings',(Join-Path $PSScriptRoot 'ReleaseBindings.json'),'--sha256',$ExpectedBindingsSHA256)
  if($Create){$arguments+='--create'}
+ if($RetainedOnly){$arguments+='--retained-only'}
  & $c.venv.path @arguments | Out-Host
  $code=$LASTEXITCODE
  if($code -in @(10,11)){return $code}
@@ -246,8 +248,9 @@ function Resolve-RecoverySeed([switch]$Create) {
  $binding=Join-Path $directory 'bindings.json'
  $raw=Read-Bytes $binding
  $derived=[Text.Encoding]::UTF8.GetString($raw)|ConvertFrom-Json
- # The helper rechecks all three live SQL contracts and recomputes this file
- # from protected collected rows. No operational binding may be changed by it.
+ # Recompute from protected collected rows. After seed installation, native
+ # start/readiness verification owns fresh SQL; seed reuse is historical only.
+ # No operational binding may be changed by this derivation.
  if(@($derived.PSObject.Properties).Count -ne @($c.PSObject.Properties).Count){throw 'Derived binding fields differ'}
  foreach($property in $c.PSObject.Properties) {
   if($property.Name -notin @('seed_members','new_policy','new_policy_sha256') -and -not(Same $derived.($property.Name) $property.Value)){throw ('Derived operational binding differs: '+$property.Name)}
@@ -949,7 +952,8 @@ try {
   ($Action -ceq 'Preflight' -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'start-requested.json')))
  )) {
   if($Action -ceq 'ApplySeed'){Assert-ContinuationIntent 'seed'}
-  $seedCode=Resolve-RecoverySeed -Create:($Action -ceq 'ApplySeed')
+  $retainedSeed=$Action -in @('VerifyStart','ApplyStart','VerifyReadiness','AwaitReadiness','Preflight')
+  $seedCode=Resolve-RecoverySeed -Create:($Action -ceq 'ApplySeed') -RetainedOnly:$retainedSeed
   if($seedCode -ne 0) {
    if($Action -ceq 'VerifySeed' -and -not(Test-Path -LiteralPath $c.new_seed_directory) -and -not(Test-Path -LiteralPath $c.new_state_directory)){exit $seedCode}
    throw 'Verified recovery seed required before installation or startup'

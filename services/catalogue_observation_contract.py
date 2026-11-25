@@ -20,12 +20,18 @@ from services.export_contract_resources import read_contract_resource
 
 PROTOCOL_SHA256 = "73be803fe432907cccee0ed86fe593e733b6d682959f4e526f6d7ec47d7a53cc"
 
+OPTIONS_PROTOCOL_SHA256 = "b2bcb43e6558077a02e8a71bb7a5e638d385de12c9ce8ac13f4418efabef45cc"
+_PROTOCOL_RESOURCES = {
+    PROTOCOL_SHA256: "p02_observer_protocol.json",
+    OPTIONS_PROTOCOL_SHA256: "p02_observer_options_protocol.json",
+}
 
-def reviewed_protocol_modules():
+
+def reviewed_protocol_modules(protocol_sha256=PROTOCOL_SHA256):
     """Read only the source resource accompanying this code, never live SQL."""
     try:
-        source = json.loads(read_contract_resource("p02_observer_protocol.json"))
-        if digest(source).hex() != PROTOCOL_SHA256:
+        source = json.loads(read_contract_resource(_PROTOCOL_RESOURCES[protocol_sha256]))
+        if digest(source).hex() != protocol_sha256:
             raise ValueError("Protocol source digest differs")
         rows = source["modules"]
         if len(rows) != len(MODULES) or {row["name"] for row in rows} != MODULES:
@@ -81,7 +87,8 @@ class ObservationInstallation:
             or set(approved) != fields
             or type(approved["version"]) is not int
             or approved["version"] != 1
-            or approved["protocol_sha256"] != PROTOCOL_SHA256
+            or not isinstance(approved["protocol_sha256"], str)
+            or approved["protocol_sha256"] not in _PROTOCOL_RESOURCES
             or type(approved["bootstrap_generation"]) is not int
             or approved["bootstrap_generation"] != 1
             or any(
@@ -107,7 +114,11 @@ class ObservationInstallation:
         identity += (approved["sequence_object_id"], created, modified)
         object.__setattr__(self, "identity", identity)
         object.__setattr__(self, "bootstrap_generation", approved["bootstrap_generation"])
-        object.__setattr__(self, "modules", tuple(sorted(reviewed_protocol_modules().items())))
+        object.__setattr__(
+            self,
+            "modules",
+            tuple(sorted(reviewed_protocol_modules(approved["protocol_sha256"]).items())),
+        )
 
     def require_modules(self, expected):
         if not isinstance(expected, Mapping):

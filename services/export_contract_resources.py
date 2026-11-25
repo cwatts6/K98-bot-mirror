@@ -14,6 +14,7 @@ _RESOURCES = frozenset(
         "p02_phase1_activation_scope.json",
         "p02_d4_activation_scope.json",
         "p02_observer_protocol.json",
+        "p02_observer_options_protocol.json",
         "p02_observer_legacy_source.json",
         "p02_observer_activation_scope.json",
     }

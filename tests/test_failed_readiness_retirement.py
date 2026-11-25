@@ -272,3 +272,29 @@ Write-Output 'ACTUAL_CONSUMER_PASS: package accepted; missing, substituted and c
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "ACTUAL_CONSUMER_PASS" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "damage", [None, "missing_sql", "fake_start", "missing_derived", "extra_step", "version"]
+)
+def test_completed_sql_failed_start_retirement_has_an_explicit_shape(damage):
+    document = profile()
+    document.update(version=2, derived_bindings_sha256="d" * 64)
+    del document["receipts"]["start.complete.json"]
+    document["receipts"].update({"sql-00.intent.json": "a" * 64, "sql-00.complete.json": "b" * 64})
+    if damage == "missing_sql":
+        del document["receipts"]["sql-00.complete.json"]
+    elif damage == "fake_start":
+        document["receipts"]["start.complete.json"] = "a" * 64
+    elif damage == "missing_derived":
+        del document["derived_bindings_sha256"]
+    elif damage == "extra_step":
+        document["receipts"]["sql-01.complete.json"] = "a" * 64
+    elif damage == "version":
+        document["version"] = 1
+    raw = json.dumps(document).encode()
+    if damage is None:
+        assert retirement_profile(raw) == document
+    else:
+        with pytest.raises(ValueError):
+            retirement_profile(raw)

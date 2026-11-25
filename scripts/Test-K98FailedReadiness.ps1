@@ -113,6 +113,35 @@ $livePlan.manifests.bot='C:\elsewhere';Reject {Get-RetirementRuntime $context} '
 $issuer.plan_sha256='b'*64;Reject {Get-RetirementRuntime $context} '*issuer publication*';$issuer.plan_sha256='d'*64
 $issuer.issuer.pid=1;Reject {Get-RetirementRuntime $context} '*distinct retirement*';$issuer.issuer.pid=3
 
+# Explicit completed-SQL / failed VerifyStart profile. Never synthesize start.complete.
+$v2=$profile|ConvertTo-Json -Depth 12|ConvertFrom-Json
+$v2.version=2;$v2|Add-Member NoteProperty derived_bindings_sha256 ('d'*64)
+$v2.receipts.PSObject.Properties.Remove('start.complete.json')
+$v2.receipts|Add-Member NoteProperty 'sql-00.intent.json' ('a'*64)
+$v2.receipts|Add-Member NoteProperty 'sql-00.complete.json' ('a'*64)
+Assert-RetirementProfile $v2;Check $true 'completed SQL failed-start profile accepted'
+$v2.receipts|Add-Member NoteProperty 'start.complete.json' ('a'*64)
+Reject {Assert-RetirementProfile $v2} '*completed source/seed/start*'
+$v2.receipts.PSObject.Properties.Remove('start.complete.json')
+$manifest.steps=@(@{id='sql-00';kind='sql'},@{id='source';kind='source'},@{id='seed';kind='seed'},@{id='start';kind='start'},@{id='readiness';kind='readiness'})
+$bindings|Add-Member NoteProperty new_policy ([pscustomobject]@{source_hashes=@{a='b'};flags=@{a=$true};state_directory=$newState;predecessor=@{nonce='same'};seed_plan=@{path='fixed';sha256=('a'*64)}})
+$derived=$bindings|ConvertTo-Json -Depth 12|ConvertFrom-Json
+$derived.new_policy_sha256='d'*64;$derived.new_policy.seed_plan.sha256='d'*64
+$records[(Join-Path $stage 'verified-seed\bindings.json')]=$derived
+$context2=Get-RetirementContext $v2
+Check ($context2.bindings.new_policy_sha256 -ceq ('d'*64)) 'uses authenticated derived installed seed'
+$derived.target='c'*40;Reject {Get-RetirementContext $v2} '*operational binding*';$derived.target='a'*40
+$derived.new_policy.flags.a=$false;Reject {Get-RetirementContext $v2} '*operational policy*';$derived.new_policy.flags.a=$true
+$derived.new_policy.seed_plan.path='other';Reject {Get-RetirementContext $v2} '*seed location*';$derived.new_policy.seed_plan.path='fixed'
+$derived|Add-Member NoteProperty unreviewed $true;Reject {Get-RetirementContext $v2} '*shape differs*';$derived.PSObject.Properties.Remove('unreviewed')
+$records['C:\ProgramData\K98\S11\updates\active.json'].release_id=$profile.release_id
+$script:receiptCount=7
+foreach($entry in $v2.receipts.PSObject.Properties){$parts=$entry.Name.Split('.');$records[(Join-Path (Join-Path $stage '.receipts') $entry.Name)]=[pscustomobject]@{release_id=$v2.release_id;step=$parts[0];stage=$(if($parts[1] -ceq 'complete'){'verified'}else{'starting'})}}
+Assert-RetirementEvidence $context2;Check $true 'completed SQL and unacknowledged start remain distinguished'
+$sqlReceipt=$records[(Join-Path (Join-Path $stage '.receipts') 'sql-00.complete.json')]
+$sqlReceipt.stage='starting';Reject {Assert-RetirementEvidence $context2} '*receipt differs*';$sqlReceipt.stage='verified'
+$script:receiptCount=8;Reject {Assert-RetirementEvidence $context2} '*advanced*';$script:receiptCount=7
+
 # Restore real filesystem adapters; keep only custody substituted for an ordinary
 # development-account fixture. The native hard-link/stream checks and atomic
 # file writes/moves execute unchanged on NTFS.

@@ -3,8 +3,9 @@
 # Requires the existing protected-read/write and source-custody primitives.
 function Assert-RetirementProfile($Profile) {
  $fields='active_sha256,approved_target,bindings_sha256,drain_sha256,failure_evidence_sha256,host,journal_name,journal_sha256,kind,manifest_sha256,prepared_sha256,receipts,release_id,request_sha256,sid,start_sha256,version,work'
+ if($Profile.version -eq 2){$fields=(@(($fields.Split(','))+@('derived_bindings_sha256'))|Sort-Object) -join ','}
  if((($Profile.PSObject.Properties.Name|Sort-Object) -join ',') -cne $fields -or
-    $Profile.version -isnot [int] -or $Profile.version -ne 1 -or $Profile.kind -cne 'failed_readiness_retirement' -or
+    $Profile.version -isnot [int] -or $Profile.version -notin @(1,2) -or $Profile.kind -cne 'failed_readiness_retirement' -or
     $Profile.host -cne 'MINI_AMD' -or $Profile.sid -cnotmatch '^S-1-5-21-(?:[0-9]+-){3}[0-9]+$' -or
     $Profile.release_id -cnotmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -or
     $Profile.work -cnotmatch '^C:\\ProgramData\\K98\\S11\\updates\\[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -or
@@ -14,6 +15,10 @@ function Assert-RetirementProfile($Profile) {
   if($Profile.($name+'_sha256') -cnotmatch '^[a-f0-9]{64}$'){throw 'Retirement profile digest differs'}
  }
  $expected=@('seed.complete.json','seed.intent.json','source.complete.json','source.intent.json','start.complete.json','start.intent.json')
+ if($Profile.version -eq 2){
+  if($Profile.derived_bindings_sha256 -cnotmatch '^[a-f0-9]{64}$'){throw 'Retirement derived binding digest differs'}
+  $expected=@('seed.complete.json','seed.intent.json','source.complete.json','source.intent.json','sql-00.complete.json','sql-00.intent.json','start.intent.json')
+ }
  if((@($Profile.receipts.PSObject.Properties.Name|Sort-Object) -join ',') -cne ($expected -join ',')){throw 'Only completed source/seed/start retirement is supported'}
  foreach($entry in $Profile.receipts.PSObject.Properties){if($entry.Value -cnotmatch '^[a-f0-9]{64}$'){throw 'Retirement receipt digest differs'}}
 }
@@ -69,10 +74,11 @@ function Get-RetirementContext($Profile,[string]$ProfileHash=$script:retirementP
     $bindings.release_id -cne $Profile.release_id -or $bindings.host -cne $Profile.host -or $bindings.sid -cne $Profile.sid -or
     $bindings.root -cne 'C:\discord_file_downloader' -or $bindings.target -cne $prepared.target -or
     $prepared.target -cnotmatch '^[a-f0-9]{40}$' -or $prepared.target -ceq $Profile.approved_target){throw 'Retirement installed release identity differs'}
- if(@($manifest.steps).Count -ne 4){throw 'Only source-only releases can be retired'}
- for($i=0;$i -lt 4;$i++) {
-  $name=@('source','seed','start','readiness')[$i]
-  if($manifest.steps[$i].id -cne $name -or $manifest.steps[$i].kind -cne $name){throw 'Only source-only releases can be retired'}
+ $steps=if($Profile.version -eq 1){@('source','seed','start','readiness')}else{@('sql-00','source','seed','start','readiness')}
+ if(@($manifest.steps).Count -ne $steps.Count){throw 'Only the exact source-only or completed-SQL release can be retired'}
+ for($i=0;$i -lt $steps.Count;$i++) {
+  $name=$steps[$i];$kind=if($name -ceq 'sql-00'){'sql'}else{$name}
+  if($manifest.steps[$i].id -cne $name -or $manifest.steps[$i].kind -cne $kind){throw 'Only the exact source-only or completed-SQL release can be retired'}
  }
  foreach($path in @($bindings.old_policy.StateDirectory,$bindings.new_state_directory)) {
   if($path -cnotmatch '^C:\\ProgramData\\K98\\S11\\automatic-startup\\[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$'){throw 'Retirement state path differs'}
@@ -84,6 +90,19 @@ function Get-RetirementContext($Profile,[string]$ProfileHash=$script:retirementP
  $oldPolicy=Read-RetirementJson $manifest.policy.path $manifest.policy.sha256
  if($oldPolicy.state_directory -cne $bindings.old_policy.StateDirectory){throw 'Retirement predecessor policy differs'}
  $stage=Join-Path $bindings.old_policy.StateDirectory ('release-'+$Profile.release_id)
+ if($Profile.version -eq 2){
+  $derived=Read-RetirementJson (Join-Path $stage 'verified-seed\bindings.json') $Profile.derived_bindings_sha256
+  if((@($derived.PSObject.Properties.Name|Sort-Object) -join ',') -cne (@($bindings.PSObject.Properties.Name|Sort-Object) -join ',')){throw 'Retirement derived binding shape differs'}
+  foreach($entry in $bindings.PSObject.Properties){
+   if($entry.Name -cin @('new_policy','new_policy_sha256','seed_members')){continue}
+   if(($entry.Value|ConvertTo-Json -Depth 80 -Compress) -cne ($derived.($entry.Name)|ConvertTo-Json -Depth 80 -Compress)){throw ('Retirement operational binding differs: '+$entry.Name)}
+  }
+  foreach($key in @('source_hashes','flags','state_directory','predecessor')){
+   if(($bindings.new_policy.$key|ConvertTo-Json -Depth 80 -Compress) -cne ($derived.new_policy.$key|ConvertTo-Json -Depth 80 -Compress)){throw 'Retirement operational policy differs'}
+  }
+  if($bindings.new_policy.seed_plan.path -cne $derived.new_policy.seed_plan.path){throw 'Retirement seed location differs'}
+  $bindings=$derived
+ }
  if($ProfileHash -cnotmatch '^[a-f0-9]{64}$'){throw 'Retirement profile hash required'}
  $marker=[ordered]@{version=1;kind='failed_readiness_retirement';release_id=$Profile.release_id;profile_sha256=$ProfileHash}
  [pscustomobject]@{profile=$Profile;paths=$paths;prepared=$prepared;manifest=$manifest;bindings=$bindings;stage=$stage;
@@ -94,6 +113,7 @@ function Assert-RetirementEvidence($Context,[switch]$Archived) {
  $p=$Context.profile;$b=$Context.bindings;$stage=$Context.stage
  $null=Read-RetirementBytes (Join-Path $stage '.release.json') $p.manifest_sha256 65536
  $null=Read-RetirementBytes (Join-Path $stage 'ReleaseBindings.json') $p.bindings_sha256
+ if($p.version -eq 2){$null=Read-RetirementBytes (Join-Path $stage 'verified-seed\bindings.json') $p.derived_bindings_sha256}
  $null=Read-RetirementBytes (Join-Path $stage 'start-requested.json') $p.start_sha256
  $request=Read-RetirementJson (Join-Path $b.old_policy.StateDirectory 'deployment-request.json') $p.request_sha256
  $drain=Read-RetirementJson (Join-Path $b.old_policy.StateDirectory ('deployment-drained-'+$p.release_id+'.json')) $p.drain_sha256
@@ -101,8 +121,9 @@ function Assert-RetirementEvidence($Context,[switch]$Archived) {
     $drain.stage -cne 'deployment_drained' -or $drain.request_sha256 -cne $p.request_sha256){throw 'Retirement request/drain identity differs'}
  $receiptRoot=Join-Path $stage '.receipts'
  Assert-RetirementDirectory $receiptRoot
- $items=@(Get-ChildItem -LiteralPath $receiptRoot -Force|Select-Object -First 7)
- if($items.Count -ne 6 -or @($items|Where-Object {$_.PSIsContainer}).Count){throw 'Retirement release has advanced or lacks completed stages'}
+ $count=if($p.version -eq 1){6}else{7}
+ $items=@(Get-ChildItem -LiteralPath $receiptRoot -Force|Select-Object -First ($count+1))
+ if($items.Count -ne $count -or @($items|Where-Object {$_.PSIsContainer}).Count){throw 'Retirement release has advanced or lacks completed stages'}
  foreach($entry in $p.receipts.PSObject.Properties) {
   $record=Read-RetirementJson (Join-Path $receiptRoot $entry.Name) $entry.Value
   $parts=$entry.Name.Split('.');$expected=if($parts[1] -ceq 'complete'){'verified'}else{'starting'}

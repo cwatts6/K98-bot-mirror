@@ -7,6 +7,7 @@ object images nor expected permissions are learned from the installation.
 """
 
 from copy import deepcopy
+from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
@@ -54,10 +55,14 @@ def validate_specification(value):
     if not 1 <= len(value["sources"]) <= 128:
         raise ValueError("Bounded protected recovery inventory required.")
     family = value.get("sql", {}).get("profile", {}).get("profile")
-    observer = family in {"p02_catalogue_observer_v1", "p02_observer_return_v1"}
+    observer = family in {
+        "p02_catalogue_observer_v1",
+        "p02_observer_return_v1",
+        "p02_observer_options_v1",
+    }
     source_pattern = r"(?:core|services|scripts|ui/views)/[a-z_]+\.py|(?:run_bot|bot_config|constants|processing_pipeline|file_utils)\.py"
     if observer:
-        source_pattern += r"|scripts/[a-z0-9_]+\.py|kvk/(?:dal|services)/[a-z_]+\.py|(?:bot_instance|proc_config_import|player_stats_cache|kvk_all_importer|stats_module)\.py|deploy/p02_observer_(?:protocol|legacy_source|activation_scope|application_sources)\.json"
+        source_pattern += r"|scripts/[a-z0-9_]+\.py|kvk/(?:dal|services)/[a-z_]+\.py|(?:bot_instance|proc_config_import|player_stats_cache|kvk_all_importer|stats_module)\.py|deploy/p02_observer_(?:protocol|options_protocol|legacy_source|activation_scope|application_sources)\.json"
     paths = set()
     for row in value["sources"]:
         if set(row) != {"path", "before", "after"} or not re.fullmatch(
@@ -118,6 +123,8 @@ def validate_specification(value):
             raise ValueError("Three matching application contracts required.")
         if family == "p02_observer_return_v1":
             validate_return_contracts(value)
+        if family == "p02_observer_options_v1":
+            validate_options_contracts(value)
 
 
 def validate_sql_policy(sql):
@@ -126,6 +133,8 @@ def validate_sql_policy(sql):
     ):
         raise ValueError("Exact reviewed SQL revision required.")
     profile = sql["profile"]
+    if isinstance(profile, dict) and profile.get("profile") == "p02_observer_options_v1":
+        return validate_options_sql_policy(sql)
     if isinstance(profile, dict) and profile.get("profile") == "p02_observer_return_v1":
         return validate_return_sql_policy(sql)
     if isinstance(profile, dict) and profile.get("profile") == "p02_catalogue_observer_v1":
@@ -373,6 +382,140 @@ def validate_return_contracts(value):
         raise ValueError("Only the application contract carries the original incarnation.")
 
 
+OPTIONS_REVIEW_ID = "fdb157e4-b699-4957-ad96-a1ec2038dbbf"
+OPTIONS_MIGRATION = "20261125_001_p02_observer_xml_options"
+OPTIONS_PROFILE_SHA256 = "ebf2a575c20c439a8f63496171c0602a649c0e09ddb7c05fa6b8abef66017bfe"
+OPTIONS_BEFORE_METADATA = "f575d6a9dfdfa74bc628d2e22e79924c4ce9cec63428321814a6f6b9d8c9994c"
+OPTIONS_AFTER_METADATA = "23a2ba93ba2cf8b4d8c685fcfdcd36b7a3282e7299feb11b7504c69d39ecc9e2"
+
+
+def validate_options_sql_policy(sql):
+    """One fixed trigger amendment, using the complete existing SQL runner closure."""
+    profile = sql["profile"]
+    if (
+        profile.get("version") != 1
+        or profile.get("migration_id") != OPTIONS_MIGRATION
+        or profile.get("requires")
+        != [dict(migration_id=OBSERVER_MIGRATION, sha256=OBSERVER_PROFILE_SHA256, status="Applied")]
+    ):
+        raise ValueError("Exact options correction and original observer history required.")
+    expected = {
+        "deploy/" + name
+        for name in (
+            "Deploy-SqlMigration.ps1",
+            "SqlDeploy.ModuleRelease.ps1",
+            "SqlDeploy.P02D4Release.ps1",
+            "SqlDeploy.Phase1Release.ps1",
+            "SqlDeploy.P02ObserverRelease.ps1",
+            "SqlDeploy.P02ObserverReturn.ps1",
+            "SqlDeploy.P02ObserverOptions.ps1",
+        )
+    } | {
+        "migrations/" + OPTIONS_MIGRATION + suffix
+        for suffix in (".sql", ".release.json", ".before.sql", ".after.sql")
+    }
+    rows = sql["members"]
+    if (
+        not isinstance(rows, list)
+        or len(rows) != len(expected)
+        or any(
+            not isinstance(row, dict)
+            or set(row) != {"path", "sha256"}
+            or row["path"] not in expected
+            or not re.fullmatch(r"[a-f0-9]{64}", row["sha256"])
+            for row in rows
+        )
+    ):
+        raise ValueError("Complete options correction SQL runner required.")
+    pins = {row["path"]: row["sha256"] for row in rows}
+    if (
+        set(pins) != expected
+        or pins["migrations/" + OPTIONS_MIGRATION + ".release.json"] != OPTIONS_PROFILE_SHA256
+    ):
+        raise ValueError("Fixed reviewed options correction profile required.")
+    for member, suffix in (
+        (profile["script"], ".sql"),
+        (profile["checks"]["before"], ".before.sql"),
+        (profile["checks"]["after"], ".after.sql"),
+    ):
+        if (
+            set(member) != {"file", "sha256"}
+            or member["file"] != OPTIONS_MIGRATION + suffix
+            or pins["migrations/" + member["file"]] != member["sha256"]
+        ):
+            raise ValueError("Options correction profile and SQL member disagree.")
+
+
+def validate_options_contracts(value):
+    """Carry the original issued sequence; only the reviewed trigger fingerprint changes."""
+    original_protocol = "73be803fe432907cccee0ed86fe593e733b6d682959f4e526f6d7ec47d7a53cc"
+    corrected_protocol = "b2bcb43e6558077a02e8a71bb7a5e638d385de12c9ce8ac13f4418efabef45cc"
+    pairs = value["contracts"]
+    for name in ("sql_contract", "legacy_sql_contract"):
+        if pairs[name]["before"] != pairs[name]["after"]:
+            raise ValueError("Options correction cannot change fixed or legacy contracts.")
+    before, after = (pairs["application_sql_contract"][phase] for phase in ("before", "after"))
+    if (
+        before.get("observer_installation") != OBSERVER_MIGRATION
+        or before.get("metadata_hash") != OPTIONS_BEFORE_METADATA
+        or after.get("metadata_hash") != OPTIONS_AFTER_METADATA
+    ):
+        raise ValueError("Exact source-derived options metadata transition required.")
+    old = before.get("observation_installation")
+    new = after.get("observation_installation")
+    fields = {
+        "version",
+        "protocol_sha256",
+        "server",
+        "database",
+        "database_id",
+        "principal",
+        "login",
+        "sequence_object_id",
+        "sequence_created",
+        "sequence_modified",
+        "bootstrap_generation",
+    }
+    for installation in (old, new):
+        if (
+            not isinstance(installation, dict)
+            or set(installation) != fields
+            or any(
+                type(installation[key]) is not int or installation[key] != 1
+                for key in ("version", "bootstrap_generation")
+            )
+            or any(
+                type(installation[key]) is not int or not 0 < installation[key] < 2**31
+                for key in ("database_id", "sequence_object_id")
+            )
+            or any(
+                not isinstance(installation[key], str)
+                or not 1 <= len(installation[key]) <= 128
+                or installation[key] != installation[key].strip()
+                for key in ("server", "database", "principal", "login")
+            )
+        ):
+            raise ValueError("Complete issued observer installation required.")
+        stamp = installation["sequence_created"]
+        if (
+            not isinstance(stamp, str)
+            or stamp != installation["sequence_modified"]
+            or datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%f").isoformat(timespec="microseconds")
+            != stamp
+        ):
+            raise ValueError("Original unaltered observer sequence timestamps required.")
+    if old["protocol_sha256"] != original_protocol or new["protocol_sha256"] != corrected_protocol:
+        raise ValueError("Exact original and corrected observer protocols required.")
+    expected = deepcopy(before)
+    expected["metadata_hash"] = OPTIONS_AFTER_METADATA
+    expected["review_id"] = OPTIONS_REVIEW_ID
+    expected["observation_installation"]["protocol_sha256"] = corrected_protocol
+    if after != expected:
+        raise ValueError(
+            "Options correction must preserve the original installation and other fields."
+        )
+
+
 def selected_specification(before):
     value = specification()
     specs = value["releases"] if value.get("version") == 2 else [value]
@@ -447,12 +590,18 @@ def sql_payload(spec, environment, read_blob):
         files[name] = raw
     profile = deepcopy(sql["profile"])
     name = profile["migration_id"] + ".release.json"
-    if profile.get("profile") in {"p02_catalogue_observer_v1", "p02_observer_return_v1"}:
+    if profile.get("profile") in {
+        "p02_catalogue_observer_v1",
+        "p02_observer_return_v1",
+        "p02_observer_options_v1",
+    }:
         validate_sql_policy(sql)
         raw = files[name]
         expected = (
             OBSERVER_PROFILE_SHA256
             if profile["profile"] == "p02_catalogue_observer_v1"
+            else OPTIONS_PROFILE_SHA256
+            if profile["profile"] == "p02_observer_options_v1"
             else RETURN_PROFILES[profile["migration_id"]][1]
         )
         if sha(raw) != expected or json.loads(raw) != profile:

@@ -116,8 +116,37 @@ _OBSERVER_QUALIFIED_CANDIDATE_PAIRS = {
 }
 
 
+# Exact test-only bridge for this focused correction. Original source and registry pins remain unchanged.
+_OBSERVER_OPTIONS_CORRECTION_PAIRS = {
+    "scripts/p0a_release.py": [
+        "0dc53a4bdff370b776c36a66d2f4be7edd39b6970734af9e5c475d15017713f0",
+        "1d3eed488fcce8e40cef158a6eac2bb3341ae6c8c74fe2067329bf4df6a67924",
+    ],
+    "scripts/recovery_release_seed.py": [
+        "9705d9314a26f43da1034a0cf85a9fd92da2800a456c6827fa076793db9e2329",
+        "af596ab93de1504efe8b67bcedbe195eb2a3374f6ebf3841a02512a79eed4957",
+    ],
+    "scripts/verify_k98_update_pair.py": [
+        "517fcd956d57a160c5b9f8bd5a4bca688679354cdb092f40e2d38145ea836405",
+        "3d60fc5998f40f4b2d7b86c789d8a981a53b53993cd977fdde048c04f8d231ea",
+    ],
+    "services/application_maintenance_contract.py": [
+        "b71930b8e562d20e83b97b16674a91a8341a9d2a848ed43b22b47fcc5c984241",
+        "0d45e9c2b064c1eb355bd625966d91f20e158096ff4d78ed83eb1cc77ac882c4",
+    ],
+    "services/export_contract_resources.py": [
+        "c572ddc2d462d77348f459684117e43e7961180ba05abee33322a488a3e46309",
+        "7a1711b76b812ac24d6a58e2b00a790190b6abb4e3ea8ed15bd2075c09006044",
+    ],
+}
+
+
 def before_observer_hash(root, path):
     actual = prepare_k98_update.sha256((root / path).read_bytes().replace(b"\r\n", b"\n"))
+    if path in _OBSERVER_OPTIONS_CORRECTION_PAIRS:
+        predecessor, candidate = _OBSERVER_OPTIONS_CORRECTION_PAIRS[path]
+        assert actual == candidate, path
+        actual = predecessor
     if path in _OBSERVER_QUALIFIED_CANDIDATE_PAIRS:
         predecessor, candidate = _OBSERVER_QUALIFIED_CANDIDATE_PAIRS[path]
         assert actual == candidate, path

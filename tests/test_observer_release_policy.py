@@ -310,12 +310,15 @@ switch($Damage) {
     }
 
 
-def test_windows_git_checkout_preserves_pinned_observer_bytes(release, tmp_path):
+@pytest.mark.parametrize(
+    "resource", ["p02_observer_protocol.json", "p02_observer_options_protocol.json"]
+)
+def test_windows_git_checkout_preserves_pinned_observer_bytes(release, tmp_path, resource):
     """Exercise Git's real filters without touching either worktree's index."""
     spec, files, _, _ = release
     source = Path(os.environ["K98_OBSERVER_SQL_SOURCE"])
     bot = Path(__file__).resolve().parents[1]
-    protocol = json.loads((bot / "deploy/p02_observer_protocol.json").read_bytes())
+    protocol = json.loads((bot / "deploy" / resource).read_bytes())
     pins = {
         name: row["raw_source_sha256"]
         for row in [*protocol["modules"], protocol["sequence"]]
@@ -343,6 +346,13 @@ def test_windows_git_checkout_preserves_pinned_observer_bytes(release, tmp_path)
     (fixture / ".gitattributes").write_bytes((source / ".gitattributes").read_bytes())
     for name, digest in pins.items():
         raw = files[name] if name in files else (source / name).read_bytes()
+        if (
+            resource == "p02_observer_protocol.json"
+            and name == "sql_schema/tr_P02CatalogueObservation.DatabaseTrigger.sql"
+        ):
+            # Retain the immutable predecessor fixture after its source snapshot advances.
+            body = next(row["definition"] for row in protocol["modules"] if row["path"] == name)
+            raw = ("SET ANSI_NULLS ON;\nSET QUOTED_IDENTIFIER ON;\nGO\n" + body + "GO\n").encode()
         assert policy.sha(raw) == digest
         target = fixture / name
         target.parent.mkdir(parents=True, exist_ok=True)

@@ -184,7 +184,11 @@ def canonical_lifecycle_metadata(
         _require(
             observation_guard == "catalogue_generation_v1", "observer generation proof required."
         )
-        canonical = canonical_observer_metadata(observed["metadata"], observed["schema_identity"])
+        canonical = canonical_observer_metadata(
+            observed["metadata"],
+            observed["schema_identity"],
+            protocol_sha256=approved.get("observation_installation", {}).get("protocol_sha256"),
+        )
     else:
         canonical = canonical_application_metadata(
             observed["metadata"], observed["schema_identity"]

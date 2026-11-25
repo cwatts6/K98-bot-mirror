@@ -213,13 +213,49 @@ def load_release_verifier(config):
     return verifier
 
 
+def verify_retained_seed(config, binding_hash, candidate, directory, read):
+    """Revalidate installed seed evidence only; never claim fresh SQL admission.
+
+    Used after seed installation. The native/start/readiness verifier separately
+    owns fresh contracts and process/session admission. Protected historical rows
+    remain the input to deterministic seed derivation, never current SQL state.
+    """
+    from core.export_startup_windows import administrative_path
+
+    if not directory.exists():
+        return 10
+    administrative_path(directory, private=True)
+    proof_path = directory / "sql-evidence.json"
+    if not proof_path.exists():
+        return 11
+    proof = json.loads(read(proof_path))
+    files = prepare_verified_files(config, binding_hash, candidate, proof)
+    for member in directory.iterdir():
+        if member.name not in {*files, "sql-evidence.json"} and not re.fullmatch(
+            r"pending-[0-9a-f]{32}", member.name
+        ):
+            raise ValueError("Unknown verified seed member.")
+        administrative_path(member, private=True)
+        if not member.is_file():
+            raise ValueError("Unexpected verified seed directory.")
+    for name, content in files.items():
+        if not (directory / name).exists():
+            return 11
+        if read(directory / name) != content:
+            raise ValueError("Verified seed differs from collected evidence: " + name)
+    print(json.dumps(dict(stage="RECOVERY_SEED_RETAINED_EVIDENCE_VERIFIED", live_sql=False)))
+    return 0
+
+
 def main():
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bindings", required=True)
     parser.add_argument("--sha256", required=True)
-    parser.add_argument("--create", action="store_true")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--create", action="store_true")
+    modes.add_argument("--retained-only", action="store_true")
     args = parser.parse_args()
     if not sys.flags.isolated:
         raise ValueError("Isolated reviewed Python required.")
@@ -250,6 +286,10 @@ def main():
     if read(path) != raw:
         raise ValueError("Protected binding readback differs.")
     candidate = candidate_files(config, path.parent, read)
+    if args.retained_only:
+        return verify_retained_seed(
+            config, args.sha256, candidate, path.parent / "verified-seed", read
+        )
     # This returns actual complete SQL query results only after all three live
     # comparisons pass. Retain those results, including their collection time.
     from services.export_observer_contract import observer_contract

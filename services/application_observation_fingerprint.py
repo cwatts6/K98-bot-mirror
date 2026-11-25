@@ -56,10 +56,14 @@ def reviewed_procedure_hashes():
         ) from error
 
 
-def canonical_observer_metadata(metadata, identity):
+def canonical_observer_metadata(metadata, identity, *, protocol_sha256=None):
     result = canonical_application_metadata(metadata, identity)
     procedure_hashes = reviewed_procedure_hashes()
-    protocol = reviewed_protocol_modules()
+    protocol = (
+        reviewed_protocol_modules()
+        if protocol_sha256 is None
+        else reviewed_protocol_modules(protocol_sha256)
+    )
     seen = set()
     for category in ("objects", "triggers", "database_triggers"):
         for row in result["metadata"][category]:

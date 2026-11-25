@@ -45,6 +45,11 @@ foreach($code in @(10,11)) {
  Check ('--create' -notin $script:arguments) 'Verification attempted evidence creation'
 }
 Reset-Case
+Check ((Resolve-RecoverySeed -RetainedOnly) -eq 0) 'Protected retained seed did not verify'
+Check ('--retained-only' -in $script:arguments) 'Post-seed verification recollected live SQL'
+Check ('--create' -notin $script:arguments) 'Retained seed verification attempted writes'
+Reject {Resolve-RecoverySeed -Create -RetainedOnly} '*Choose seed creation*'
+Reset-Case
 Check ((Resolve-RecoverySeed -Create) -eq 0) 'Verified SQL did not select derived seed'
 Check ($script:events[0] -ceq 'source') 'Helper ran before complete target source authentication'
 Check ($script:events.IndexOf('read:contract_verifier.zip') -gt 0 -and $script:events.IndexOf('read:contract_verifier.zip') -lt $script:events.IndexOf('helper')) 'Archive check did not precede helper execution'

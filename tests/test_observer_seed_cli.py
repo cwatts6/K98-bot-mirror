@@ -219,3 +219,60 @@ def test_observer_cli_interrupted_publication_preserves_first_proof(owner, monke
     if retained is not None:
         assert proof_path.read_bytes() == retained
     assert all(connection.closed for connection in owner.connections)
+
+
+def test_post_seed_verification_uses_retained_evidence_without_sql_or_writes(owner):
+    assert seed.main() == 0
+    directory = owner.root / "verified-seed"
+    before = {p.name: p.read_bytes() for p in directory.iterdir()}
+    owner.events.clear()
+    # A fresh comparison would now fail. Retained verification must not call it;
+    # independent native verification remains responsible for current admission.
+    owner.failure = "comparison"
+    owner.args.remove("--create")
+    owner.args.append("--retained-only")
+    assert seed.main() == 0
+    assert owner.events == ["derive"]
+    assert {p.name: p.read_bytes() for p in directory.iterdir()} == before
+
+
+def test_retained_seed_mode_cannot_create_evidence_or_connect_when_seed_missing(owner):
+    owner.args.remove("--create")
+    owner.args.append("--retained-only")
+    assert seed.main() == 10
+    assert owner.events == []
+    assert not (owner.root / "verified-seed").exists()
+
+
+@pytest.mark.parametrize("damage", ["release", "binding", "seed", "extra"])
+def test_retained_seed_mode_refuses_changed_proof_without_sql_or_repair(owner, damage):
+    assert seed.main() == 0
+    directory = owner.root / "verified-seed"
+    if damage in {"release", "binding"}:
+        path = directory / "sql-evidence.json"
+        proof = json.loads(path.read_bytes())
+        proof["release_id" if damage == "release" else "bindings_sha256"] = (
+            str(uuid4()) if damage == "release" else "0" * 64
+        )
+        path.write_bytes(seed.encode(proof))
+    elif damage == "seed":
+        (directory / "bot-template.json").write_bytes(b"{}")
+    else:
+        (directory / "unreviewed.json").write_bytes(b"{}")
+    before = {p.name: p.read_bytes() for p in directory.iterdir()}
+    owner.events.clear()
+    owner.args.remove("--create")
+    owner.args.append("--retained-only")
+    with pytest.raises(ValueError):
+        seed.main()
+    assert "connect" not in owner.events
+    assert "three_contracts" not in owner.events
+    assert {p.name: p.read_bytes() for p in directory.iterdir()} == before
+
+
+def test_seed_creation_and_retained_only_are_mutually_exclusive(owner):
+    owner.args.append("--retained-only")
+    with pytest.raises(SystemExit) as error:
+        seed.main()
+    assert error.value.code == 2
+    assert owner.events == []
