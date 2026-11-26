@@ -10,7 +10,7 @@ Purpose: document the weekly alliance activity Excel import path.
   generic durable import audit wiring, duplicate/success/error embeds, notify-channel fallback,
   ingest offload dispatch, and best-effort log-backup scheduling.
 - `weekly_activity_importer.py` parses and writes activity snapshots.
-- SQL schema lives in `C:\K98-bot-SQL-Server`.
+- Verify snapshot and completion contracts in the [pinned SQL repository](../../AGENTS.md#sql-validation-source).
 
 ## Expected Workbook
 

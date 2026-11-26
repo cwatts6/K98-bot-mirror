@@ -18,7 +18,7 @@ background, operational, promotion, domain, or template-support material.
 
 ## Working Rules
 
-- Step 1 must always be review/scope only unless explicitly told otherwise.
+- Start unapproved work with review and scope. For an approved task, verify the required DEV capabilities against the commissioning handoff. Carry out routine edit, DEV deploy, test, diagnosis, correction, restart and retest within that scope. Pause for a new boundary, an unsafe destructive action, unresolved ambiguity or a production decision.
 - Keep changes PR-sized and focused.
 - Avoid embedded SQL in command modules and views.
 - Prefer service and DAL layers for business logic and persistence.
@@ -61,17 +61,16 @@ background, operational, promotion, domain, or template-support material.
 - `origin` is the scrubbed Codex mirror: `K98-bot-mirror`.
 - `production` is the private production repository: `K98-bot`.
 - Codex should create branches and PRs against `K98-bot-mirror`.
-- Production promotion happens only after local validation.
-- Production changes are promoted by pushing the same branch to the `production` remote and opening a PR into `K98-bot/main`.
+- With authorised repository access, automation can apply the validated mirror file delta on a branch based on private `production/main`, open the private PR and prepare its final head for merge. Preserve private-only files and separate review evidence for both histories.
+- Private merge requires its own decision. It triggers a mirror scrub that closes open mirror PRs, including unmerged work. Preserve and reconcile all affected work using the [private merge and scrub procedure](docs/reference/Promotion%20Guide.md#private-merge-and-mirror-scrub).
+- Production promotion and execution require a separate human decision on the private-main release, SQL pairing, window and recovery plan.
 - The bot machine must deploy only from `K98-bot/main`, never from `K98-bot-mirror`.
 
-Use `docs/reference/Promotion Guide.md` only for promotion/deployment tasks.
+Use the [Promotion Guide](docs/reference/Promotion%20Guide.md) for private PR preparation, merge, promotion and deployment tasks.
 
 ## SQL Validation Source
 
-The authoritative SQL schema and stored procedures are stored in:
-
-`C:\K98-bot-SQL-Server`
+Validate intended SQL schema and stored procedures against an authorised checkout of `cwatts6/K98-bot-SQL-Server` at the SQL commit pinned in the task. `C:\K98-bot-SQL-Server` is one local example.
 
 Codex must validate all SQL-facing implementation details against that SQL repo before
 implementation:
@@ -92,11 +91,11 @@ If schema ambiguity exists:
 2. Report missing objects explicitly.
 3. Do not guess column names.
 
-Useful SQL repo searches:
+Run these example searches from the root of that verified SQL checkout:
 
 ```powershell
-rg "CREATE TABLE.*STAGING_STATS" C:\K98-bot-SQL-Server
-rg "ProcConfig" C:\K98-bot-SQL-Server
-rg "EXCEL_FOR_KVK" C:\K98-bot-SQL-Server
-rg "GovernorID" C:\K98-bot-SQL-Server
+rg "CREATE TABLE.*STAGING_STATS" .
+rg "ProcConfig" .
+rg "EXCEL_FOR_KVK" .
+rg "GovernorID" .
 ```

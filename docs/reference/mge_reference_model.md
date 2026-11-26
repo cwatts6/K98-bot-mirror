@@ -57,7 +57,7 @@ deployment and operator acceptance remain separate gates.
 
 
 Purpose: provide a quick model reference for MGE work. Validate all SQL object and column details
-against `C:\K98-bot-SQL-Server` before implementation.
+against the [pinned SQL repository](../../AGENTS.md#sql-validation-source) before implementation.
 
 ## Main Bot Areas
 

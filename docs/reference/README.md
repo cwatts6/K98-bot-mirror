@@ -1,3 +1,11 @@
+## Delivery reading map
+
+Read the approved task, [AGENTS.md](../../AGENTS.md), [README-DEV](../../README-DEV.md) and the [five core standards](#required-for-every-repo-task). Select the [conditional references](#conditional-references) for the affected command, upload, scheduler, provider, startup or recovery path. Use the [canonical task pack](../templates/Codex%20Task%20Pack%20Template.md) to pin the task and its evidence.
+
+In the project’s K98 DEV LAB folder, open **K98 SDLC-01 — Delivery baseline and first pilot design** and its **Source, workflow and evidence register**. Use **K98 DEV — Master Architecture & Operating Principles** for the overall boundary. The register’s **Drive sources** tab identifies the exact revisions and DEV-06 Phase A handoff. DEV-07 workflow evidence is pending until its owner publishes a handoff. Drive owns cross-repository policy and gate decisions. Git owns the versioned technical contracts and tests. Issues and PRs carry task decisions and evidence links. Restricted receipts stay under their existing custody.
+
+For a dedicated DEV task, record the Bot candidate, SQL commit, installed-state evidence, policy revision and the exact permitted effects. In the current commissioning sequence DEV-06 owns R/L/I and the startup hold, and DEV-07 owns wider qualification. Check the accepted profile before exercising an effect. Dated entries below remain available for outstanding obligations and audit history.
+
 > **P02 local implementation, 19 November 2026:** [Candidate implementation and native proof](../task_packs/P02%20-%20Observer%20Local%20Implementation%20-%202026-11-19.md) is the current local-work checkpoint. Production is unchanged. Native qualification and final Changes reviews remain open; earlier documentation-only phase boundaries are historical.
 
 > **P02 offline design review, 19 November 2026:** [Observer/admission decision and qualification plan](../task_packs/P02%20-%20Observer%20Admission%20Design%20and%20Qualification%20-%202026-11-19.md) recommends coherently versioned observation with same-admission reuse, subject to complete SQL invalidation and real concurrent cost/progress gates. This is a reviewable proposal, not implementation or execution approval. D7 remains 1/4; E1 is closed and failed E2 is preserved. MINI_AMD stays running. The new traceability supplement retains all 68 requirement records and 73 policy pairs. Current operator policy removes cumulative local test quotas and shortfall gates: use a finite, evidence-led plan with realistic timeouts, reuse and bounded cleanup. Earlier quota ledgers are historical records only.
@@ -516,9 +524,7 @@ docs as mandatory reading unless the task is to create or update a task pack.
 ## SQL Source Of Truth
 
 For SQL-facing work, validate object names, columns, procedures, views, indexes, and `ProcConfig`
-usage against:
-
-`C:\K98-bot-SQL-Server`
+usage against an authorised checkout of `cwatts6/K98-bot-SQL-Server` at the SQL commit pinned in the task. `C:\K98-bot-SQL-Server` is one local example.
 
 The SQL repo overrides inferred schema assumptions from Python code.
 

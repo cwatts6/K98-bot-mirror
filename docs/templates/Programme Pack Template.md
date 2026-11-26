@@ -243,9 +243,7 @@ services/<service>.py
 
 ### SQL repo areas to validate if needed
 
-```text
-C:\K98-bot-SQL-Server
-```
+Record the [SQL repository identity](../../AGENTS.md#sql-validation-source), commit and verified checkout location for this programme.
 
 List likely SQL-backed contracts:
 

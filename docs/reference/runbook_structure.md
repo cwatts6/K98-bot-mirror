@@ -32,9 +32,7 @@ Purpose: quick navigation map. Architecture rules live in
 
 ## SQL Repo
 
-SQL schema and stored procedures are authoritative in:
-
-`C:\K98-bot-SQL-Server`
+Validate intended SQL schema and stored procedures against the [pinned SQL repository](../../AGENTS.md#sql-validation-source).
 
 Use the SQL repo to validate table names, columns, stored procedures, views, indexes, and
 `ProcConfig` usage before SQL-facing Python changes.

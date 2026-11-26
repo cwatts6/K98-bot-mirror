@@ -37,17 +37,9 @@ operational, promotion, or template documents only when the task calls for them.
 
 ### Conflict Resolution
 
-Use this priority order:
+Operator instructions and commissioned profiles define permitted actions. The pinned SQL repository governs intended schema facts. Accepted observations identify the installed state at the time of collection. If intended and observed state disagree, retain both and resolve the discrepancy before dependent work.
 
-1. Live SQL schema / SQL repo contract
-2. Feature specification or explicit user instruction
-3. Project engineering standards
-4. Testing standards
-5. Coding execution guidelines
-6. Skills and refactor triggers
-7. Deferred optimisation framework
-8. Task pack
-9. Existing code patterns
+Within the authorised scope, apply the feature specification, project engineering standards, testing standards, execution guidelines, refactor guidance and deferred framework to the task pack. Record the resolution of a material conflict.
 
 Existing code patterns should be followed for consistency, but never used to justify keeping an
 anti-pattern when the standards require improvement or deferred capture.
@@ -94,20 +86,11 @@ Before coding, identify:
 Step 1 is review/scope only unless the user explicitly says to proceed in one pass or has already
 approved implementation.
 
-### 3.2 Stop-And-Confirm Workflow
+### 3.2 Task approval and unattended DEV work
 
-Default workflow:
+For unapproved work, review scope, architecture, risks and the implementation plan. Obtain the owner's decision before implementation. For an approved task, identify the exact profiles, actors, targets and effects that cover it. Approval for an explicit one-pass task includes its ordinary in-scope validation and corrections.
 
-1. Review scope.
-2. Stop for confirmation.
-3. Validate architecture and proposed design.
-4. Stop for confirmation.
-5. Present implementation plan.
-6. Stop for confirmation.
-7. Code only after approval.
-
-If the user explicitly asks for a full draft/update of standards documents, a complete task pack,
-or a one-pass implementation, proceed within that approved scope.
+Within a commissioned DEV profile, build, deploy to DEV, test, inspect failures, correct, restart and retest unattended. Preserve failed attempts and reconcile unknown outcomes before retry. Pause when the work needs a different scope or security boundary, an unsafe destructive operation, an unresolved decision or production action. The commissioning owner controls first startup and new capabilities.
 
 ### 3.3 No Line-Only Edits Mindset
 
@@ -143,7 +126,7 @@ Target placement:
 | Operational tooling | `scripts/` |
 | Tests | `tests/` |
 | Embedded Python SQL | `sql/` when justified |
-| SQL schema object | SQL repo `sql_schema/<schema>.<Object>.<Type>.sql` |
+| SQL schema change | SQL repo `migrations/`, with matching expected-state references in `sql_schema/` |
 
 Do not add new long-term domain logic to major legacy root modules. If a legacy file must be
 touched, prefer extracting new logic to the target architecture and importing it back.
@@ -194,7 +177,8 @@ SQL changes belong in the SQL Server repo.
 
 Required SQL rules:
 
-- Use `sql_schema/<schema>.<ObjectName>.<Type>.sql`.
+- Deliver intentional changes as reviewed SQL-repository migrations. Update the corresponding `sql_schema/<schema>.<ObjectName>.<Type>.sql` expected-state reference where applicable.
+- Record the exact migration set, Bot/SQL compatibility, native validation against the authorised target and rollback, restore or roll-forward plan.
 - Include `SET ANSI_NULLS ON`.
 - Include `SET QUOTED_IDENTIFIER ON`.
 - Keep Python behaviour aligned to the SQL contract.

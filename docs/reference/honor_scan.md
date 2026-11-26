@@ -94,7 +94,7 @@ When changing this pipeline, cover:
 
 ## Operational Notes
 
-- SQL table/view names must be validated against `C:\K98-bot-SQL-Server`.
+- SQL table/view names must be validated against the [pinned SQL repository](../../AGENTS.md#sql-validation-source).
 - Keep parsing and database work out of the Discord event loop.
 - Preserve user-safe upload error messages in `upload_routes/honor_route.py`.
 - Keep generic audit writes best-effort; Honor imports must not fail solely because audit writes

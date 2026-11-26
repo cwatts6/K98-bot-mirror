@@ -30,9 +30,7 @@ When documents conflict, follow the priority chain in the execution guidelines.
 | `cwatts6/K98-bot` | Private production bot repository | Python |
 | `cwatts6/K98-bot-SQL-Server` | Authoritative SQL Server schema, views, procedures, functions | T-SQL |
 
-Local SQL source-of-truth path:
-
-`C:\K98-bot-SQL-Server`
+Use an authorised checkout of `cwatts6/K98-bot-SQL-Server` at the SQL commit pinned in the task. `C:\K98-bot-SQL-Server` is one local example.
 
 For SQL-facing work, validate against the SQL repo before implementation. Do not infer table,
 column, procedure, view, index, `ProcConfig`, staging, or output-table contracts purely from
@@ -58,7 +56,7 @@ root is the application root. There is no `bot/` wrapper directory.
 | Operational scripts | `scripts/` | Diagnostics, validation, tooling |
 | Tests | `tests/` | `pytest` suite |
 | Embedded Python-side SQL | `sql/` when justified | Prefer DAL/repository modules for query execution |
-| SQL schema objects | SQL repo `sql_schema/<schema>.<Object>.<Type>.sql` | Authoritative database contract |
+| SQL schema changes | SQL repo `migrations/` | Reviewed deployable changes, with expected object snapshots in `sql_schema/` |
 | Documentation | `docs/` | Standards, references, runbooks, task support |
 | Runtime config | `config/` | JSON and related config files |
 
@@ -139,11 +137,9 @@ Repository code should avoid Discord concerns and presentation logic.
 
 ## 5. SQL Standards
 
-SQL schema changes belong in the SQL repo using:
+Implement intentional SQL changes in reviewed SQL-repository migrations. Update the matching `sql_schema/<schema>.<ObjectName>.<Type>.sql` expected-state snapshot where applicable. Record the migration IDs and hashes, compatible Bot revision, validation against the intended engine and database, deployment order and recovery route. The SQL repository’s [migration instructions](https://github.com/cwatts6/K98-bot-SQL-Server/blob/main/migrations/README.md) govern authoring. Pin the applicable SQL commit in the task record.
 
-`sql_schema/<schema>.<ObjectName>.<Type>.sql`
-
-Examples:
+Example snapshot names:
 
 - `dbo.MGE_Events.Table.sql`
 - `dbo.usp_CommandUsage_Snapshot.StoredProcedure.sql`

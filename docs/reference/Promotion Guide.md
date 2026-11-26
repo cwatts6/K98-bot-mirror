@@ -197,6 +197,19 @@ bind any reviewed replacement to the **now-installed** updater manifest and use
 a fresh continuation directory. Do not replay the original upgrade or infer that
 deployment ran from an observation file alone.
 
+## Private merge and mirror scrub
+
+| Stage | Responsible party and completion evidence |
+|---|---|
+| Open the private PR | With approved repository access, automation branches from current private main, applies the reviewed mirror file delta, preserves private-only files and records both bases and heads. |
+| Make the private PR merge-ready | Automation handles in-scope corrections and review feedback, checks patch equivalence, required reviews, final-head CI and unresolved threads. Report readiness on the exact private head and leave the merge decision open. |
+| Merge private source | The decision owner chooses the private PR head, actor and timing after the pre-merge checkpoint below. Record the resulting private-main SHA and reconcile the mirror scrub. |
+| Promote and deploy to production | The human release owner separately approves an exact private-main build, paired SQL state, operator, window, stop conditions and recovery route. Record deployed identity and subsequent workflow observations. |
+
+**Before private merge.** A private merge triggers a scrub of the Bot mirror. The scrub currently closes open mirror PRs, including unmerged work. Enumerate all open mirror PRs across all pages and active unpublished candidates. For each, preserve its owner, base/head, reviewed delta, outstanding comments and CI, linked receipts and intended disposition. Retain a verified, access-controlled Git bundle or equivalent recoverable source outside the mutable mirror refs. Immediately before merge recheck the list and head SHAs. Hold and reconcile any addition, changed head or missing recovery copy.
+
+**After the scrub.** Record the private merge SHA and refreshed mirror main. Recheck every saved PR's merged flag and compare the preserved file changes against refreshed source. Record included, still needed, partly superseded or retired by owner. Link any continuation PR and rerun checks affected by the new base. Retain the original decision and failure receipts. A closed PR can contain outstanding work. Private merge and scrub reconciliation can complete while production continues to run its previous release.
+
 ## Step 1 — Validate and prepare both PRs
 
 **Where:** Codex on the development PC. Skip if both PRs are already merged.
@@ -239,8 +252,8 @@ not be represented as an installed capability check.
 
 **Where:** GitHub, then normal PowerShell on the **development PC only**.
 
-1. Merge the mirror PR into `K98-bot-mirror/main`.
-2. Merge the private PR into `K98-bot/main`.
+1. Follow the approved mirror review/merge disposition and retain the reviewed source.
+2. When the private merge decision covers the exact head, complete the [pre-merge custody and post-scrub reconciliation](#private-merge-and-mirror-scrub) around the merge into `K98-bot/main`.
 3. If the development PC is not already updated, paste:
 
 ```powershell
@@ -265,6 +278,8 @@ git rev-parse production/main
 **Expected:** clean local main and the refreshed private-main SHA. Mirror/private hashes may differ because their Git histories differ. Do not rerun branch promotion after merging to deploy the same delta.
 
 ## Step 3 — Run the fixed updater on MINI_AMD
+
+Begin this production step only after the separate human production promotion decision names the release, SQL pairing, operator, window and recovery route.
 
 **Implementation status:** the installed updater completed its first release.
 Ownership/index corrections have passed local review and the elevated custody
@@ -431,7 +446,7 @@ Run `/ops graceful_restart` once in Discord. It restarts the **installed** relea
 ## Repository and validation rules
 
 - `origin` is the scrubbed mirror; `production` is private `K98-bot`. Never push mirror history to production.
-- Deploy only an exact reviewed private-main commit. Review SQL-facing contracts against `C:\K98-bot-SQL-Server`.
+- Deploy only an exact reviewed private-main commit. Review SQL-facing contracts against the task’s pinned `cwatts6/K98-bot-SQL-Server` checkout.
 - Use the K98 review, test-selection, SQL-validation, security-routing and promotion-check skills as applicable. Preserve exact diff review and test evidence.
 - Run or justify architecture, deferred-item, test-selection, security-routing, smoke-import, registration, lint and appropriate pytest/log-hygiene checks before promotion. Runtime changes require appropriate focused/full validation; deployment is not the place to auto-format source.
 - Never discover and execute all pending migration files. Include only required reviewed migration IDs and retain successful receipts.

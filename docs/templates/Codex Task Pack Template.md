@@ -14,7 +14,9 @@ Do not use archived templates as active guidance.
 - Date: `<YYYY-MM-DD>`
 - Owner/context: `<requester, issue, PR, incident, or source>`
 - Task type: `<feature | bug fix | refactor | deferred optimisation batch | docs | tooling>`
-- One-pass approved: `<yes | no>`
+- Task authority: `<review only | approved implementation | approved one-pass>`
+- Source and policy pins: `<Bot base/head, SQL commit and migration IDs, observed installed state, project handoff/revision and evidence cutoff>`
+- Permitted DEV effects: `<profile, real actor, operation, target, fixture owner, read/write limits, independent readback and stop conditions>`
 
 ## 2. Required Reading
 
@@ -31,9 +33,7 @@ applicable nested `SECURITY.md` files when present, and the `k98-security-review
 Then follow the required reading order and conditional references defined by
 `docs/reference/README.md`. Do not add every reference document to a task pack by default.
 
-For SQL-facing work, validate schema, procedure, view, index, and `ProcConfig` details against:
-
-`C:\K98-bot-SQL-Server`
+For SQL-facing work, validate schema, procedure, view, index and `ProcConfig` details against an authorised checkout of `cwatts6/K98-bot-SQL-Server` at the SQL commit pinned in the task. `C:\K98-bot-SQL-Server` is one local example.
 
 ## 3. Objective
 
@@ -125,19 +125,19 @@ Routing rules:
 
 ## 8. Mandatory Workflow
 
-Default workflow:
+For an unapproved task, bring the owner the scope, design and plan for decision. For approved implementation, use that decision and the verified commissioned profiles throughout the following steps.
 
-1. Audit / scope review, then stop for approval.
+1. Audit the task scope, source pins and permitted effects.
 2. Use `k98-security-review-routing` to record the provisional security decision and exact target;
    do not start a standard or deep scan merely because the routing skill was selected.
-3. Architecture validation, then stop for approval.
-4. Implementation plan, then stop for approval.
+3. Validate architecture, SQL contracts and recovery assumptions.
+4. Confirm that the implementation plan fits the approved boundary. Escalate uncovered effects.
 5. Implementation after approval.
 6. Validation and final review.
 7. Execute or confirm the selected security outcome against the final change. For a Changes review,
    verify the intended base/head and `Deep: Off`; for a skip, record the precise evidence-based reason.
 
-Proceed in one pass only when the user explicitly approves it.
+For an approved DEV task, complete the ordinary deploy, diagnose, correct, restart and retest loop within the enrolled profile. Link original failures and any continuation.
 
 ## 9. Audit Requirements
 
@@ -174,7 +174,7 @@ Map the likely:
 | Shared helpers | `core/` or existing helper modules |
 | Operational tooling | `scripts/` |
 | Documentation | `docs/` |
-| SQL schema | SQL repo `sql_schema/<schema>.<Object>.<Type>.sql` |
+| SQL schema | Reviewed SQL repo migration plus the expected `sql_schema/` snapshot where applicable |
 | Tests | `tests/` |
 
 ## 11. Likely Files
@@ -279,6 +279,20 @@ consider:
 Before PR handoff, complete the Security Review Decision table and retain the resulting evidence.
 For a routine change requiring review, use the diff-focused Changes workflow against the final
 base/head with `Deep: Off`. For a skip, record the files inspected and the precise reason.
+
+### Evidence manifest
+
+Copy one record per meaningful attempt. Use a short entry for a documentation-only change. Record an inapplicable field or a skip with its reason.
+
+| Field | Record |
+|---|---|
+| Requirement and attempt | Task, case, attempt ID, parent/retry ID, UTC start/end, owner and status (passed, failed, held, skipped or untested). |
+| Source and environment | Bot base/head and delivered package hash, SQL commit and installed ledger/objects, policy and dependency versions, actual actor and DEV target. |
+| Expected and observed | Fixture digest, expected outcome, actual independent readback, file/SQL/provider effects, drain or timeout, and original receipt reference/hash. |
+| Recovery and decision | Commit or unknown-outcome disposition, retained owner, continuation, retest, limits, deferred owner/trigger and scoped acceptance. |
+| Source delivery | Mirror and private PRs, bases/heads, file equivalence, CI and reviews, private PR opened and merge-ready states. |
+| Private merge | Independent decision, authorising owner, exact head and resulting SHA, pre-merge mirror inventory/custody, post-scrub dispositions and continuation links. |
+| Production | Separate human decision, exact private release and SQL pairing, deployment order, rollback/restore/roll-forward, operator, deployment receipt and observed production outcome. |
 
 ## 15. Acceptance Criteria
 
