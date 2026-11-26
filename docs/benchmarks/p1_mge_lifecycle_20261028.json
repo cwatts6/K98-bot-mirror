@@ -1,0 +1,411 @@
+{
+  "signup_before": {
+    "fixture": "real simplified signup callback; simulated blocking service",
+    "samples": 20,
+    "simulated_service_ms": 50.0,
+    "median": {
+      "ack_ms": 50.30725000005987,
+      "total_ms": 50.321749999966414,
+      "max_loop_lag_ms": 49.38630000012745,
+      "mutations": 1.0,
+      "replies": 1.0,
+      "refreshes": 1.0
+    },
+    "p95": {
+      "ack_ms": 50.62980000002426,
+      "total_ms": 50.65290000038658,
+      "max_loop_lag_ms": 49.85850000023129,
+      "mutations": 1,
+      "replies": 1,
+      "refreshes": 1
+    },
+    "observations": [
+      {
+        "ack_ms": 50.4798000001756,
+        "total_ms": 50.516500000412634,
+        "max_loop_lag_ms": 49.646900000174355,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.16140000043379,
+        "total_ms": 50.17680000037217,
+        "max_loop_lag_ms": 49.2544000000853,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.17920000000231,
+        "total_ms": 50.19529999981387,
+        "max_loop_lag_ms": 49.27669999981299,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 51.221499999883235,
+        "total_ms": 51.23729999968418,
+        "max_loop_lag_ms": 50.31049999999959,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.23639999990337,
+        "total_ms": 50.25489999979982,
+        "max_loop_lag_ms": 49.33400000002075,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.311599999986356,
+        "total_ms": 50.328499999977794,
+        "max_loop_lag_ms": 49.39790000000721,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.31660000031479,
+        "total_ms": 50.33159999993586,
+        "max_loop_lag_ms": 49.39699999997538,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.26660000021366,
+        "total_ms": 50.28040000024703,
+        "max_loop_lag_ms": 49.349699999969744,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.14209999990271,
+        "total_ms": 50.154099999872415,
+        "max_loop_lag_ms": 49.2145999998902,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.33659999980955,
+        "total_ms": 50.349199999800476,
+        "max_loop_lag_ms": 49.41080000000875,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.24779999985185,
+        "total_ms": 50.26069999985339,
+        "max_loop_lag_ms": 49.321100000019214,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.5235000000539,
+        "total_ms": 50.535800000034214,
+        "max_loop_lag_ms": 49.59669999991456,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.21790000000692,
+        "total_ms": 50.2292999999554,
+        "max_loop_lag_ms": 49.289900000279886,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.381600000037,
+        "total_ms": 50.40540000027249,
+        "max_loop_lag_ms": 49.50780000010491,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.41029999983948,
+        "total_ms": 50.422299999809184,
+        "max_loop_lag_ms": 49.48540000007051,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.30290000013338,
+        "total_ms": 50.314999999955035,
+        "max_loop_lag_ms": 49.37560000027952,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.232900000082736,
+        "total_ms": 50.25060000025405,
+        "max_loop_lag_ms": 49.33500000035929,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.62980000002426,
+        "total_ms": 50.65290000038658,
+        "max_loop_lag_ms": 49.85850000023129,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.212999999985186,
+        "total_ms": 50.225700000282814,
+        "max_loop_lag_ms": 49.31209999970088,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 50.31970000027286,
+        "total_ms": 50.34300000033909,
+        "max_loop_lag_ms": 49.44210000005478,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      }
+    ],
+    "source_revision": "50c5e1a4a60a0438dca788298047f7d6dfb66e39",
+    "source_hashes": {
+      "ui/views/mge_simplified_signup_form_view.py": "d51c88084aee6b6b7ff3ceea5c3183f2a51ec58e766434dea4b4e6d36b183dfd",
+      "mge/mge_embed_manager.py": "13020faa512cd2c7f75485499b3b09e978ecf54f6353a29a7e92ca7afbcc82fa"
+    }
+  },
+  "signup_after": {
+    "fixture": "real simplified signup callback; simulated blocking service",
+    "samples": 20,
+    "simulated_service_ms": 50.0,
+    "median": {
+      "ack_ms": 0.01944999985425966,
+      "total_ms": 51.08250000012049,
+      "max_loop_lag_ms": 15.892649999817877,
+      "mutations": 1.0,
+      "replies": 1.0,
+      "refreshes": 1.0
+    },
+    "p95": {
+      "ack_ms": 0.025599999844416743,
+      "total_ms": 51.46000000013373,
+      "max_loop_lag_ms": 16.418299999917508,
+      "mutations": 1,
+      "replies": 1,
+      "refreshes": 1
+    },
+    "observations": [
+      {
+        "ack_ms": 0.025599999844416743,
+        "total_ms": 69.008599999961,
+        "max_loop_lag_ms": 16.418299999917508,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.03300000025774352,
+        "total_ms": 51.41030000004321,
+        "max_loop_lag_ms": 16.180699999698845,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.020400000266818097,
+        "total_ms": 51.06440000008661,
+        "max_loop_lag_ms": 15.574499999933323,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.019099999917671084,
+        "total_ms": 51.25259999977061,
+        "max_loop_lag_ms": 16.030800000156887,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.019800000245595584,
+        "total_ms": 51.12760000019989,
+        "max_loop_lag_ms": 16.040799999904266,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.019999999949504854,
+        "total_ms": 50.84529999976439,
+        "max_loop_lag_ms": 15.970799999853625,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.02009999980145949,
+        "total_ms": 50.945299999966664,
+        "max_loop_lag_ms": 16.075799999929586,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.02120000044669723,
+        "total_ms": 50.84460000034596,
+        "max_loop_lag_ms": 15.944299999977375,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.018600000203150557,
+        "total_ms": 51.05090000006385,
+        "max_loop_lag_ms": 15.63009999992937,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.01849999989644857,
+        "total_ms": 51.40290000008463,
+        "max_loop_lag_ms": 15.729899999972986,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.019999999949504854,
+        "total_ms": 51.26379999956043,
+        "max_loop_lag_ms": 14.775200000007317,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.02500000027794158,
+        "total_ms": 51.10060000015437,
+        "max_loop_lag_ms": 15.84099999965838,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.01919999976962572,
+        "total_ms": 50.872100000106,
+        "max_loop_lag_ms": 15.24179999998887,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.019699999938893598,
+        "total_ms": 51.114099999722384,
+        "max_loop_lag_ms": 15.005300000415446,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.01880000036180718,
+        "total_ms": 51.03159999998752,
+        "max_loop_lag_ms": 16.00510000000577,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.019099999917671084,
+        "total_ms": 50.74759999979506,
+        "max_loop_lag_ms": 16.591100000117876,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.018199999885837315,
+        "total_ms": 51.44799999970928,
+        "max_loop_lag_ms": 15.590100000030361,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.01810000003388268,
+        "total_ms": 50.94499999995605,
+        "max_loop_lag_ms": 16.02320000003965,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.01880000036180718,
+        "total_ms": 50.70049999994808,
+        "max_loop_lag_ms": 15.286399999899004,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      },
+      {
+        "ack_ms": 0.018400000044493936,
+        "total_ms": 51.46000000013373,
+        "max_loop_lag_ms": 15.517900000053487,
+        "mutations": 1,
+        "replies": 1,
+        "refreshes": 1
+      }
+    ],
+    "source_revision": "50c5e1a4a60a0438dca788298047f7d6dfb66e39",
+    "source_hashes": {
+      "ui/views/mge_simplified_signup_form_view.py": "4b918e9a9b40e9bf8af90e9d2dda7b18f1611ea9b215aa886a3c45235031d6a7",
+      "mge/mge_embed_manager.py": "7ce9e4bb622d1438a638463dd16a0dca8e38bc3b5d4ad2a42b005f5a046629f8"
+    }
+  },
+  "refresh_before": {
+    "fixture": "real board sync; simulated SQL and Discord; same-turn burst",
+    "requests": 20,
+    "simulated_pass_io_ms": 50.0,
+    "elapsed_ms": 556.3065999999708,
+    "event_reads": 20,
+    "roster_reads": 20,
+    "edits": 20,
+    "id_writes": 20,
+    "source_revision": "50c5e1a4a60a0438dca788298047f7d6dfb66e39",
+    "source_hashes": {
+      "ui/views/mge_simplified_signup_form_view.py": "d51c88084aee6b6b7ff3ceea5c3183f2a51ec58e766434dea4b4e6d36b183dfd",
+      "mge/mge_embed_manager.py": "13020faa512cd2c7f75485499b3b09e978ecf54f6353a29a7e92ca7afbcc82fa"
+    }
+  },
+  "refresh_after": {
+    "fixture": "real board sync; simulated SQL and Discord; same-turn burst",
+    "requests": 20,
+    "simulated_pass_io_ms": 50.0,
+    "elapsed_ms": 81.6224999998667,
+    "event_reads": 1,
+    "roster_reads": 1,
+    "edits": 1,
+    "id_writes": 1,
+    "source_revision": "50c5e1a4a60a0438dca788298047f7d6dfb66e39",
+    "source_hashes": {
+      "ui/views/mge_simplified_signup_form_view.py": "4b918e9a9b40e9bf8af90e9d2dda7b18f1611ea9b215aa886a3c45235031d6a7",
+      "mge/mge_embed_manager.py": "7ce9e4bb622d1438a638463dd16a0dca8e38bc3b5d4ad2a42b005f5a046629f8"
+    }
+  },
+  "method": "Offline real callback/board paths with simulated 50ms IO; 20 samples or same-turn requests. Windows scheduling. Not production or native SQL results.",
+  "baseline": "50c5e1a4a60a0438dca788298047f7d6dfb66e39",
+  "after_source_checkpoint": "9d3ef829cd61ea50877b1e251a444d8d5947124f"
+}

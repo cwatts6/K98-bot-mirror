@@ -1,0 +1,1407 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
+import json
+import logging
+from typing import Any
+
+from file_utils import cursor_row_to_dict, fetch_one_dict, run_blocking_in_thread
+from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
+from voting.models import (
+    VoteCastResult,
+    VoteCloseResult,
+    VoteCreateRequest,
+    VoteLookupChoice,
+    VoteOption,
+    VoteReminder,
+    VoteSnapshot,
+    VoteVoterAuditRow,
+)
+from voting.option_emojis import (
+    OPTION_EMOJI_MIGRATION_MESSAGE,
+    OptionEmoji,
+    option_emoji_from_row,
+    option_emoji_sql_values,
+)
+from voting.result_visibility import normalize_result_visibility
+from voting.vote_modes import (
+    VOTE_MODE_MULTI_SELECT,
+    normalize_vote_mode,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _naive_utc(value: datetime) -> datetime:
+    aware = value.astimezone(UTC) if value.tzinfo else value.replace(tzinfo=UTC)
+    return aware.replace(tzinfo=None)
+
+
+def _aware_utc(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    if isinstance(value, str):
+        text = value.strip().replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+    return None
+
+
+def _bool(value: Any) -> bool:
+    return bool(int(value or 0))
+
+
+def _option_key(index: int) -> str:
+    return f"opt{index + 1}"
+
+
+def _reminder_due_at(closes_at_utc: datetime, offset_minutes: int) -> datetime:
+    return closes_at_utc - timedelta(minutes=int(offset_minutes))
+
+
+def _rows_to_options(rows: Sequence[dict[str, Any]]) -> tuple[VoteOption, ...]:
+    return tuple(
+        VoteOption(
+            option_id=int(row["OptionID"]),
+            vote_post_id=int(row["VotePostID"]),
+            option_key=str(row.get("OptionKey") or ""),
+            label=str(row.get("Label") or ""),
+            sort_order=int(row.get("SortOrder") or 0),
+            button_style=row.get("ButtonStyle"),
+            vote_count=int(row.get("VoteCount") or 0),
+            emoji=option_emoji_from_row(row),
+        )
+        for row in rows
+    )
+
+
+async def _vote_option_emoji_columns_exist() -> bool:
+    row = await run_one_async("""
+        SELECT COL_LENGTH(N'dbo.VotePostOptions', N'EmojiKind') AS EmojiKindColumn;
+        """)
+    return bool(row and row.get("EmojiKindColumn") not in (None, ""))
+
+
+def _vote_option_emoji_columns_exist_sync(cur) -> bool:
+    cur.execute("""
+        SELECT COL_LENGTH(N'dbo.VotePostOptions', N'EmojiKind') AS EmojiKindColumn;
+        """)
+    row = fetch_one_dict(cur)
+    return bool(row and row.get("EmojiKindColumn") not in (None, ""))
+
+
+def _rows_to_reminders(rows: Sequence[dict[str, Any]]) -> tuple[VoteReminder, ...]:
+    reminders: list[VoteReminder] = []
+    for row in rows:
+        due_at = _aware_utc(row.get("DueAtUtc"))
+        if due_at is None:
+            continue
+        reminders.append(
+            VoteReminder(
+                reminder_id=int(row["ReminderID"]),
+                vote_post_id=int(row["VotePostID"]),
+                offset_minutes_before_close=int(row.get("OffsetMinutesBeforeClose") or 0),
+                due_at_utc=due_at,
+                sent_at_utc=_aware_utc(row.get("SentAtUtc")),
+                message_id=(
+                    int(row["MessageID"]) if row.get("MessageID") not in (None, "") else None
+                ),
+            )
+        )
+    return tuple(reminders)
+
+
+def _snapshot_from_rows(
+    post: dict[str, Any],
+    option_rows: Sequence[dict[str, Any]],
+    reminder_rows: Sequence[dict[str, Any]],
+) -> VoteSnapshot:
+    closes_at = _aware_utc(post.get("ClosesAtUtc"))
+    created_at = _aware_utc(post.get("CreatedAtUtc"))
+    updated_at = _aware_utc(post.get("UpdatedAtUtc"))
+    if closes_at is None or created_at is None or updated_at is None:
+        raise ValueError("VotePost row is missing required UTC timestamps.")
+    vote_mode = normalize_vote_mode(post.get("VoteMode"))
+    return VoteSnapshot(
+        vote_post_id=int(post["VotePostID"]),
+        guild_id=int(post["GuildID"]),
+        channel_id=int(post["ChannelID"]),
+        message_id=int(post["MessageID"]) if post.get("MessageID") not in (None, "") else None,
+        created_by_discord_user_id=int(post["CreatedByDiscordUserID"]),
+        title=str(post.get("Title") or ""),
+        description=post.get("Description"),
+        status=str(post.get("Status") or ""),
+        allow_vote_change=_bool(post.get("AllowVoteChange")),
+        launch_mention_everyone=_bool(post.get("LaunchMentionEveryone")),
+        reminder_mention_everyone=_bool(post.get("ReminderMentionEveryone")),
+        close_mention_everyone=_bool(post.get("CloseMentionEveryone")),
+        opens_at_utc=_aware_utc(post.get("OpensAtUtc")),
+        closes_at_utc=closes_at,
+        closed_at_utc=_aware_utc(post.get("ClosedAtUtc")),
+        closed_by_discord_user_id=(
+            int(post["ClosedByDiscordUserID"])
+            if post.get("ClosedByDiscordUserID") not in (None, "")
+            else None
+        ),
+        closed_reason=post.get("ClosedReason"),
+        background_asset_key=post.get("BackgroundAssetKey"),
+        total_votes=int(post.get("TotalVotes") or 0),
+        created_at_utc=created_at,
+        updated_at_utc=updated_at,
+        options=_rows_to_options(option_rows),
+        reminders=_rows_to_reminders(reminder_rows),
+        result_visibility=normalize_result_visibility(post.get("ResultVisibility")),
+        vote_mode=vote_mode,
+        min_selections=int(post.get("MinSelections") or 1),
+        max_selections=int(post.get("MaxSelections") or 1),
+        total_selections=int(post.get("TotalSelections") or post.get("TotalVotes") or 0),
+    )
+
+
+def _rows_to_voter_audit(rows: Sequence[dict[str, Any]]) -> tuple[VoteVoterAuditRow, ...]:
+    output: list[VoteVoterAuditRow] = []
+    for row in rows:
+        created_at = _aware_utc(row.get("VoteCreatedAtUtc"))
+        updated_at = _aware_utc(row.get("VoteUpdatedAtUtc"))
+        if created_at is None or updated_at is None:
+            raise ValueError("VotePostVotes row is missing required UTC timestamps.")
+        output.append(
+            VoteVoterAuditRow(
+                vote_post_id=int(row["VotePostID"]),
+                title=str(row.get("Title") or ""),
+                closed_at_utc=_aware_utc(row.get("ClosedAtUtc")),
+                discord_user_id=int(row["DiscordUserID"]),
+                option_id=int(row["OptionID"]),
+                option_key=str(row.get("OptionKey") or ""),
+                option_label=str(row.get("OptionLabel") or ""),
+                original_option_id=(
+                    int(row["OriginalOptionID"])
+                    if row.get("OriginalOptionID") not in (None, "")
+                    else None
+                ),
+                original_option_key=row.get("OriginalOptionKey"),
+                original_option_label=row.get("OriginalOptionLabel"),
+                vote_created_at_utc=created_at,
+                vote_updated_at_utc=updated_at,
+                selected_option_ids=(int(row["OptionID"]),),
+                selected_option_keys=(str(row.get("OptionKey") or ""),),
+                selected_option_labels=(str(row.get("OptionLabel") or ""),),
+                original_option_ids=(
+                    (int(row["OriginalOptionID"]),)
+                    if row.get("OriginalOptionID") not in (None, "")
+                    else ()
+                ),
+                original_option_keys=(
+                    (str(row.get("OriginalOptionKey") or ""),)
+                    if row.get("OriginalOptionKey") not in (None, "")
+                    else ()
+                ),
+                original_option_labels=(
+                    (str(row.get("OriginalOptionLabel") or ""),)
+                    if row.get("OriginalOptionLabel") not in (None, "")
+                    else ()
+                ),
+            )
+        )
+    return tuple(output)
+
+
+def _option_id_json(value: Any) -> tuple[int, ...]:
+    if value in (None, ""):
+        return ()
+    try:
+        parsed = json.loads(str(value))
+    except (TypeError, ValueError):
+        return ()
+    if not isinstance(parsed, list):
+        return ()
+    output: list[int] = []
+    for item in parsed:
+        try:
+            output.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return tuple(output)
+
+
+def _multi_select_audit_rows(
+    rows: Sequence[dict[str, Any]],
+    option_rows: Sequence[dict[str, Any]],
+) -> tuple[VoteVoterAuditRow, ...]:
+    options_by_id = {
+        int(row["OptionID"]): (
+            str(row.get("OptionKey") or ""),
+            str(row.get("Label") or ""),
+        )
+        for row in option_rows
+    }
+    grouped: dict[int, dict[str, Any]] = {}
+    for row in rows:
+        user_id = int(row["DiscordUserID"])
+        current = grouped.setdefault(
+            user_id,
+            {
+                "base": row,
+                "selected_ids": [],
+                "selected_keys": [],
+                "selected_labels": [],
+            },
+        )
+        if row.get("OptionID") in (None, ""):
+            continue
+        option_id = int(row["OptionID"])
+        current["selected_ids"].append(option_id)
+        current["selected_keys"].append(str(row.get("OptionKey") or ""))
+        current["selected_labels"].append(str(row.get("OptionLabel") or ""))
+
+    output: list[VoteVoterAuditRow] = []
+    for user_id, item in grouped.items():
+        row = item["base"]
+        created_at = _aware_utc(row.get("VoteCreatedAtUtc"))
+        updated_at = _aware_utc(row.get("VoteUpdatedAtUtc"))
+        if created_at is None or updated_at is None:
+            raise ValueError("VotePostMultiSelectVotes row is missing required UTC timestamps.")
+        original_ids = _option_id_json(row.get("OriginalOptionIDsJson"))
+        original_keys = tuple(
+            options_by_id.get(option_id, ("", ""))[0] for option_id in original_ids
+        )
+        original_labels = tuple(
+            options_by_id.get(option_id, ("", ""))[1] for option_id in original_ids
+        )
+        selected_ids = tuple(int(value) for value in item["selected_ids"])
+        selected_keys = tuple(str(value) for value in item["selected_keys"])
+        selected_labels = tuple(str(value) for value in item["selected_labels"])
+        first_option_id = selected_ids[0] if selected_ids else 0
+        first_original_id = original_ids[0] if original_ids else None
+        output.append(
+            VoteVoterAuditRow(
+                vote_post_id=int(row["VotePostID"]),
+                title=str(row.get("Title") or ""),
+                closed_at_utc=_aware_utc(row.get("ClosedAtUtc")),
+                discord_user_id=user_id,
+                option_id=first_option_id,
+                option_key=selected_keys[0] if selected_keys else "",
+                option_label=selected_labels[0] if selected_labels else "",
+                original_option_id=first_original_id,
+                original_option_key=original_keys[0] if original_keys else None,
+                original_option_label=original_labels[0] if original_labels else None,
+                vote_created_at_utc=created_at,
+                vote_updated_at_utc=updated_at,
+                selected_option_ids=selected_ids,
+                selected_option_keys=selected_keys,
+                selected_option_labels=selected_labels,
+                original_option_ids=original_ids,
+                original_option_keys=original_keys,
+                original_option_labels=original_labels,
+            )
+        )
+    return tuple(output)
+
+
+async def create_vote_post(req: VoteCreateRequest) -> int:
+    def _callback(cur) -> int:
+        now = _naive_utc(datetime.now(UTC))
+        cur.execute(
+            """
+            INSERT INTO dbo.VotePosts
+                (
+                    GuildID, ChannelID, CreatedByDiscordUserID, Title, Description, Status,
+                    AllowVoteChange, LaunchMentionEveryone, ReminderMentionEveryone,
+                    CloseMentionEveryone, OpensAtUtc, ClosesAtUtc, BackgroundAssetKey,
+                    ResultVisibility, VoteMode, MinSelections, MaxSelections,
+                    CreatedAtUtc, UpdatedAtUtc
+                )
+            OUTPUT INSERTED.VotePostID
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                int(req.guild_id),
+                int(req.channel_id),
+                int(req.created_by_discord_user_id),
+                req.title,
+                req.description,
+                "Open",
+                1 if req.allow_vote_change else 0,
+                1 if req.launch_mention_everyone else 0,
+                1 if req.reminder_mention_everyone else 0,
+                1 if req.close_mention_everyone else 0,
+                _naive_utc(req.opens_at_utc) if req.opens_at_utc else None,
+                _naive_utc(req.closes_at_utc),
+                req.background_asset_key,
+                normalize_result_visibility(req.result_visibility),
+                normalize_vote_mode(req.vote_mode),
+                int(req.min_selections),
+                int(req.max_selections),
+                now,
+                now,
+            ),
+        )
+        row = cur.fetchone()
+        vote_post_id = int(row[0]) if row else 0
+        for index, label in enumerate(req.options):
+            cur.execute(
+                """
+                INSERT INTO dbo.VotePostOptions
+                    (VotePostID, OptionKey, Label, SortOrder, CreatedAtUtc)
+                VALUES (?, ?, ?, ?, ?);
+                """,
+                (vote_post_id, _option_key(index), label, index + 1, now),
+            )
+        for offset in req.reminder_offsets_minutes:
+            due_at = _reminder_due_at(req.closes_at_utc, int(offset))
+            cur.execute(
+                """
+                INSERT INTO dbo.VotePostReminders
+                    (VotePostID, OffsetMinutesBeforeClose, DueAtUtc, CreatedAtUtc)
+                VALUES (?, ?, ?, ?);
+                """,
+                (vote_post_id, int(offset), _naive_utc(due_at), now),
+            )
+        cur.execute(
+            """
+            INSERT INTO dbo.VotePostAudit
+                (VotePostID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
+            VALUES (?, ?, 'Created', ?, ?);
+            """,
+            (
+                vote_post_id,
+                int(req.created_by_discord_user_id),
+                json.dumps(
+                    {
+                        "option_count": len(req.options),
+                        "result_visibility": normalize_result_visibility(req.result_visibility),
+                        "vote_mode": normalize_vote_mode(req.vote_mode),
+                        "min_selections": int(req.min_selections),
+                        "max_selections": int(req.max_selections),
+                    },
+                    ensure_ascii=False,
+                ),
+                now,
+            ),
+        )
+        return vote_post_id
+
+    vote_post_id = await run_blocking_in_thread(
+        _create_vote_post_sync, _callback, name="vote_create"
+    )
+    return int(vote_post_id or 0)
+
+
+def _create_vote_post_sync(callback) -> Any:
+    return exec_with_cursor(callback)
+
+
+async def update_vote_message(vote_post_id: int, *, channel_id: int, message_id: int) -> bool:
+    row = await run_one_async(
+        """
+        UPDATE dbo.VotePosts
+        SET ChannelID = ?,
+            MessageID = ?,
+            UpdatedAtUtc = SYSUTCDATETIME()
+        OUTPUT INSERTED.VotePostID
+        WHERE VotePostID = ?;
+        """,
+        (int(channel_id), int(message_id), int(vote_post_id)),
+    )
+    return bool(row)
+
+
+async def cancel_vote_launch_failure(
+    *,
+    vote_post_id: int,
+    actor_discord_user_id: int | None,
+    reason: str,
+    now_utc: datetime,
+) -> bool:
+    row = await run_one_async(
+        """
+        UPDATE dbo.VotePosts
+        SET Status = 'Cancelled',
+            ClosedAtUtc = ?,
+            ClosedByDiscordUserID = ?,
+            ClosedReason = ?,
+            UpdatedAtUtc = ?
+        OUTPUT INSERTED.VotePostID
+        WHERE VotePostID = ?
+          AND Status = 'Open'
+          AND MessageID IS NULL;
+        """,
+        (
+            _naive_utc(now_utc),
+            int(actor_discord_user_id) if actor_discord_user_id is not None else None,
+            reason,
+            _naive_utc(now_utc),
+            int(vote_post_id),
+        ),
+    )
+    if row:
+        await insert_audit(
+            vote_post_id=vote_post_id,
+            actor_discord_user_id=actor_discord_user_id,
+            action_type="LaunchFailed",
+            details={"reason": reason},
+            now_utc=now_utc,
+        )
+    return bool(row)
+
+
+async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
+    post = await run_one_async(
+        """
+        SELECT p.*,
+               CASE
+                   WHEN COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
+                       THEN (
+                           SELECT COUNT_BIG(1)
+                           FROM dbo.VotePostMultiSelectVotes mv
+                           WHERE mv.VotePostID = p.VotePostID
+                       )
+                   ELSE (
+                       SELECT COUNT_BIG(1)
+                       FROM dbo.VotePostVotes v
+                       WHERE v.VotePostID = p.VotePostID
+                   )
+               END AS TotalVotes,
+               CASE
+                   WHEN COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
+                       THEN (
+                           SELECT COUNT_BIG(1)
+                           FROM dbo.VotePostMultiSelectSelections ms
+                           WHERE ms.VotePostID = p.VotePostID
+                       )
+                   ELSE (
+                       SELECT COUNT_BIG(1)
+                       FROM dbo.VotePostVotes v
+                       WHERE v.VotePostID = p.VotePostID
+                   )
+               END AS TotalSelections
+        FROM dbo.VotePosts p
+        WHERE p.VotePostID = ?;
+        """,
+        (int(vote_post_id),),
+    )
+    if not post:
+        return None
+    emoji_columns_exist = await _vote_option_emoji_columns_exist()
+    emoji_select = (
+        "o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if emoji_columns_exist
+        else (
+            "CAST(NULL AS varchar(20)) AS EmojiKind, "
+            "CAST(NULL AS nvarchar(120)) AS EmojiText, "
+            "CAST(NULL AS nvarchar(64)) AS EmojiName, "
+            "CAST(NULL AS varchar(32)) AS EmojiID, "
+            "CAST(NULL AS bit) AS EmojiAnimated"
+        )
+    )
+    emoji_group_by = (
+        ", o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if emoji_columns_exist
+        else ""
+    )
+    options = await run_query_async(
+        f"""
+        SELECT o.OptionID, o.VotePostID, o.OptionKey, o.Label, o.SortOrder, o.ButtonStyle,
+               {emoji_select},
+               CASE
+                   WHEN COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
+                       THEN COUNT(ms.DiscordUserID)
+                   ELSE COUNT(v.DiscordUserID)
+               END AS VoteCount
+        FROM dbo.VotePostOptions o
+        JOIN dbo.VotePosts p ON p.VotePostID = o.VotePostID
+        LEFT JOIN dbo.VotePostVotes v
+          ON v.VotePostID = o.VotePostID
+         AND v.OptionID = o.OptionID
+         AND COALESCE(p.VoteMode, 'OneChoice') <> 'MultiSelect'
+        LEFT JOIN dbo.VotePostMultiSelectSelections ms
+          ON ms.VotePostID = o.VotePostID
+         AND ms.OptionID = o.OptionID
+         AND COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
+        WHERE o.VotePostID = ?
+        GROUP BY o.OptionID, o.VotePostID, o.OptionKey, o.Label, o.SortOrder, o.ButtonStyle,
+                 p.VoteMode{emoji_group_by}
+        ORDER BY o.SortOrder ASC, o.OptionID ASC;
+        """,
+        (int(vote_post_id),),
+    )
+    reminders = await run_query_async(
+        """
+        SELECT ReminderID, VotePostID, OffsetMinutesBeforeClose, DueAtUtc, SentAtUtc, MessageID
+        FROM dbo.VotePostReminders
+        WHERE VotePostID = ?
+        ORDER BY DueAtUtc ASC, ReminderID ASC;
+        """,
+        (int(vote_post_id),),
+    )
+    return _snapshot_from_rows(post, options, reminders)
+
+
+async def update_vote_option_emoji(
+    *,
+    vote_post_id: int,
+    option_id: int,
+    emoji: OptionEmoji | None,
+    actor_discord_user_id: int,
+) -> VoteSnapshot:
+    emoji_kind, emoji_text, emoji_name, emoji_id, emoji_animated = option_emoji_sql_values(emoji)
+
+    def _callback(cur) -> str:
+        if not _vote_option_emoji_columns_exist_sync(cur):
+            return "missing_migration"
+        cur.execute(
+            """
+            SELECT VotePostID, Status
+            FROM dbo.VotePosts WITH (UPDLOCK, HOLDLOCK)
+            WHERE VotePostID = ?;
+            """,
+            (int(vote_post_id),),
+        )
+        post = fetch_one_dict(cur)
+        if not post or str(post.get("Status")) != "Open":
+            return "not_open"
+        cur.execute(
+            """
+            UPDATE dbo.VotePostOptions
+            SET EmojiKind = ?,
+                EmojiText = ?,
+                EmojiName = ?,
+                EmojiID = ?,
+                EmojiAnimated = ?
+            OUTPUT INSERTED.OptionID
+            WHERE VotePostID = ? AND OptionID = ?;
+            """,
+            (
+                emoji_kind,
+                emoji_text,
+                emoji_name,
+                emoji_id,
+                emoji_animated,
+                int(vote_post_id),
+                int(option_id),
+            ),
+        )
+        updated = cur.fetchone() is not None
+        if not updated:
+            return "missing_option"
+        cur.execute(
+            """
+            UPDATE dbo.VotePosts
+            SET UpdatedAtUtc = SYSUTCDATETIME()
+            WHERE VotePostID = ?;
+            """,
+            (int(vote_post_id),),
+        )
+        cur.execute(
+            """
+            INSERT INTO dbo.VotePostAudit
+                (VotePostID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
+            VALUES (?, ?, 'OptionEmojiUpdated', ?, SYSUTCDATETIME());
+            """,
+            (
+                int(vote_post_id),
+                int(actor_discord_user_id),
+                json.dumps(
+                    {
+                        "option_id": int(option_id),
+                        "emoji_kind": emoji_kind,
+                        "emoji_name": emoji_name,
+                        "emoji_id": emoji_id,
+                        "cleared": emoji is None,
+                    },
+                    ensure_ascii=False,
+                ),
+            ),
+        )
+        return "updated"
+
+    result = await run_blocking_in_thread(
+        _create_vote_post_sync, _callback, name="vote_option_emoji_update"
+    )
+    if result == "missing_migration":
+        raise ValueError(OPTION_EMOJI_MIGRATION_MESSAGE)
+    if result == "not_open":
+        raise ValueError("Vote was not found or is already closed.")
+    if result != "updated":
+        raise ValueError("Vote option was not found.")
+    snapshot = await get_vote_snapshot(vote_post_id)
+    if snapshot is None:
+        raise ValueError("Vote could not be reloaded after option emoji update.")
+    return snapshot
+
+
+async def get_multi_select_selection_ids(
+    *, vote_post_id: int, discord_user_id: int
+) -> tuple[int, ...]:
+    rows = await run_query_async(
+        """
+        SELECT OptionID
+        FROM dbo.VotePostMultiSelectSelections
+        WHERE VotePostID = ?
+          AND DiscordUserID = ?
+        ORDER BY OptionID ASC;
+        """,
+        (int(vote_post_id), int(discord_user_id)),
+    )
+    return tuple(int(row["OptionID"]) for row in rows)
+
+
+async def list_open_vote_posts() -> list[VoteSnapshot]:
+    rows = await run_query_async("""
+        SELECT p.*,
+               (SELECT COUNT_BIG(1) FROM dbo.VotePostVotes v WHERE v.VotePostID = p.VotePostID) AS TotalVotes
+        FROM dbo.VotePosts p
+        WHERE p.Status = 'Open'
+          AND p.MessageID IS NOT NULL
+        ORDER BY p.ClosesAtUtc ASC, p.VotePostID ASC;
+        """)
+    snapshots: list[VoteSnapshot] = []
+    for row in rows:
+        snapshot = await get_vote_snapshot(int(row["VotePostID"]))
+        if snapshot:
+            snapshots.append(snapshot)
+    return snapshots
+
+
+async def search_vote_posts(query: str | None = None, *, limit: int = 25) -> list[VoteLookupChoice]:
+    text = (query or "").strip()
+    like = f"%{text}%"
+    vote_id = int(text) if text.isdigit() else None
+    rows = await run_query_async(
+        """
+        SELECT TOP (?) VotePostID, Title, Status, ChannelID, ClosesAtUtc, ClosedAtUtc
+        FROM dbo.VotePosts
+        WHERE MessageID IS NOT NULL
+          AND (
+              ? = ''
+              OR Title LIKE ?
+              OR VotePostID = ?
+          )
+        ORDER BY
+          CASE WHEN Status = 'Open' THEN 0 ELSE 1 END,
+          CASE WHEN Status = 'Open' THEN ClosesAtUtc END ASC,
+          UpdatedAtUtc DESC,
+          VotePostID DESC;
+        """,
+        (int(max(1, min(limit, 25))), text, like, vote_id),
+    )
+    choices: list[VoteLookupChoice] = []
+    for row in rows:
+        closes_at = _aware_utc(row.get("ClosesAtUtc"))
+        if closes_at is None:
+            continue
+        choices.append(
+            VoteLookupChoice(
+                vote_post_id=int(row["VotePostID"]),
+                title=str(row.get("Title") or ""),
+                status=str(row.get("Status") or ""),
+                channel_id=int(row.get("ChannelID") or 0),
+                closes_at_utc=closes_at,
+                closed_at_utc=_aware_utc(row.get("ClosedAtUtc")),
+            )
+        )
+    return choices
+
+
+async def search_closed_vote_posts(
+    query: str | None = None, *, limit: int = 25
+) -> list[VoteLookupChoice]:
+    text = (query or "").strip()
+    like = f"%{text}%"
+    vote_id = int(text) if text.isdigit() else None
+    rows = await run_query_async(
+        """
+        SELECT TOP (?) VotePostID, Title, Status, ChannelID, ClosesAtUtc, ClosedAtUtc
+        FROM dbo.VotePosts
+        WHERE MessageID IS NOT NULL
+          AND Status = 'Closed'
+          AND (
+              ? = ''
+              OR Title LIKE ?
+              OR VotePostID = ?
+          )
+        ORDER BY ClosedAtUtc DESC, UpdatedAtUtc DESC, VotePostID DESC;
+        """,
+        (int(max(1, min(limit, 25))), text, like, vote_id),
+    )
+    choices: list[VoteLookupChoice] = []
+    for row in rows:
+        closes_at = _aware_utc(row.get("ClosesAtUtc"))
+        if closes_at is None:
+            continue
+        choices.append(
+            VoteLookupChoice(
+                vote_post_id=int(row["VotePostID"]),
+                title=str(row.get("Title") or ""),
+                status=str(row.get("Status") or ""),
+                channel_id=int(row.get("ChannelID") or 0),
+                closes_at_utc=closes_at,
+                closed_at_utc=_aware_utc(row.get("ClosedAtUtc")),
+            )
+        )
+    return choices
+
+
+async def list_vote_voter_audit_rows(vote_post_id: int) -> tuple[VoteVoterAuditRow, ...]:
+    mode_row = await run_one_async(
+        "SELECT VoteMode FROM dbo.VotePosts WHERE VotePostID = ?;",
+        (int(vote_post_id),),
+    )
+    if mode_row and normalize_vote_mode(mode_row.get("VoteMode")) == VOTE_MODE_MULTI_SELECT:
+        rows = await run_query_async(
+            """
+            SELECT p.VotePostID,
+                   p.Title,
+                   p.ClosedAtUtc,
+                   mv.DiscordUserID,
+                   mv.OriginalOptionIDsJson,
+                   mv.CreatedAtUtc AS VoteCreatedAtUtc,
+                   mv.UpdatedAtUtc AS VoteUpdatedAtUtc,
+                   s.OptionID,
+                   o.OptionKey,
+                   o.Label AS OptionLabel
+            FROM dbo.VotePostMultiSelectVotes mv
+            JOIN dbo.VotePosts p ON p.VotePostID = mv.VotePostID
+            LEFT JOIN dbo.VotePostMultiSelectSelections s
+              ON s.VotePostID = mv.VotePostID
+             AND s.DiscordUserID = mv.DiscordUserID
+            LEFT JOIN dbo.VotePostOptions o
+              ON o.VotePostID = s.VotePostID
+             AND o.OptionID = s.OptionID
+            WHERE mv.VotePostID = ?
+            ORDER BY mv.UpdatedAtUtc ASC, mv.DiscordUserID ASC, o.SortOrder ASC, o.OptionID ASC;
+            """,
+            (int(vote_post_id),),
+        )
+        option_rows = await run_query_async(
+            """
+            SELECT OptionID, OptionKey, Label
+            FROM dbo.VotePostOptions
+            WHERE VotePostID = ?;
+            """,
+            (int(vote_post_id),),
+        )
+        return _multi_select_audit_rows(rows, option_rows)
+
+    rows = await run_query_async(
+        """
+        SELECT p.VotePostID,
+               p.Title,
+               p.ClosedAtUtc,
+               v.DiscordUserID,
+               v.OptionID,
+               o.OptionKey,
+               o.Label AS OptionLabel,
+               v.OriginalOptionID,
+               original.OptionKey AS OriginalOptionKey,
+               original.Label AS OriginalOptionLabel,
+               v.CreatedAtUtc AS VoteCreatedAtUtc,
+               v.UpdatedAtUtc AS VoteUpdatedAtUtc
+        FROM dbo.VotePostVotes v
+        JOIN dbo.VotePosts p ON p.VotePostID = v.VotePostID
+        JOIN dbo.VotePostOptions o
+          ON o.VotePostID = v.VotePostID
+         AND o.OptionID = v.OptionID
+        LEFT JOIN dbo.VotePostOptions original
+          ON original.VotePostID = v.VotePostID
+         AND original.OptionID = v.OriginalOptionID
+        WHERE v.VotePostID = ?
+        ORDER BY v.UpdatedAtUtc ASC, v.DiscordUserID ASC;
+        """,
+        (int(vote_post_id),),
+    )
+    return _rows_to_voter_audit(rows)
+
+
+async def cast_vote(
+    *,
+    vote_post_id: int,
+    option_id: int,
+    discord_user_id: int,
+    now_utc: datetime,
+) -> VoteCastResult:
+    def _callback(cur) -> VoteCastResult:
+        now = _naive_utc(now_utc)
+        cur.execute(
+            """
+            SELECT VotePostID, Status, AllowVoteChange, ClosesAtUtc, VoteMode
+            FROM dbo.VotePosts WITH (UPDLOCK, HOLDLOCK)
+            WHERE VotePostID = ?;
+            """,
+            (int(vote_post_id),),
+        )
+        post = fetch_one_dict(cur)
+        if not post:
+            return VoteCastResult("missing", vote_post_id, message="This vote no longer exists.")
+        closes_at = _aware_utc(post.get("ClosesAtUtc"))
+        if str(post.get("Status")) != "Open" or (closes_at is not None and now_utc >= closes_at):
+            return VoteCastResult("closed", vote_post_id, message="This vote is already closed.")
+        if normalize_vote_mode(post.get("VoteMode")) == VOTE_MODE_MULTI_SELECT:
+            return VoteCastResult(
+                "wrong_mode",
+                vote_post_id,
+                message="Use the multi-select panel for this vote.",
+            )
+
+        cur.execute(
+            """
+            SELECT OptionID
+            FROM dbo.VotePostOptions
+            WHERE VotePostID = ? AND OptionID = ?;
+            """,
+            (int(vote_post_id), int(option_id)),
+        )
+        if cur.fetchone() is None:
+            return VoteCastResult(
+                "invalid_option", vote_post_id, message="That option is not valid."
+            )
+
+        cur.execute(
+            """
+            SELECT OptionID
+            FROM dbo.VotePostVotes WITH (UPDLOCK, HOLDLOCK)
+            WHERE VotePostID = ? AND DiscordUserID = ?;
+            """,
+            (int(vote_post_id), int(discord_user_id)),
+        )
+        row = cur.fetchone()
+        previous_option_id = int(row[0]) if row else None
+        if previous_option_id == int(option_id):
+            return VoteCastResult(
+                "unchanged",
+                vote_post_id,
+                option_id=int(option_id),
+                previous_option_id=previous_option_id,
+                message="Your vote was already recorded for this option.",
+            )
+        if previous_option_id is not None and not _bool(post.get("AllowVoteChange")):
+            return VoteCastResult(
+                "change_blocked",
+                vote_post_id,
+                option_id=previous_option_id,
+                previous_option_id=previous_option_id,
+                message="You have already voted and changes are not enabled for this vote.",
+            )
+        if previous_option_id is None:
+            cur.execute(
+                """
+                INSERT INTO dbo.VotePostVotes
+                    (VotePostID, DiscordUserID, OptionID, OriginalOptionID, CreatedAtUtc, UpdatedAtUtc)
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (int(vote_post_id), int(discord_user_id), int(option_id), int(option_id), now, now),
+            )
+            action = "VoteRecorded"
+            status = "recorded"
+            message = "Vote recorded."
+        else:
+            cur.execute(
+                """
+                UPDATE dbo.VotePostVotes
+                SET OptionID = ?,
+                    UpdatedAtUtc = ?
+                WHERE VotePostID = ? AND DiscordUserID = ?;
+                """,
+                (int(option_id), now, int(vote_post_id), int(discord_user_id)),
+            )
+            action = "VoteChanged"
+            status = "changed"
+            message = "Vote updated."
+
+        cur.execute(
+            """
+            INSERT INTO dbo.VotePostAudit
+                (VotePostID, ActorDiscordUserID, ActionType, OptionID, PreviousOptionID, CreatedAtUtc)
+            VALUES (?, ?, ?, ?, ?, ?);
+            """,
+            (
+                int(vote_post_id),
+                int(discord_user_id),
+                action,
+                int(option_id),
+                previous_option_id,
+                now,
+            ),
+        )
+        return VoteCastResult(
+            status,
+            vote_post_id,
+            option_id=int(option_id),
+            previous_option_id=previous_option_id,
+            message=message,
+        )
+
+    result = await run_blocking_in_thread(_cast_vote_sync, _callback, name="vote_cast")
+    if isinstance(result, VoteCastResult):
+        return result
+    return VoteCastResult("error", vote_post_id, message="Vote could not be recorded.")
+
+
+def _cast_vote_sync(callback) -> Any:
+    return exec_with_cursor(callback)
+
+
+async def cast_multi_select_vote(
+    *,
+    vote_post_id: int,
+    option_ids: tuple[int, ...],
+    discord_user_id: int,
+    now_utc: datetime,
+) -> VoteCastResult:
+    def _callback(cur) -> VoteCastResult:
+        now = _naive_utc(now_utc)
+        normalized_option_ids = tuple(int(option_id) for option_id in option_ids)
+        if not normalized_option_ids:
+            return VoteCastResult(
+                "invalid_selection",
+                vote_post_id,
+                message="Choose at least one option.",
+            )
+        if len(set(normalized_option_ids)) != len(normalized_option_ids):
+            return VoteCastResult(
+                "invalid_selection",
+                vote_post_id,
+                message="Choose each option only once.",
+            )
+
+        cur.execute(
+            """
+            SELECT VotePostID, Status, AllowVoteChange, ClosesAtUtc,
+                   VoteMode, MinSelections, MaxSelections
+            FROM dbo.VotePosts WITH (UPDLOCK, HOLDLOCK)
+            WHERE VotePostID = ?;
+            """,
+            (int(vote_post_id),),
+        )
+        post = fetch_one_dict(cur)
+        if not post:
+            return VoteCastResult("missing", vote_post_id, message="This vote no longer exists.")
+        closes_at = _aware_utc(post.get("ClosesAtUtc"))
+        if str(post.get("Status")) != "Open" or (closes_at is not None and now_utc >= closes_at):
+            return VoteCastResult("closed", vote_post_id, message="This vote is already closed.")
+        if normalize_vote_mode(post.get("VoteMode")) != VOTE_MODE_MULTI_SELECT:
+            return VoteCastResult(
+                "wrong_mode",
+                vote_post_id,
+                message="Use the vote buttons for this vote.",
+            )
+
+        min_selections = int(post.get("MinSelections") or 1)
+        max_selections = int(post.get("MaxSelections") or 1)
+        selection_count = len(normalized_option_ids)
+        if selection_count < min_selections:
+            return VoteCastResult(
+                "invalid_selection",
+                vote_post_id,
+                message=f"Choose at least {min_selections} option{'s' if min_selections != 1 else ''}.",
+            )
+        if selection_count > max_selections:
+            return VoteCastResult(
+                "invalid_selection",
+                vote_post_id,
+                message=f"Choose at most {max_selections} options.",
+            )
+
+        placeholders = ", ".join("?" for _ in normalized_option_ids)
+        cur.execute(
+            f"""
+            SELECT OptionID
+            FROM dbo.VotePostOptions
+            WHERE VotePostID = ? AND OptionID IN ({placeholders});
+            """,
+            (int(vote_post_id), *normalized_option_ids),
+        )
+        valid_option_ids = {int(row[0]) for row in cur.fetchall()}
+        if valid_option_ids != set(normalized_option_ids):
+            return VoteCastResult(
+                "invalid_option",
+                vote_post_id,
+                message="One or more selected options are not valid.",
+            )
+
+        cur.execute(
+            """
+            SELECT DiscordUserID, OriginalOptionIDsJson
+            FROM dbo.VotePostMultiSelectVotes WITH (UPDLOCK, HOLDLOCK)
+            WHERE VotePostID = ? AND DiscordUserID = ?;
+            """,
+            (int(vote_post_id), int(discord_user_id)),
+        )
+        ballot = fetch_one_dict(cur)
+        cur.execute(
+            """
+            SELECT OptionID
+            FROM dbo.VotePostMultiSelectSelections WITH (UPDLOCK, HOLDLOCK)
+            WHERE VotePostID = ? AND DiscordUserID = ?
+            ORDER BY OptionID ASC;
+            """,
+            (int(vote_post_id), int(discord_user_id)),
+        )
+        previous_option_ids = tuple(int(row[0]) for row in cur.fetchall())
+        selected_option_ids = tuple(sorted(normalized_option_ids))
+
+        if previous_option_ids == selected_option_ids:
+            return VoteCastResult(
+                "unchanged",
+                vote_post_id,
+                selected_option_ids=selected_option_ids,
+                previous_option_ids=previous_option_ids,
+                message="Your selections were already recorded.",
+            )
+        if ballot is not None and not _bool(post.get("AllowVoteChange")):
+            return VoteCastResult(
+                "change_blocked",
+                vote_post_id,
+                selected_option_ids=previous_option_ids,
+                previous_option_ids=previous_option_ids,
+                message="You have already voted and changes are not enabled for this vote.",
+            )
+
+        if ballot is None:
+            cur.execute(
+                """
+                INSERT INTO dbo.VotePostMultiSelectVotes
+                    (
+                        VotePostID, DiscordUserID, OriginalOptionIDsJson,
+                        CreatedAtUtc, UpdatedAtUtc
+                    )
+                VALUES (?, ?, ?, ?, ?);
+                """,
+                (
+                    int(vote_post_id),
+                    int(discord_user_id),
+                    json.dumps(list(selected_option_ids)),
+                    now,
+                    now,
+                ),
+            )
+            action = "MultiSelectVoteRecorded"
+            status = "recorded"
+            message = "Selections recorded."
+        else:
+            cur.execute(
+                """
+                UPDATE dbo.VotePostMultiSelectVotes
+                SET UpdatedAtUtc = ?
+                WHERE VotePostID = ? AND DiscordUserID = ?;
+                """,
+                (now, int(vote_post_id), int(discord_user_id)),
+            )
+            action = "MultiSelectVoteChanged"
+            status = "changed"
+            message = "Selections updated."
+
+        cur.execute(
+            """
+            DELETE FROM dbo.VotePostMultiSelectSelections
+            WHERE VotePostID = ? AND DiscordUserID = ?;
+            """,
+            (int(vote_post_id), int(discord_user_id)),
+        )
+        for option_id in selected_option_ids:
+            cur.execute(
+                """
+                INSERT INTO dbo.VotePostMultiSelectSelections
+                    (VotePostID, DiscordUserID, OptionID, CreatedAtUtc)
+                VALUES (?, ?, ?, ?);
+                """,
+                (int(vote_post_id), int(discord_user_id), int(option_id), now),
+            )
+
+        cur.execute(
+            """
+            INSERT INTO dbo.VotePostAudit
+                (VotePostID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
+            VALUES (?, ?, ?, ?, ?);
+            """,
+            (
+                int(vote_post_id),
+                int(discord_user_id),
+                action,
+                json.dumps(
+                    {
+                        "option_ids": list(selected_option_ids),
+                        "previous_option_ids": list(previous_option_ids),
+                    },
+                    ensure_ascii=False,
+                ),
+                now,
+            ),
+        )
+        return VoteCastResult(
+            status,
+            vote_post_id,
+            selected_option_ids=selected_option_ids,
+            previous_option_ids=previous_option_ids,
+            message=message,
+        )
+
+    result = await run_blocking_in_thread(
+        _cast_multi_select_vote_sync, _callback, name="vote_multi_select_cast"
+    )
+    if isinstance(result, VoteCastResult):
+        return result
+    return VoteCastResult("error", vote_post_id, message="Vote could not be recorded.")
+
+
+def _cast_multi_select_vote_sync(callback) -> Any:
+    return exec_with_cursor(callback)
+
+
+async def update_vote_post(
+    *,
+    vote_post_id: int,
+    actor_discord_user_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    closes_at_utc: datetime | None = None,
+    reminder_offsets_minutes: tuple[int, ...] | None = None,
+    reminder_mention_everyone: bool | None = None,
+    close_mention_everyone: bool | None = None,
+) -> bool:
+    def _callback(cur) -> bool:
+        now = _naive_utc(datetime.now(UTC))
+        cur.execute(
+            """
+            SELECT VotePostID, Status
+            FROM dbo.VotePosts WITH (UPDLOCK, HOLDLOCK)
+            WHERE VotePostID = ?;
+            """,
+            (int(vote_post_id),),
+        )
+        post = fetch_one_dict(cur)
+        if not post or str(post.get("Status")) != "Open":
+            return False
+        if title is not None:
+            cur.execute(
+                "UPDATE dbo.VotePosts SET Title = ?, UpdatedAtUtc = ? WHERE VotePostID = ?;",
+                (title, now, int(vote_post_id)),
+            )
+        if description is not None:
+            cur.execute(
+                "UPDATE dbo.VotePosts SET Description = ?, UpdatedAtUtc = ? WHERE VotePostID = ?;",
+                (description, now, int(vote_post_id)),
+            )
+        if closes_at_utc is not None:
+            cur.execute(
+                "UPDATE dbo.VotePosts SET ClosesAtUtc = ?, UpdatedAtUtc = ? WHERE VotePostID = ?;",
+                (_naive_utc(closes_at_utc), now, int(vote_post_id)),
+            )
+        if reminder_mention_everyone is not None:
+            cur.execute(
+                """
+                UPDATE dbo.VotePosts
+                SET ReminderMentionEveryone = ?, UpdatedAtUtc = ?
+                WHERE VotePostID = ?;
+                """,
+                (1 if reminder_mention_everyone else 0, now, int(vote_post_id)),
+            )
+        if close_mention_everyone is not None:
+            cur.execute(
+                """
+                UPDATE dbo.VotePosts
+                SET CloseMentionEveryone = ?, UpdatedAtUtc = ?
+                WHERE VotePostID = ?;
+                """,
+                (1 if close_mention_everyone else 0, now, int(vote_post_id)),
+            )
+        if reminder_offsets_minutes is not None:
+            cur.execute(
+                """
+                DELETE FROM dbo.VotePostReminders
+                WHERE VotePostID = ? AND SentAtUtc IS NULL;
+                """,
+                (int(vote_post_id),),
+            )
+            close_for_due = closes_at_utc
+            if close_for_due is None:
+                cur.execute(
+                    "SELECT ClosesAtUtc FROM dbo.VotePosts WHERE VotePostID = ?;",
+                    (int(vote_post_id),),
+                )
+                row = cur.fetchone()
+                close_for_due = _aware_utc(row[0]) if row else None
+            if close_for_due is not None:
+                for offset in reminder_offsets_minutes:
+                    cur.execute(
+                        """
+                        INSERT INTO dbo.VotePostReminders
+                            (VotePostID, OffsetMinutesBeforeClose, DueAtUtc, CreatedAtUtc)
+                        VALUES (?, ?, ?, ?);
+                        """,
+                        (
+                            int(vote_post_id),
+                            int(offset),
+                            _naive_utc(_reminder_due_at(close_for_due, int(offset))),
+                            now,
+                        ),
+                    )
+        cur.execute(
+            """
+            INSERT INTO dbo.VotePostAudit
+                (VotePostID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
+            VALUES (?, ?, 'Updated', ?, ?);
+            """,
+            (
+                int(vote_post_id),
+                int(actor_discord_user_id),
+                json.dumps(
+                    {
+                        "title": title is not None,
+                        "description": description is not None,
+                        "closes_at": closes_at_utc is not None,
+                        "reminders": reminder_offsets_minutes is not None,
+                    }
+                ),
+                now,
+            ),
+        )
+        return True
+
+    result = await run_blocking_in_thread(_update_vote_post_sync, _callback, name="vote_update")
+    return bool(result)
+
+
+def _update_vote_post_sync(callback) -> Any:
+    return exec_with_cursor(callback)
+
+
+async def claim_due_reminders(now_utc: datetime, *, limit: int = 10) -> list[dict[str, Any]]:
+    def _callback(cur) -> list[dict[str, Any]]:
+        now = _naive_utc(now_utc)
+        cur.execute(
+            """
+            ;WITH due AS (
+                SELECT TOP (?) r.ReminderID
+                FROM dbo.VotePostReminders r WITH (UPDLOCK, READPAST)
+                JOIN dbo.VotePosts p ON p.VotePostID = r.VotePostID
+                WHERE p.Status = 'Open'
+                  AND p.ClosesAtUtc > ?
+                  AND r.SentAtUtc IS NULL
+                  AND r.DueAtUtc <= ?
+                  AND (r.ClaimedAtUtc IS NULL OR r.ClaimedAtUtc < DATEADD(minute, -30, ?))
+                ORDER BY r.DueAtUtc ASC, r.ReminderID ASC
+            )
+            UPDATE r
+            SET ClaimedAtUtc = ?
+            OUTPUT INSERTED.ReminderID, INSERTED.VotePostID
+            FROM dbo.VotePostReminders r
+            JOIN due ON due.ReminderID = r.ReminderID;
+            """,
+            (int(limit), now, now, now, now),
+        )
+        return [cursor_row_to_dict(cur, row) for row in cur.fetchall()]
+
+    rows = await run_blocking_in_thread(
+        _claim_due_reminders_sync, _callback, name="vote_claim_reminders"
+    )
+    return list(rows or [])
+
+
+def _claim_due_reminders_sync(callback) -> Any:
+    return exec_with_cursor(callback)
+
+
+async def mark_reminder_sent(reminder_id: int, *, message_id: int, now_utc: datetime) -> bool:
+    row = await run_one_async(
+        """
+        UPDATE dbo.VotePostReminders
+        SET SentAtUtc = ?,
+            MessageID = ?
+        OUTPUT INSERTED.ReminderID
+        WHERE ReminderID = ? AND SentAtUtc IS NULL;
+        """,
+        (_naive_utc(now_utc), int(message_id), int(reminder_id)),
+    )
+    return bool(row)
+
+
+async def list_due_closes(now_utc: datetime, *, limit: int = 10) -> list[int]:
+    rows = await run_query_async(
+        """
+        SELECT TOP (?) VotePostID
+        FROM dbo.VotePosts
+        WHERE Status = 'Open'
+          AND ClosesAtUtc <= ?
+        ORDER BY ClosesAtUtc ASC, VotePostID ASC;
+        """,
+        (int(limit), _naive_utc(now_utc)),
+    )
+    return [int(row["VotePostID"]) for row in rows]
+
+
+async def close_vote(
+    *,
+    vote_post_id: int,
+    actor_discord_user_id: int | None,
+    reason: str,
+    now_utc: datetime,
+) -> VoteCloseResult:
+    row = await run_one_async(
+        """
+        UPDATE dbo.VotePosts
+        SET Status = 'Closed',
+            ClosedAtUtc = ?,
+            ClosedByDiscordUserID = ?,
+            ClosedReason = ?,
+            UpdatedAtUtc = ?
+        OUTPUT INSERTED.VotePostID
+        WHERE VotePostID = ?
+          AND Status = 'Open';
+        """,
+        (
+            _naive_utc(now_utc),
+            int(actor_discord_user_id) if actor_discord_user_id is not None else None,
+            reason,
+            _naive_utc(now_utc),
+            int(vote_post_id),
+        ),
+    )
+    if row:
+        await insert_audit(
+            vote_post_id=vote_post_id,
+            actor_discord_user_id=actor_discord_user_id,
+            action_type="ClosedEarly" if actor_discord_user_id else "ClosedAutomatically",
+            details={"reason": reason},
+            now_utc=now_utc,
+        )
+        return VoteCloseResult("closed", vote_post_id, "Vote closed.")
+    snapshot = await get_vote_snapshot(vote_post_id)
+    if snapshot and snapshot.status == "Closed":
+        return VoteCloseResult("already_closed", vote_post_id, "Vote is already closed.")
+    return VoteCloseResult("missing", vote_post_id, "Vote was not found.")
+
+
+async def insert_audit(
+    *,
+    vote_post_id: int,
+    actor_discord_user_id: int | None,
+    action_type: str,
+    details: dict[str, Any] | None = None,
+    option_id: int | None = None,
+    previous_option_id: int | None = None,
+    now_utc: datetime | None = None,
+) -> None:
+    await run_one_async(
+        """
+        INSERT INTO dbo.VotePostAudit
+            (VotePostID, ActorDiscordUserID, ActionType, OptionID, PreviousOptionID, DetailsJson, CreatedAtUtc)
+        OUTPUT INSERTED.AuditID
+        VALUES (?, ?, ?, ?, ?, ?, ?);
+        """,
+        (
+            int(vote_post_id),
+            int(actor_discord_user_id) if actor_discord_user_id is not None else None,
+            action_type,
+            int(option_id) if option_id is not None else None,
+            int(previous_option_id) if previous_option_id is not None else None,
+            json.dumps(details, ensure_ascii=False) if details else None,
+            _naive_utc(now_utc or datetime.now(UTC)),
+        ),
+    )
