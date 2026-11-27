@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime
 import logging
 
@@ -298,15 +300,25 @@ async def test_prekvk_route_refresh_failure_preserves_audit_batch_with_error_det
 
 
 @pytest.mark.asyncio
-async def test_prekvk_route_duplicate_skip_preserves_embed_without_refresh_side_effects():
+@pytest.mark.parametrize(
+    ("note", "outcome_metadata"),
+    [
+        ("Duplicate file skipped (hash match).", {}),
+        ("Already imported.", {"business_outcome": "duplicate"}),
+    ],
+)
+async def test_prekvk_route_duplicate_skip_preserves_embed_without_refresh_side_effects(
+    note, outcome_metadata
+):
     audit_events = []
     deps, sent, offloads, created, stats = _deps(
         audit_events=audit_events,
         offload_result=(
             True,
-            "Duplicate file skipped (hash match).",
+            note,
             0,
             {
+                **outcome_metadata,
                 "status": "duplicate",
                 "phase": "db_dedupe_check",
                 "kvk_no": 15,
@@ -326,7 +338,7 @@ async def test_prekvk_route_duplicate_skip_preserves_embed_without_refresh_side_
     _ch, title, fields, color, _mention = sent[-1]
     assert title == "Pre-KVK Snapshot Skipped"
     assert fields["Rows"] == "0"
-    assert fields["Note"] == "Duplicate file skipped (hash match)."
+    assert fields["Note"] == note
     assert color == 0xF1C40F
     assert audit_events[-1][0] == "complete"
     assert audit_events[-1][2]["status"] == "duplicate"
@@ -444,3 +456,92 @@ async def test_delivery_result_logged_without_changing_import_completion(caplog)
         assert await route.handle_prekvk_upload(_message(), deps) is True
     assert "correlation=upload-receipt" in caplog.text and "outcome=unknown" in caplog.text
     assert audit_events[-1][2]["status"] == "completed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "result",
+    [
+        (
+            True,
+            "Imported 2 rows.",
+            2,
+            {"status": "accepted", "business_outcome": "outcome_unconfirmed"},
+        ),
+        (
+            True,
+            "Duplicate file skipped (hash match).",
+            0,
+            {"status": "duplicate", "business_outcome": "committed"},
+        ),
+        (True, "Imported.", 2, {"status": "accepted", "rows_written": 0}),
+        (True, "Imported.", 2, {"status": "accepted", "business_outcome": None}),
+        (True, "Imported.", 2, {}),
+        (True, "Imported.", 2, None),
+        (True, "Incomplete"),
+        (True, "Already imported.", 0),
+        (False, "SQL connection lost.", 0),
+        (False, "Failed.", 0, {"status": "failed"}),
+    ],
+)
+async def test_unconfirmed_result_holds_followups_and_terminal_audit(result):
+    audit = []
+    deps, sent, _, backups, refreshes = _deps(audit_events=audit, offload_result=result)
+    assert await route.handle_prekvk_upload(_message(), deps)
+    assert not backups and not refreshes
+    assert sent[-1][1].startswith("Import outcome unconfirmed")
+    assert audit[-1][0] == "phase"
+    assert audit[-1][2]["details"]["business_outcome"] == "outcome_unconfirmed"
+    assert not any(event[0] in ("complete", "fail") for event in audit)
+
+
+@pytest.mark.parametrize(
+    ("result", "business"),
+    [
+        ((True, "Imported 2 rows as scan 9.", 2), "committed"),
+        ((True, "Duplicate file skipped (unique constraint).", 0), "duplicate"),
+        ((True, "Already imported.", 0, {"status": "duplicate"}), "duplicate"),
+        (
+            (False, "Integrity error", 0, {"status": "failed", "business_outcome": "rejected"}),
+            "failed_confirmed",
+        ),
+        (
+            (
+                True,
+                "Previous duplicate file skipped.",
+                2,
+                {"status": "accepted", "business_outcome": "committed"},
+            ),
+            "committed",
+        ),
+    ],
+)
+def test_supported_importer_result_shapes(result, business):
+    assert route._import_business_outcome(result) == business
+
+
+@pytest.mark.asyncio
+async def test_cancelling_upload_waits_for_importer_without_requesting_followups():
+    entered, release, finished = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def importer(*args, **kwargs):
+        entered.set()
+        await release.wait()
+        finished.set()
+        return True, "Imported.", 2, {"status": "accepted", "business_outcome": "committed"}
+
+    deps, _, _, backups, refreshes = _deps()
+    task = asyncio.create_task(
+        route.handle_prekvk_upload(_message(), replace(deps, offload_callable=importer))
+    )
+    await asyncio.wait_for(entered.wait(), 2)
+    task.cancel()
+    await asyncio.sleep(0)
+    try:
+        assert not task.done()
+    finally:
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 2)
+    assert finished.is_set()
+    assert not backups and not refreshes
