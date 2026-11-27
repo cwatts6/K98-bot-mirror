@@ -97,10 +97,72 @@ async def _refresh_stats_embed(deps: PreKvkRouteDeps):
     return await stats_refresh(deps.bot, ts, True, is_test=False)
 
 
-def _metadata_dict(result: Any) -> dict[str, Any]:
-    if isinstance(result, tuple) and len(result) >= 4 and isinstance(result[3], dict):
-        return result[3]
-    return {}
+def _import_business_outcome(result: tuple) -> str:
+    """Classify an importer response before recording success or requesting follow-ups."""
+    if not isinstance(result, tuple) or len(result) not in (3, 4):
+        raise ValueError("Unexpected Pre-KVK importer result shape.")
+    ok, note, rows = result[:3]
+    if type(ok) is not bool or not isinstance(note, str) or type(rows) is not int or rows < 0:
+        raise ValueError("Invalid Pre-KVK importer result fields.")
+
+    if len(result) == 3:
+        # Older callers have no structured disposition. Recognise known importer responses.
+        if (
+            ok
+            and rows == 0
+            and note
+            in (
+                "Duplicate file skipped (hash match).",
+                "Duplicate file skipped (unique constraint).",
+            )
+        ):
+            return "duplicate"
+        if (
+            ok
+            and rows > 0
+            and not any(word in note.lower() for word in ("duplicate", "unconfirmed"))
+        ):
+            return "committed"
+        if (
+            not ok
+            and rows == 0
+            and note.startswith(
+                (
+                    "Duplicate GovernorID(s) detected in file:",
+                    "Missing required column(s):",
+                    "Non-numeric value(s) in ",
+                    "No valid governor rows after cleaning.",
+                    "Unable to read workbook.",
+                    "No sheets found in workbook",
+                )
+            )
+        ):
+            return "failed_confirmed"
+        return "outcome_unconfirmed"
+
+    metadata = result[3]
+    if not isinstance(metadata, dict):
+        return "outcome_unconfirmed"
+    if "rows_written" in metadata and (
+        type(metadata["rows_written"]) is not int or metadata["rows_written"] != rows
+    ):
+        return "outcome_unconfirmed"
+
+    status = metadata.get("status")
+    if ok and status == "accepted":
+        expected = "committed"
+    elif ok and status == "duplicate" and rows == 0:
+        expected = "duplicate"
+    elif not ok and status in ("rejected", "failed") and rows == 0:
+        expected = "rejected"
+    else:
+        return "outcome_unconfirmed"
+
+    # A legacy "failed" status cannot distinguish rejection from a lost commit reply.
+    fallback = None if status == "failed" else expected
+    if metadata.get("business_outcome", fallback) != expected:
+        return "outcome_unconfirmed"
+    return "failed_confirmed" if expected == "rejected" else expected
 
 
 def _metadata_int(metadata: dict[str, Any], key: str) -> int | None:
@@ -342,18 +404,9 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                 meta={"filename": target.filename, "kvk_no": detected_kvk_no},
             )
         )
-        ok, note, rows = result[0], result[1], result[2]
-        outcome = UploadOutcome(
-            (
-                ("duplicate" if "duplicate file skipped" in (note or "").lower() else "committed")
-                if ok
-                else "failed_confirmed"
-            ),
-            "settled",
-        )
-        metadata = _metadata_dict(result)
-        if metadata.get("business_outcome") == "outcome_unconfirmed":
-            outcome = UploadOutcome("outcome_unconfirmed", "settled")
+        outcome = UploadOutcome(_import_business_outcome(result), "settled")
+        _, note, rows = result[:3]
+        metadata = result[3] if len(result) == 4 and isinstance(result[3], dict) else {}
         external_batch_table, external_batch_id = _external_batch_from_metadata(metadata)
         rows_in_source = _metadata_int(metadata, "rows_in_source")
         rows_written = _metadata_int(metadata, "rows_written")
@@ -361,18 +414,19 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
         history_id = _metadata_int(metadata, "history_id")
         elapsed_ms = audit_duration_ms(import_started)
 
-        await _record_importer_audit_phases(
-            deps,
-            audit_ref,
-            audit_context,
-            metadata,
-            import_started=import_started,
-            elapsed_ms=elapsed_ms,
-            note=note,
-        )
+        if outcome.business != "outcome_unconfirmed":
+            await _record_importer_audit_phases(
+                deps,
+                audit_ref,
+                audit_context,
+                metadata,
+                import_started=import_started,
+                elapsed_ms=elapsed_ms,
+                note=note,
+            )
 
-        if ok:
-            duplicate_skip = "duplicate file skipped" in (note or "").lower()
+        if outcome.business in {"committed", "duplicate"}:
+            duplicate_skip = outcome.business == "duplicate"
             delivery = None
             refresh_error = None
             if not duplicate_skip:
@@ -480,6 +534,7 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
             )
 
         else:
+            counts_known = outcome.business == "failed_confirmed"
             rows_skipped = rows_in_source if rows_in_source is not None else rows
             await observe_upload_failure(
                 outcome,
@@ -489,9 +544,9 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                 error_type=_metadata_text(metadata, "error_type") or "PreKvkImportFailed",
                 error_text=note or "Unknown",
                 rows_in_source=rows_in_source,
-                rows_staged=0,
-                rows_written=0,
-                rows_skipped=rows_skipped,
+                rows_staged=0 if counts_known else None,
+                rows_written=0 if counts_known else None,
+                rows_skipped=rows_skipped if counts_known else None,
                 external_batch_table=external_batch_table,
                 external_batch_id=external_batch_id,
                 details=prekvk_audit_details(
