@@ -4,6 +4,8 @@
 
 # Startup Runbook
 
+**Dedicated DEV first start.** Follow the [delivery reading map](README.md#delivery-reading-map) to the current DEV-06 handoff. Check the offline readiness decision (Gate R) and the separate first-live approval (Gate L) for the exact candidate, identities and effects before using the startup sequence below. DEV-06 owns the hold and the limited integration and restart proof (Gate I).
+
 ## P01.3 candidate: passive health presentation — 4 November 2026
 
 This implementation is prepared locally; deployment is not established. After deployment,

@@ -394,6 +394,28 @@ the current file-backed model unless a new approved task explicitly changes the 
 3. Search telemetry for the relevant event, filename, `offload_id`, or `pid`.
 4. Inspect persisted state under `DATA_DIR`.
 5. Run focused smoke/test commands for the affected subsystem.
+## Pre-KVK workbook triage
+
+Use this section when a workbook upload stalls, appears twice, or reports a refresh error. The dispatch diagnostic below exercises message delivery on a separate path. Start with the original attempt and preserve its evidence before considering another upload.
+
+1. **Identify the attempt.** Record the message ID, uploader, channel, filename, UTC time, intended KVK and full SHA-256 of the original attachment bytes. The route checks the configured Pre-KVK channel and accepts `1198_prekvk.xlsx` or `PreKvK_Rankings_*.xlsx`. Record the actual notification destination, which can fall back to the source channel.
+2. **Locate the last completed step.** Check attachment read, SQL headroom, current KVK lookup, workbook parsing and SQL ingest in order. Preserve the original error. For a SQL access failure, verify the intended endpoint, database and effective worker identity through the authorised reader. Use the existing DEV profile and its permitted effects.
+3. **Check the committed business data.** Have the authorised reader look up `dbo.PreKvk_Scan` by `KVK_NO` and the full `FileHash`. Capture its `ScanID` and check the corresponding `dbo.PreKvk_Scores` rows by `KVK_NO` and `ScanID`, including governor IDs and expected values. For the proposed two-governor DEV fixture, expect one scan and two scores after either one or two identical submissions. Real workbook totals depend on the accepted input.
+4. **Correlate the attempt history.** Use the accepted batch reference `<KVK_NO>:<ScanID>` and the import history `HistoryID` where recorded. Inspect the parse, ingest and refresh audit phases individually. Duplicate or failed attempts can add history without adding scores. A missing audit entry alone leaves the business outcome unresolved.
+
+| Evidence | Operator action |
+| --- | --- |
+| Confirmed rejection before any business write | Record the cause and verify the worker has settled. Correct the input or route under the existing task authority before resubmission. |
+| The scan and expected scores exist | Preserve that import. Check the outcome of the log-backup job, stats refresh and Discord notification individually. Scheduling a job or sending an import message does not prove the other effects completed. |
+| Identical or concurrent submissions | Check for one scan and one set of scores. The current route uses the phrase `duplicate file skipped` in the importer note to suppress backup and refresh. If the wording or observed effects disagree, retain both attempts and flag the discrepancy. |
+| Lost commit acknowledgement, active worker, conflicting rows or unavailable independent readback | Hold resubmission. Give the Bot and SQL owners the original message, KVK, full hash, attempt IDs and observations. Resume only after they establish the business outcome and identify any remaining authorised follow-up. |
+
+Source references: [upload route](../../upload_routes/prekvk_route.py), [importer](../../prekvk_importer.py), [scan key](https://github.com/cwatts6/K98-bot-SQL-Server/blob/006456a1e855bb85d1ad69af426790ec01e9ef2d/sql_schema/dbo.PreKvk_Scan.Table.sql), [score key](https://github.com/cwatts6/K98-bot-SQL-Server/blob/006456a1e855bb85d1ad69af426790ec01e9ef2d/sql_schema/dbo.PreKvk_Scores.Table.sql) and [import history](https://github.com/cwatts6/K98-bot-SQL-Server/blob/006456a1e855bb85d1ad69af426790ec01e9ef2d/sql_schema/dbo.PreKvk_ImportHistory.Table.sql).
+
+## Stats fallback after SQL commit
+
+For a Stats fallback import with a pending CSV archive or partial reporting, retain the completed filename, digest, scan order and preparation ID. Open the [Recovery centre operator workflow](Recovery%20centre%20reports%20and%20evidence%20repair.md#operator-workflow) and consult the [SQL reporting continuation permission boundary](https://github.com/cwatts6/K98-bot-SQL-Server/blob/006456a1e855bb85d1ad69af426790ec01e9ef2d/docs/reporting-recovery-boundary.md). The guarded continuation verifies the committed input before reconciling the archive. Keep the original scan and use the authorised recovery path. The live-queue section above covers queued message state.
+
 ## Isolated Pre-KVK dispatch diagnostics (Phase 2H)
 
 Use `/prekvk dispatch_test destination:<channel> action:run` to allocate a session and

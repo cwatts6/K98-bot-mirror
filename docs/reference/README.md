@@ -498,6 +498,8 @@ Read the task brief, issue, or task pack before these documents when one exists.
 | Repo navigation | `runbook_structure.md` |
 | Helper or shared utility changes | `REVIEW_HELPERS.md` |
 | MGE work | `mge_reference_model.md` plus SQL repo validation |
+| Pre-KVK workbook upload, duplicate or missing refresh | [Pre-KVK workbook triage](runbook_diagnostics.md#pre-kvk-workbook-triage) |
+| Stats fallback committed with archive or reporting pending | [Stats fallback after SQL commit](runbook_diagnostics.md#stats-fallback-after-sql-commit) |
 | Honor ingestion | `honor_scan.md` |
 | Event reminders and calendar reminders | `events_and_dm_reminders.md` |
 | Weekly activity import | `weekly_activity_importer.md` |
